@@ -1,0 +1,240 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, test } from "vitest";
+
+import { byCodepoint } from "#/modules/export/render/bytes";
+import { fixtureMission } from "#/modules/export/render/fixture-mission";
+import { packagePreimage, sha256Hex } from "#/modules/export/render/manifest";
+import { render } from "#/modules/export/render/render";
+
+const GOLDEN = path.resolve("fixtures/golden/slice-1/.avel");
+
+/**
+ * The three files D5 blocks. GOLDEN-FIXTURE puts skills under
+ * `roster/<agent>/skills/`; DATA-CONTRACTS-V2 renders them to `.avel/skills/`
+ * and `.avel/capabilities/`. The content is settled, the path is not, and
+ * guessing would produce a package that looks complete and hashes wrong.
+ */
+const D5_BLOCKED = [
+	"roster/nemi/skills/playwright-gate.md",
+	"roster/transactions/skills/drizzle-migrate.md",
+	"roster/transactions/skills/nestjs-module.md",
+];
+
+function loadGolden(): Map<string, Uint8Array> {
+	const out = new Map<string, Uint8Array>();
+	const walk = (dir: string) => {
+		for (const entry of readdirSync(dir).sort(byCodepoint)) {
+			const full = path.join(dir, entry);
+			if (statSync(full).isDirectory()) walk(full);
+			else
+				out.set(
+					path.relative(GOLDEN, full).split(path.sep).join("/"),
+					new Uint8Array(readFileSync(full)),
+				);
+		}
+	};
+	walk(GOLDEN);
+	return out;
+}
+
+const golden = loadGolden();
+
+describe("render(mission)", () => {
+	test("the golden package is the 20 files the spec's tree declares", () => {
+		expect(golden.size).toBe(20);
+	});
+
+	test("renders every file D5 does not block, and no others", () => {
+		const expected = [...golden.keys()]
+			.filter((p) => !D5_BLOCKED.includes(p))
+			.sort(byCodepoint);
+		expect([...render(fixtureMission).keys()].sort(byCodepoint)).toEqual(
+			expected,
+		);
+	});
+
+	test("creates no evidence/ directory", () => {
+		expect(
+			[...render(fixtureMission).keys()].filter((p) =>
+				p.startsWith("evidence/"),
+			),
+		).toEqual([]);
+	});
+
+	/**
+	 * The byte-for-byte test the spec names. Compared as raw bytes with no
+	 * normalising step on either side — a comparison that trims or re-encodes
+	 * would pass on exactly the differences this is here to catch.
+	 */
+	test.each(
+		[...golden.keys()]
+			.filter((p) => !D5_BLOCKED.includes(p) && p !== "manifest.json")
+			.sort(byCodepoint),
+	)("%s renders byte-for-byte", (file) => {
+		expect(render(fixtureMission).get(file)).toEqual(golden.get(file));
+	});
+
+	/**
+	 * manifest.json CANNOT match while D5 is unruled, and this asserts the
+	 * shape of the difference rather than skipping it. Its `files` array hashes
+	 * every other file in the package, so three unrenderable paths make three
+	 * missing entries and a different package_sha256. Everything else in it is
+	 * expected to agree.
+	 */
+	test("manifest.json differs only by the three files D5 blocks", () => {
+		const mine = JSON.parse(
+			new TextDecoder().decode(render(fixtureMission).get("manifest.json")),
+		);
+		const theirs = JSON.parse(
+			new TextDecoder().decode(golden.get("manifest.json") as Uint8Array),
+		);
+
+		const minePaths = mine.files.map((f: { path: string }) => f.path);
+		const theirPaths = theirs.files.map((f: { path: string }) => f.path);
+		expect(theirPaths.filter((p: string) => !minePaths.includes(p))).toEqual(
+			D5_BLOCKED,
+		);
+
+		// Every file both sides render agrees on its hash.
+		for (const entry of mine.files as { path: string; sha256: string }[]) {
+			const match = (theirs.files as { path: string; sha256: string }[]).find(
+				(f) => f.path === entry.path,
+			);
+			expect(match?.sha256, entry.path).toBe(entry.sha256);
+		}
+
+		// Fields that do not depend on the blocked files agree exactly.
+		for (const key of [
+			"avel_version",
+			"cut",
+			"cut_source",
+			"mission_id",
+			"sprint",
+		]) {
+			expect(mine[key], key).toEqual(theirs[key]);
+		}
+		expect(mine.gate).toEqual(theirs.gate);
+
+		// And the package hash differs, because three files are missing from it.
+		expect(mine.package_sha256).not.toBe(theirs.package_sha256);
+	});
+
+	test("the package preimage is path + LF + hex + LF, concatenated", () => {
+		expect(
+			packagePreimage([
+				{ path: "b.md", sha256: "22" },
+				{ path: "a.md", sha256: "11" },
+			]),
+		).toBe("a.md\n11\nb.md\n22\n");
+	});
+
+	test("manifest.json is never listed inside itself", () => {
+		const mine = JSON.parse(
+			new TextDecoder().decode(render(fixtureMission).get("manifest.json")),
+		);
+		expect(mine.files.map((f: { path: string }) => f.path)).not.toContain(
+			"manifest.json",
+		);
+	});
+});
+
+/** A single hash over every rendered path and its bytes. */
+function packageDigest(files: ReadonlyMap<string, Uint8Array>): string {
+	const h = createHash("sha256");
+	for (const key of [...files.keys()].sort(byCodepoint)) {
+		h.update(key);
+		h.update("\n");
+		h.update(sha256Hex(files.get(key) as Uint8Array));
+		h.update("\n");
+	}
+	return h.digest("hex");
+}
+
+const CHILD = `
+import { render } from "#/modules/export/render/render";
+import { fixtureMission } from "#/modules/export/render/fixture-mission";
+import { localeProbeMission } from "#/modules/export/render/locale-probe";
+import { createHash } from "node:crypto";
+const mission = process.env.RENDER_CASE === "locale-probe" ? localeProbeMission : fixtureMission;
+const files = render(mission);
+const h = createHash("sha256");
+for (const key of [...files.keys()].sort()) {
+  h.update(key); h.update("\\n");
+  h.update(createHash("sha256").update(files.get(key)).digest("hex")); h.update("\\n");
+}
+process.stdout.write(h.digest("hex"));
+`;
+
+function renderInFreshProcess(env: NodeJS.ProcessEnv): string {
+	return execFileSync(
+		path.resolve("node_modules/.bin/tsx"),
+		["--eval", CHILD],
+		{ encoding: "utf8", env: { ...process.env, ...env } },
+	).trim();
+}
+
+describe("determinism", () => {
+	test("twice in one process", () => {
+		expect(packageDigest(render(fixtureMission))).toBe(
+			packageDigest(render(fixtureMission)),
+		);
+	});
+
+	test("twice in fresh processes", () => {
+		expect(renderInFreshProcess({})).toBe(renderInFreshProcess({}));
+	}, 60_000);
+
+	/**
+	 * The configuration that matters. Turkish lowercases I to a dotless ı, so
+	 * any sort reaching localeCompare orders paths differently here and the
+	 * package hash moves. Tokyo catches a date leaking into rendered bytes.
+	 */
+	test("under TZ=Asia/Tokyo LANG=tr_TR", () => {
+		expect(
+			renderInFreshProcess({
+				TZ: "Asia/Tokyo",
+				LANG: "tr_TR.UTF-8",
+				LC_ALL: "tr_TR.UTF-8",
+			}),
+		).toBe(renderInFreshProcess({}));
+	}, 60_000);
+
+	/**
+	 * The check above cannot fail on the slice-1 fixture: none of its 17 paths
+	 * contains a character pair Turkish and root collation disagree about.
+	 * Proven by mutation — swapping byCodepoint for localeCompare left every
+	 * test green. This renders a mission that DOES contain such a pair, so a
+	 * comparator regression moves the hash instead of hiding.
+	 */
+	test("under tr_TR, on paths where collation and codepoint order disagree", () => {
+		expect(
+			renderInFreshProcess({
+				RENDER_CASE: "locale-probe",
+				TZ: "Asia/Tokyo",
+				LANG: "tr_TR.UTF-8",
+				LC_ALL: "tr_TR.UTF-8",
+			}),
+		).toBe(renderInFreshProcess({ RENDER_CASE: "locale-probe" }));
+	}, 60_000);
+
+	/**
+	 * The comparator itself. The hazard is not that any one locale is wrong,
+	 * it is that two locales DISAGREE: tr orders "Ilk" before "ilk" and en
+	 * orders it after, so a locale-derived sort produces different bytes on
+	 * different machines. byCodepoint is invariant.
+	 *
+	 * The first version of this test asserted that tr disagrees with codepoint
+	 * order. That was false — tr and codepoint happen to agree on this pair —
+	 * and the test caught it. The fact under test is the tr/en disagreement.
+	 */
+	test("byCodepoint is not locale-derived", () => {
+		expect(Math.sign("Ilk".localeCompare("ilk", "tr"))).not.toBe(
+			Math.sign("Ilk".localeCompare("ilk", "en")),
+		);
+		expect(Math.sign(byCodepoint("Ilk", "ilk"))).toBe(-1);
+		expect(Math.sign(byCodepoint("ilk", "Ilk"))).toBe(1);
+	});
+});
