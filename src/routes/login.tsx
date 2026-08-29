@@ -116,12 +116,6 @@ function Login() {
 					<span className="font-mono text-text-subtle">avelco.dev</span>
 				</div>
 
-				<p className="border-t border-[var(--elevation-border-rest)] pt-4 text-xs leading-relaxed text-text-subtle">
-					No auth provider is wired yet. The session gate is real and rejects
-					hard; the identity source behind it is a stub. GitHub sign-in needs
-					GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in{" "}
-					<code className="font-mono">.env</code>.
-				</p>
 			</main>
 		</div>
 	);
