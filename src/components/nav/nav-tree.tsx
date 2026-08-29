@@ -40,11 +40,23 @@ function Icon({ item }: { item: NavItem }) {
 	);
 }
 
-const ROW = "flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-xs";
+const ROW = "flex items-center rounded-sm py-1.5 text-xs";
+/** Collapsed the row is a 40px icon target; expanded it is an icon plus label. */
+const ROW_WIDTH = (collapsed: boolean) =>
+	collapsed ? "justify-center px-0" : "gap-2.5 px-2";
 
-function Row({ item }: { item: NavItem }) {
+function Row({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+	/**
+	 * Collapsed, the label is hidden VISUALLY and kept in the accessibility
+	 * tree. `display: none` would have removed it, and the row's only other
+	 * content is an aria-hidden icon — which would have left every rail item
+	 * with no accessible name at all.
+	 */
 	const label = (
-		<span className="truncate" title={DEVICE_LABEL[item.device]}>
+		<span
+			className={collapsed ? "sr-only" : "truncate"}
+			title={DEVICE_LABEL[item.device]}
+		>
 			{item.label}
 		</span>
 	);
@@ -68,7 +80,7 @@ function Row({ item }: { item: NavItem }) {
 		return (
 			<span
 				aria-disabled="true"
-				className={cn(ROW, "text-text-muted")}
+				className={cn(ROW, ROW_WIDTH(collapsed), "text-text-muted")}
 				data-built="false"
 				data-testid={testId(item.label)}
 				title="Not built yet"
@@ -84,6 +96,7 @@ function Row({ item }: { item: NavItem }) {
 			activeProps={{ "aria-current": "page" }}
 			className={cn(
 				ROW,
+				ROW_WIDTH(collapsed),
 				"interactive text-text",
 				"aria-[current=page]:bg-app-raised aria-[current=page]:text-text",
 			)}
@@ -119,13 +132,16 @@ export function NavTree({ groups, collapsed = false }: NavTreeProps) {
 			{groups.map((group) => (
 				<div key={group.label}>
 					<p
-						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-subtle uppercase"
+						className={cn(
+							"font-mono text-micro font-medium tracking-wide text-text-subtle uppercase",
+							collapsed ? "sr-only" : "px-2 pb-1.5",
+						)}
 						data-testid={`nav-group-${group.label.toLowerCase()}`}
 					>
 						{group.label}
 					</p>
 					{group.items.map((item) => (
-						<Row item={item} key={item.label} />
+						<Row collapsed={collapsed} item={item} key={item.label} />
 					))}
 				</div>
 			))}

@@ -32,6 +32,10 @@ import type { NavGroup } from "#/contract/ui/nav";
  * status line — a nav item linking to a route that does not exist is "looks
  * finished but isn't" shipping inside the product.
  *
+ * Every item is built today. That is a fact about the app, not a reason to
+ * delete the unbuilt branch: the next item added starts unbuilt, and the
+ * branch is what stops it shipping as a working-looking link.
+ *
  * `device` mirrors the route metadata for the sidebar glyph. The route's own
  * staticData stays authoritative.
  */
@@ -55,11 +59,18 @@ export const NAV: NavGroup[] = [
 			},
 			{
 				label: "Clients",
+				to: "/clients",
 				icon: Building2,
 				device: "construction",
-				built: false,
+				built: true,
 			},
-			{ label: "Intake", icon: Inbox, device: "capture", built: false },
+			{
+				label: "Intake",
+				to: "/intake",
+				icon: Inbox,
+				device: "capture",
+				built: true,
+			},
 		],
 	},
 	{
@@ -67,43 +78,72 @@ export const NAV: NavGroup[] = [
 		items: [
 			{
 				label: "Agent templates",
+				to: "/catalog/agents",
 				icon: Users,
 				device: "construction",
-				built: false,
+				built: true,
 			},
-			{ label: "Skills", icon: Library, device: "construction", built: false },
-			{ label: "Sources", icon: Layers, device: "construction", built: false },
+			{
+				label: "Skills",
+				to: "/catalog/skills",
+				icon: Library,
+				device: "construction",
+				built: true,
+			},
+			{
+				label: "Sources",
+				to: "/catalog/sources",
+				icon: Layers,
+				device: "construction",
+				built: true,
+			},
 			{
 				label: "Presets",
+				to: "/presets",
 				icon: Bookmark,
 				device: "construction",
-				built: false,
+				built: true,
 			},
 			{
 				label: "Playbooks",
+				to: "/playbooks",
 				icon: BookMarked,
 				device: "construction",
-				built: false,
+				built: true,
 			},
 		],
 	},
 	{
 		label: "System",
 		items: [
-			{ label: "Activity", icon: Activity, device: "capture", built: false },
+			{
+				label: "Activity",
+				to: "/activity",
+				icon: Activity,
+				device: "capture",
+				built: true,
+			},
 			{
 				label: "Repositories",
+				to: "/settings/repositories",
 				icon: GitBranch,
 				device: "construction",
-				built: false,
+				built: true,
 			},
 			{
 				label: "Connections",
+				to: "/settings/connections",
 				icon: Plug,
 				device: "construction",
-				built: false,
+				built: true,
 			},
-			{ label: "Account", icon: UserCog, device: "capture", built: false },
+			{
+				label: "Account",
+				to: "/settings/account",
+				icon: UserCog,
+				device: "capture",
+				built: true,
+			},
 		],
 	},
 ];
