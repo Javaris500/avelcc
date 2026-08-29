@@ -34,6 +34,21 @@ git rather than from this project:
 shape as `ref-updated.json`, which is why `CreatedRef` is an alias rather than a
 second type.
 
+`commit-fetched.json` is the get-a-commit response, and its two SHAs are
+synthetic like the rest. The FACT it stands for is not, and is recorded here
+because it is the reason `getCommit` exists at all. Checked live by avel-96
+against `octocat/Spoon-Knife`:
+
+    GET /git/trees/main   -> sha d0dd1f61...
+    GET /commits/main     -> sha d0dd1f61...   (the same value)
+    commit.commit.tree    -> sha d7cee29e...   (a different value)
+
+The trees endpoint echoes back the resolved COMMIT sha, not the tree's. So
+`RemoteTree.commitSha` is correctly named, and a caller holding it does NOT hold
+something it can pass to `createTree` as `base_tree`. The fixture's two SHAs are
+deliberately different from each other and a test asserts it, so the distinction
+survives even though the values are made up.
+
 The error bodies are the message strings GitHub documents for each condition.
 The 422 mapping reads them, which is the one place in the module that parses a
 message; `classifyUnprocessable` says why and what happens when none matches.

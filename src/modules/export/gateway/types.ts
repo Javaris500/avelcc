@@ -212,3 +212,21 @@ export type CreateRefOptions = WriteOptions & {
 
 /** Identical to UpdatedRef; named for the call that produced it. */
 export type CreatedRef = UpdatedRef;
+
+export type GetCommitOptions = WriteOptions & {
+	/**
+	 * A COMMIT SHA, not a ref. The git-database endpoint takes an object id and
+	 * answers 404 for a branch name, which would surface as REPO_NOT_FOUND; the
+	 * call guards the shape rather than letting that happen.
+	 */
+	sha: string;
+};
+
+/**
+ * A commit, narrowed to the only field the delivery path needs.
+ *
+ * `treeSha` is lifted out rather than left nested at `tree.sha` so a caller
+ * never reaches through GitHub's response shape to reach the one value it
+ * wanted, and so the name says which kind of sha it is at every use site.
+ */
+export type FetchedCommit = { sha: string; treeSha: string };

@@ -13,6 +13,7 @@ import {
 	createPullRequest,
 	createRef,
 	createTree,
+	getCommit,
 	isRefAlreadyExists,
 	toBase64,
 	updateRef,
@@ -214,6 +215,67 @@ describe("createBlob", () => {
 			fetchImpl: asWrite,
 		});
 		expect(out.sha).toBe(UTF8_SHA);
+	});
+});
+
+/* ── getCommit ─────────────────────────────────────────────── */
+
+describe("getCommit", () => {
+	const at = {
+		...base,
+		sha: "7638417db6d59f3c431d3e1f261cc637155684cd",
+	};
+
+	it("returns the TREE sha, which is not the commit sha", async () => {
+		// The entire reason this call exists. GitHub's trees endpoint echoes the
+		// resolved COMMIT sha, so a caller holding RemoteTree.commitSha does not
+		// hold anything createTree can use as base_tree. See provenance.md for the
+		// live check behind this.
+		const { fetchImpl } = replay(fixture("commit-fetched"));
+		const out = await getCommit({ ...at, fetchImpl });
+
+		expect(out.sha).toBe("7638417db6d59f3c431d3e1f261cc637155684cd");
+		expect(out.treeSha).toBe("cd8274d15fa3ae2ab983129fb037999f264ba9a7");
+		expect(out.treeSha).not.toBe(out.sha);
+	});
+
+	it("GETs the git-database commit and sends no body", async () => {
+		// A GET that declares a JSON content type and sends nothing is a small lie
+		// that proxies occasionally take seriously.
+		const { fetchImpl, calls } = replay(fixture("commit-fetched"));
+		await getCommit({ ...at, fetchImpl });
+
+		expect(calls[0]?.url).toBe(
+			"https://api.github.com/repos/o/r/git/commits/7638417db6d59f3c431d3e1f261cc637155684cd",
+		);
+		expect(calls[0]?.init?.method).toBe("GET");
+		expect(calls[0]?.init?.body).toBeUndefined();
+		expect(calls[0]?.init?.headers?.["Content-Type"]).toBeUndefined();
+		// Still credentialed: this read only ever runs mid-delivery.
+		expect(calls[0]?.init?.headers?.Authorization).toBe("Bearer t");
+	});
+
+	it("refuses a ref rather than letting it 404 as REPO_NOT_FOUND", async () => {
+		// This endpoint takes an object id. A branch name would come back 404 and
+		// map to REPO_NOT_FOUND, sending someone to check a repository that is
+		// fine. It is a bug in the caller, so it throws a plain Error and never
+		// reaches an operator's screen as a gateway failure.
+		const { fetchImpl, calls } = replay(fixture("commit-fetched"));
+		const err = await getCommit({ ...at, sha: "main", fetchImpl }).catch(
+			(e) => e,
+		);
+		expect(err).toBeInstanceOf(Error);
+		expect(err).not.toBeInstanceOf(GatewayError);
+		expect(err.message).toContain("commit sha, not a ref");
+		// And it never went near the network.
+		expect(calls).toHaveLength(0);
+	});
+
+	it("maps real failures like every other call", async () => {
+		const { fetchImpl } = replay({}, 404);
+		await expect(getCommit({ ...at, fetchImpl })).rejects.toMatchObject({
+			code: "REPO_NOT_FOUND",
+		});
 	});
 });
 

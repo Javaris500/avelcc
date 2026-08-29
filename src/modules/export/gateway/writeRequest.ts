@@ -24,23 +24,32 @@ export const REF_ALREADY_EXISTS = "ref already exists";
 /**
  * The write side's single IO edge, mirroring readTree's.
  *
- * Every mutating call in this module goes through here, so the credential
- * header, the JSON encoding and the status-to-ErrorCode mapping exist once. A
- * second copy of the mapping is how two calls start disagreeing about what a
- * 403 means.
+ * Every call in this module goes through here, so the credential header, the
+ * JSON encoding and the status-to-ErrorCode mapping exist once. A second copy
+ * of the mapping is how two calls start disagreeing about what a 403 means.
+ *
+ * GET is allowed even though this module is the write side, for the one read
+ * that exists only to feed a write: see getCommit. A GET carries no body and no
+ * Content-Type, because a request that declares a JSON body and sends none is a
+ * small lie that proxies occasionally take seriously.
  */
-export async function githubWrite<T>(
+export async function githubRequest<T>(
 	opts: WriteOptions,
-	request: { method: "POST" | "PATCH"; path: string; body: unknown },
+	request: {
+		method: "GET" | "POST" | "PATCH";
+		path: string;
+		body?: unknown;
+	},
 ): Promise<T> {
 	const doFetch: WriteFetchLike =
 		opts.fetchImpl ?? (globalThis.fetch as unknown as WriteFetchLike);
 
 	const url = `${API}/repos/${opts.owner}/${opts.repo}${request.path}`;
+	const hasBody = request.body !== undefined;
 	const headers: Record<string, string> = {
 		Accept: "application/vnd.github+json",
 		"X-GitHub-Api-Version": "2022-11-28",
-		"Content-Type": "application/json",
+		...(hasBody ? { "Content-Type": "application/json" } : {}),
 		// Unconditional, unlike the read side. WriteOptions.token is required
 		// because GitHub accepts no anonymous write.
 		Authorization: `Bearer ${opts.token}`,
@@ -51,7 +60,7 @@ export async function githubWrite<T>(
 		res = await doFetch(url, {
 			method: request.method,
 			headers,
-			body: JSON.stringify(request.body),
+			...(hasBody ? { body: JSON.stringify(request.body) } : {}),
 		});
 	} catch (cause) {
 		// A dropped connection before a response is the one case where we know
@@ -119,7 +128,7 @@ async function toWriteGatewayError(
 		// to exist by its error code. We do not guess which.
 		return new GatewayError(
 			"REPO_NOT_FOUND",
-			`no ${where} for ${request.method} ${request.path} — the repository, or write access to it, is missing`,
+			`no ${where} for ${request.method} ${request.path} — the repository, the object, or access to it, is missing`,
 		);
 	}
 

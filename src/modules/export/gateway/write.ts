@@ -10,12 +10,14 @@ import type {
 	CreatePullRequestOptions,
 	CreateRefOptions,
 	CreateTreeOptions,
+	FetchedCommit,
+	GetCommitOptions,
 	UpdatedRef,
 	UpdateRefOptions,
 } from "#/modules/export/gateway/types";
 import { GatewayError } from "#/modules/export/gateway/types";
 import {
-	githubWrite,
+	githubRequest,
 	REF_ALREADY_EXISTS,
 } from "#/modules/export/gateway/writeRequest";
 import { gitBlobSha } from "#/modules/export/git/gitBlobSha";
@@ -69,7 +71,7 @@ export async function createBlob(
 ): Promise<CreatedBlob> {
 	const expected = gitBlobSha(opts.content);
 
-	const created = await githubWrite<{ sha: string }>(opts, {
+	const created = await githubRequest<{ sha: string }>(opts, {
 		method: "POST",
 		path: "/git/blobs",
 		body: { content: toBase64(opts.content), encoding: "base64" },
@@ -87,6 +89,48 @@ export async function createBlob(
 	}
 
 	return { sha: created.sha };
+}
+
+/** Hex object id. A ref reaches the wrong endpoint and 404s misleadingly. */
+const COMMIT_SHA = /^[0-9a-f]{7,40}$/i;
+
+/**
+ * Read a commit to get its TREE sha. The one read in the write gateway, and it
+ * exists for exactly one reason.
+ *
+ * createTree's baseTree must be a TREE sha and the read side does not carry
+ * one. RemoteTree.commitSha holds a COMMIT sha: GitHub's trees endpoint echoes
+ * back the resolved commit rather than the tree it points at, so the two values
+ * differ and that field is correctly named. Nothing else converts between them.
+ *
+ * WITHOUT THIS CALL there are two ways to fill baseTree and both are worse.
+ * Passing the commit sha and letting GitHub resolve it is undocumented, on the
+ * one field whose failure mode is a valid commit that deletes the client's
+ * codebase. Passing null and rebuilding from readTree's listing is worse still:
+ * readTree falls back to a .avel-scoped call when the full tree truncates, so
+ * on exactly the large repositories where this matters the listing is PARTIAL,
+ * and a tree built from a partial listing deletes every file outside .avel.
+ */
+export async function getCommit(
+	opts: GetCommitOptions,
+): Promise<FetchedCommit> {
+	if (!COMMIT_SHA.test(opts.sha)) {
+		// NOT a GatewayError, and the only throw in this module that is not one.
+		// A caller handing this a branch name is a bug in our own code, not
+		// something GitHub reported. The endpoint would answer 404, which maps to
+		// REPO_NOT_FOUND and sends an operator to check a repository that is
+		// perfectly fine. ERROR_CODES has nothing meaning "the caller passed the
+		// wrong kind of thing" and an operator should never see this at all.
+		throw new Error(
+			`getCommit takes a commit sha, not a ref: received ${JSON.stringify(opts.sha)}`,
+		);
+	}
+
+	const commit = await githubRequest<{ sha: string; tree: { sha: string } }>(
+		opts,
+		{ method: "GET", path: `/git/commits/${opts.sha}` },
+	);
+	return { sha: commit.sha, treeSha: commit.tree.sha };
 }
 
 /**
@@ -110,13 +154,16 @@ export async function createTree(
 		sha: entry.sha,
 	}));
 
-	const created = await githubWrite<{ sha: string; truncated?: boolean }>(
+	const created = await githubRequest<{ sha: string; truncated?: boolean }>(
 		opts,
 		{
 			method: "POST",
 			path: "/git/trees",
-			// Omitted rather than sent as null: GitHub rejects an explicit null
-			// base_tree, and absent is what "no base" means on the wire.
+			// OMITTED, never sent as null. base_tree is documented as an optional
+			// string, so absent is the specified way to say "no base"; an explicit
+			// null is undocumented, and guessing at undocumented behaviour is the
+			// exact trade this field is too dangerous for. Not verified against the
+			// live API either way, because verifying it means performing a write.
 			body:
 				opts.baseTree === null ? { tree } : { base_tree: opts.baseTree, tree },
 		},
@@ -129,7 +176,7 @@ export async function createTree(
 export async function createCommit(
 	opts: CreateCommitOptions,
 ): Promise<CreatedCommit> {
-	const created = await githubWrite<{ sha: string }>(opts, {
+	const created = await githubRequest<{ sha: string }>(opts, {
 		method: "POST",
 		path: "/git/commits",
 		body: { message: opts.message, tree: opts.tree, parents: opts.parents },
@@ -166,7 +213,7 @@ function refPath(ref: string): string {
  * dangerous one.
  */
 export async function createRef(opts: CreateRefOptions): Promise<CreatedRef> {
-	const created = await githubWrite<{ ref: string; object: { sha: string } }>(
+	const created = await githubRequest<{ ref: string; object: { sha: string } }>(
 		opts,
 		{
 			method: "POST",
@@ -208,7 +255,7 @@ export function isRefAlreadyExists(error: unknown): boolean {
  * the far end. The answer is identical: refuse, re-preview, never auto-retry.
  */
 export async function updateRef(opts: UpdateRefOptions): Promise<UpdatedRef> {
-	const updated = await githubWrite<{ ref: string; object: { sha: string } }>(
+	const updated = await githubRequest<{ ref: string; object: { sha: string } }>(
 		opts,
 		{
 			method: "PATCH",
@@ -223,7 +270,7 @@ export async function updateRef(opts: UpdateRefOptions): Promise<UpdatedRef> {
 export async function createPullRequest(
 	opts: CreatePullRequestOptions,
 ): Promise<CreatedPullRequest> {
-	const created = await githubWrite<{ number: number; html_url: string }>(
+	const created = await githubRequest<{ number: number; html_url: string }>(
 		opts,
 		{
 			method: "POST",
