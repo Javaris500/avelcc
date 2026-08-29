@@ -10,10 +10,29 @@
       "readonly": [
         "**"
       ],
+      "runtime": "model",
       "slug": "nemi",
       "writable": [
         "apps/web/e2e/**",
         "apps/web/src/**/*.test.tsx"
+      ]
+    },
+    {
+      "append_only": [
+        ".avel/process/log/decision-log.md",
+        ".avel/process/reports/**"
+      ],
+      "kind": "horizontal",
+      "phase": "A",
+      "readonly": [
+        "**"
+      ],
+      "runtime": "human",
+      "slug": "operator",
+      "writable": [
+        "apps/api/src/app.module.ts",
+        "apps/api/src/common/**",
+        "packages/shared/**"
       ]
     },
     {
@@ -29,6 +48,7 @@
         ".avel/conventions/**",
         "packages/shared/**"
       ],
+      "runtime": "model",
       "slug": "transactions",
       "writable": [
         "apps/api/src/modules/transactions/**",

@@ -5,7 +5,7 @@
   "files": [
     {
       "path": "MISSION.md",
-      "sha256": "4a3034de8cd37f2061d2d3bb855ec6c19355e0982946a2f85b08411f10cec022"
+      "sha256": "7fe72c6acb76808c3567732fc9e6c885c94175740ab4a844162c46897d086f01"
     },
     {
       "path": "contract/phase1.openapi.json",
@@ -61,7 +61,7 @@
     },
     {
       "path": "roster/roster.json",
-      "sha256": "39a73cce872aaf5a2933e3ff152929db81655effa145f44e5dc26e034ce0917b"
+      "sha256": "c472a1bf37b769924166aa852c599a7533a81fa5f9a9ef8c4cd803433e0dc571"
     },
     {
       "path": "roster/transactions/depth.md",
@@ -85,7 +85,7 @@
     "coverage_delta_min": 0,
     "mutation_floor": 60
   },
-  "mission_id": "01J8Z4K2QW3E5R7T9Y1U3I5O7A",
-  "package_sha256": "6156944ca9c96583590d248d9096fa105c0532f89be650b4a821af521ef5813a",
+  "mission_id": "01J8Z4K2QW3E5R7T9Y1V3J5P7A",
+  "package_sha256": "0b094e20b37481e97069c5c1a6a725623ab98907e8419cc33a7da240c9fab0d9",
   "sprint": 1
 }

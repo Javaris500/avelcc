@@ -22,10 +22,13 @@ Neither is optional. One red means no ship.
 
 | Phase | Agent | Owns |
 |---|---|---|
+| A | operator | The composition root, the api common layer, and shared packages |
 | B | transactions | The transactions feature, every layer |
 | C | nemi | Frontend tests and the accessibility audit |
 
-Foundations for this mission is the operator, unless a dispatch names someone else.
+Every agent on this mission, with its phase and its mount, is declared in
+`roster/roster.json`. That file is authoritative. A dispatch narrows a mount.
+It never widens one.
 
 ## Where things go
 
