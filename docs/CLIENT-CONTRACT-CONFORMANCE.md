@@ -1,8 +1,8 @@
 # Client-Side Contract Conformance
 
-**Status: `[unspecified]` — this document states the problem and the open decisions. It is not yet a spec.**
+**Status: `[specced]` — decisions D1–D5 ratified 2026-08-29. The mechanism is specified; the build is queued behind the export verification runner (it depends on `Export.verification`, which does not exist yet).**
 
-*This is the missing half of the top-priority fix. Until the questions below are answered, "machine-verified contract conformance" describes AVEL's own repo and nothing about client work.*
+*This is the missing half of the top-priority fix. The decisions below were the doc's own recommendations, adopted as written; the rationale for each is preserved under its heading.*
 
 ---
 
@@ -42,7 +42,24 @@ Something must extract the *actual* interface the built code exposes, in the cli
 
 ---
 
-## Open decisions
+## Decisions — ratified 2026-08-29
+
+Each was settled on the doc's own recommendation. The reasoning is preserved under each heading; the resolution is the summary here.
+
+| # | Decision | Resolved |
+|---|---|---|
+| **D1** | Artifact format | **OpenAPI JSON**, diffed by `oasdiff` (already a dependency). Stack-agnostic; the client-side gate becomes the same mechanism as AVEL's own. |
+| **D2** | Phase-2 extraction | **Generated from the implementation** (framework emits OpenAPI). Phase 1 mandates a framework capable of it. Run by the verification runner, **never by an agent that reports its result**. |
+| **D3** | What counts as breaking | **`oasdiff` default breaking set**, as config **under source control**, never per-mission. Same discipline as the mutation threshold. |
+| **D4** | Degradation | **Degrade to `warn`** with a **visible unverified marker** in the export. An unverified gate that renders as a passed one is worse than no gate. |
+| **D5** | Artifact location | **`.avel/contracts/phase1.openapi.json`**, hashed into the version manifest as **`mission_contract_sha256`** — distinct from `contract_sha256` (AVEL's own). |
+
+**Resulting shapes, to build against once `Export.verification` exists:**
+- `version_manifest.mission_contract_sha256` — hash of the frozen phase-1 OpenAPI artifact, alongside AVEL's own `contract_sha256`.
+- `Export.verification.conformance` — `{ result: 'pass' | 'warn' | 'fail', breaking: BreakingChange[], unverified?: true }`. Nullable until the runner produces it; `unverified: true` is the D4 marker.
+- The D2 extractor and the `oasdiff` invocation run **inside the verification job**, not in any agent path.
+
+## Original decision detail (rationale preserved)
 
 ### D1 — The artifact format
 **Options:**
@@ -90,11 +107,14 @@ An attestation honestly labelled is a known gap. An attestation described as ver
 
 ---
 
-## Blocking
+## Build status
 
-This document blocks:
-- The export engine's `verification.conformance` field shape
-- Any claim that contract conformance is machine-verified
-- The phase1-close gate becoming mechanical
+The `verification.conformance` field shape is now specified (above), so it no longer blocks. What remains is the build, gated on the export verification runner:
+
+- ✅ `verification.conformance` **field shape** — specified.
+- ⬜ The **D2 extractor** and the **`oasdiff` step** inside the verification job — unbuilt; needs `Export.verification` to exist first.
+- ⬜ The **phase1-close gate becoming mechanical** — waits on the above.
+
+Until the runner produces a real `conformance` result, the alignment gate stays a labelled `[attestation]` (see the interim position above), and no material may claim contract conformance is machine-verified.
 
 It does **not** block the export engine generally — build, tests, analysis, coverage, mutation, and ownership can all ship first, with `conformance` nullable.

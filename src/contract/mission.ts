@@ -2,7 +2,7 @@ import { initContract } from "@ts-rest/core";
 import { z } from "zod";
 
 import {
-	errorEnvelope,
+	crudErrorEnvelope,
 	success,
 	successList,
 } from "#/contract/shared/envelope";
@@ -69,12 +69,12 @@ export const missionContract = c.router({
 		method: "GET",
 		path: "/missions",
 		query: paginationQuery,
-		responses: { 200: successList(missionListRow), 403: errorEnvelope },
+		responses: { 200: successList(missionListRow), 403: crudErrorEnvelope },
 	},
 	get: {
 		method: "GET",
 		path: "/missions/:id",
-		responses: { 200: success(missionSchema), 404: errorEnvelope },
+		responses: { 200: success(missionSchema), 404: crudErrorEnvelope },
 	},
 	create: {
 		method: "POST",
@@ -84,7 +84,7 @@ export const missionContract = c.router({
 			.extend({
 				brief: z.record(z.string(), z.unknown()).optional(),
 			}),
-		responses: { 201: success(missionSchema), 422: errorEnvelope },
+		responses: { 201: success(missionSchema), 422: crudErrorEnvelope },
 	},
 	update: {
 		method: "PATCH",
@@ -94,8 +94,8 @@ export const missionContract = c.router({
 			.omit({ id: true, createdAt: true, updatedAt: true }),
 		responses: {
 			200: success(missionSchema),
-			404: errorEnvelope,
-			422: errorEnvelope,
+			404: crudErrorEnvelope,
+			422: crudErrorEnvelope,
 		},
 	},
 });

@@ -439,6 +439,54 @@ export const rosterEntrySkills = pgTable(
 	(t) => [primaryKey({ columns: [t.rosterEntryId, t.skillId] })],
 );
 
+/* ── step 3 · delivery policy ───────────────────────────────────────────── */
+
+/**
+ * Matches exportTargetKind in src/contract/export.ts. An enum, not a catalogue:
+ * each value is a different delivery path and code branches on it.
+ */
+export const exportTarget = pgEnum("export_target", [
+	"zip",
+	"github_pr",
+	"github_push",
+]);
+
+/**
+ * What a repository is allowed to receive.
+ *
+ * READ AS EXCEPTIONS, NOT A REGISTRY. DATA-CONTRACTS-V2:345 — "a repo with no
+ * policy row is treated as false. The safe behavior needs no setup; only the
+ * permissive behavior is opt-in." An absent row is the default, so the export
+ * path defaults every field to its safe value rather than requiring a lookup to
+ * succeed. Connection (*what authorizes this*) and Export (*the run itself*) are
+ * the other two step-3 tables and are not built yet; this one has no FK to
+ * either, so it lands independently.
+ */
+export const repoPolicies = pgTable(
+	"repo_policies",
+	{
+		...identity,
+		/** Normalized before insert. Unique among live rows. */
+		repoUrl: text("repo_url").notNull(),
+		label: text("label"),
+		allowDirectPushToDefault: boolean("allow_direct_push_to_default")
+			.notNull()
+			.default(false),
+		/** A DEFAULT the preview may pre-select; never the binding target. */
+		defaultTarget: exportTarget("default_target"),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		// PARTIAL, for the soft-delete reason the other unique indexes carry: a
+		// plain unique on repo_url makes a soft-deleted policy's url permanently
+		// unreclaimable.
+		uniqueIndex("repo_policies_repo_url_live_unique")
+			.on(t.repoUrl)
+			.where(sql`${t.deletedAt} is null`),
+	],
+);
+
 /* ── relations ──────────────────────────────────────────────────────────── */
 
 export const clientsRelations = relations(clients, ({ many }) => ({

@@ -1,7 +1,7 @@
 import { initContract } from "@ts-rest/core";
 import { z } from "zod";
 
-import { errorEnvelope, success } from "#/contract/shared/envelope";
+import { crudErrorEnvelope, success } from "#/contract/shared/envelope";
 
 const c = initContract();
 
@@ -65,7 +65,7 @@ export const rosterContract = c.router({
 		path: "/missions/:missionId/roster",
 		responses: {
 			200: success(z.object({ entries: z.array(rosterEntrySchema) })),
-			404: errorEnvelope,
+			404: crudErrorEnvelope,
 		},
 	},
 
@@ -75,7 +75,7 @@ export const rosterContract = c.router({
 		body: z.object({ entries: z.array(rosterEntrySchema.omit({ id: true })) }),
 		responses: {
 			200: success(z.object({ entries: z.array(rosterEntrySchema) })),
-			422: errorEnvelope, // PRECONDITION_FAILED — the hard block
+			422: crudErrorEnvelope, // PRECONDITION_FAILED — the hard block
 		},
 	},
 
@@ -90,8 +90,8 @@ export const rosterContract = c.router({
 		body: z.object({ presetId: z.string().uuid() }),
 		responses: {
 			200: success(z.object({ entries: z.array(rosterEntrySchema) })),
-			404: errorEnvelope,
-			422: errorEnvelope,
+			404: crudErrorEnvelope,
+			422: crudErrorEnvelope,
 		},
 	},
 });

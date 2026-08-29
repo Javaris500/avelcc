@@ -78,6 +78,29 @@ export const AUTH_CODES = [
 export type AuthCode = (typeof AUTH_CODES)[number];
 
 /**
+ * CRUD codes. A SEPARATE union again, for the reason AUTH_CODES and
+ * VIOLATION_CODES are separate: ErrorCode is export-scoped — the twelve codes
+ * from BLAST-RADIUS.md's delivery flow — and "this mission does not exist" or
+ * "this field failed validation" is not one of them. The Command Center's own
+ * resource routes (mission · roster · playbook) speak this vocabulary.
+ *
+ * Collapsing them into ErrorCode would route a mission 404 through the export
+ * error map, which has no case for it and asserts exhaustiveness over a set it
+ * does not belong to. The contracts previously typed these responses with the
+ * export envelope and had NO code to put in them — roster.ts even named
+ * PRECONDITION_FAILED in a comment while the enum could not express it.
+ */
+export const CRUD_CODES = [
+	"NOT_FOUND",
+	"VALIDATION_FAILED",
+	/** A hard precondition the request did not meet — e.g. the roster hard block. */
+	"PRECONDITION_FAILED",
+	"FORBIDDEN",
+] as const;
+
+export type CrudCode = (typeof CRUD_CODES)[number];
+
+/**
  * Gate vocabulary. Closed sets — `mandatory | warn` only, "there is no
  * skippable" (CLAUDE.md).
  */

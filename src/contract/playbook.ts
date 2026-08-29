@@ -2,7 +2,7 @@ import { initContract } from "@ts-rest/core";
 import { z } from "zod";
 
 import {
-	errorEnvelope,
+	crudErrorEnvelope,
 	success,
 	successList,
 } from "#/contract/shared/envelope";
@@ -44,7 +44,7 @@ export const playbookContract = c.router({
 	getForType: {
 		method: "GET",
 		path: "/playbooks/:missionType",
-		responses: { 200: success(playbookSchema), 404: errorEnvelope },
+		responses: { 200: success(playbookSchema), 404: crudErrorEnvelope },
 	},
 	update: {
 		method: "PATCH",
@@ -52,8 +52,8 @@ export const playbookContract = c.router({
 		body: playbookSchema.partial().omit({ id: true, version: true }),
 		responses: {
 			200: success(playbookSchema),
-			404: errorEnvelope,
-			422: errorEnvelope,
+			404: crudErrorEnvelope,
+			422: crudErrorEnvelope,
 		},
 	},
 });
