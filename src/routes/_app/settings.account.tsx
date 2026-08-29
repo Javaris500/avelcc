@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { UserCog } from "lucide-react";
 
-import { PageEmpty } from "#/components/ui/page-empty";
+import { PageEmpty } from "#/ui/page-empty";
 
 export const Route = createFileRoute("/_app/settings/account")({
 	staticData: { device: "capture" as const },

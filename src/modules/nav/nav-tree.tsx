@@ -1,0 +1,149 @@
+import { Link, type LinkProps } from "@tanstack/react-router";
+import {
+	DEVICE_LABEL,
+	type NavItem,
+	type NavTreeProps,
+} from "#/contract/ui/nav";
+import { cn } from "#/utils/cn";
+
+/** Stable across the shim and the seam, so testids do not move when session 2 migrates. */
+function testId(label: string): string {
+	return `nav-${label.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+/**
+ * Icon size 15 and stroke-width 1.8 are the reference's values, not defaults.
+ * Lucide is what TECH-STACK names; the reference's inline SVG paths are not
+ * copied, only its weight.
+ */
+function Icon({ item }: { item: NavItem }) {
+	const Glyph = item.icon;
+	return (
+		<Glyph
+			aria-hidden="true"
+			className={cn(
+				"size-(--icon-inline) shrink-0",
+				// The availability cue lives here rather than on the label.
+				// Tone is fully spent carrying hierarchy — group label, unbuilt
+				// item and built item occupy all three steps — so dimming the
+				// label to signal availability would cost the legibility that
+				// was just won. The icon is aria-hidden decoration, so dimming
+				// it costs a screen reader nothing while giving a sighted
+				// reader scanning the column an at-a-glance signal. It is a
+				// luminance difference, not a hue one, so it survives colour
+				// blindness. aria-disabled carries the same fact non-visually.
+				item.built ? "opacity-90" : "opacity-[var(--opacity-disabled)]",
+			)}
+			strokeWidth={1.8}
+		/>
+	);
+}
+
+const ROW = "flex items-center rounded-sm py-1.5 text-xs";
+/** Collapsed the row is a 40px icon target; expanded it is an icon plus label. */
+const ROW_WIDTH = (collapsed: boolean) =>
+	collapsed ? "justify-center px-0" : "gap-2.5 px-2";
+
+function Row({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+	/**
+	 * Collapsed, the label is hidden VISUALLY and kept in the accessibility
+	 * tree. `display: none` would have removed it, and the row's only other
+	 * content is an aria-hidden icon — which would have left every rail item
+	 * with no accessible name at all.
+	 */
+	const label = (
+		<span
+			className={collapsed ? "sr-only" : "truncate"}
+			title={DEVICE_LABEL[item.device]}
+		>
+			{item.label}
+		</span>
+	);
+
+	/**
+	 * Unbuilt: muted, no href, and removed from the tab order. Enforced by
+	 * rendering a span with no tabindex rather than by styling a disabled link
+	 * — an item that looks unfocusable while still taking tab focus is that
+	 * claim being false.
+	 *
+	 * NOT --opacity-disabled. The patch's "disabled is opacity, not a colour"
+	 * rule is about controls, where a disabled danger button must stay
+	 * recognisably danger. An unbuilt item is not a disabled control, it is an
+	 * unavailable destination, and eleven of twelve items are in this state:
+	 * at 35% it measured 1.71:1 dark and 1.56:1 light, so a reader could not
+	 * resolve the information architecture at all. Full opacity in text-subtle
+	 * carries the distinction by tone, and the href and tabindex carry the
+	 * rest.
+	 */
+	if (!item.built || !item.to) {
+		return (
+			<span
+				aria-disabled="true"
+				className={cn(ROW, ROW_WIDTH(collapsed), "text-text-muted")}
+				data-built="false"
+				data-testid={testId(item.label)}
+				title="Not built yet"
+			>
+				<Icon item={item} />
+				{label}
+			</span>
+		);
+	}
+
+	return (
+		<Link
+			activeProps={{ "aria-current": "page" }}
+			className={cn(
+				ROW,
+				ROW_WIDTH(collapsed),
+				"interactive text-text",
+				"aria-[current=page]:bg-app-raised aria-[current=page]:text-text",
+			)}
+			data-built="true"
+			data-testid={testId(item.label)}
+			to={item.to as LinkProps["to"]}
+		>
+			<Icon item={item} />
+			{label}
+			{item.badge ? (
+				<span
+					className="ml-auto font-mono text-micro text-text-muted"
+					data-testid={`${testId(item.label)}-badge`}
+				>
+					{item.badge}
+				</span>
+			) : null}
+		</Link>
+	);
+}
+
+/**
+ * The whole interface between this session and the shell frame. Session 2
+ * imports NavTree and slots it into the sidebar; nothing else crosses.
+ */
+export function NavTree({ groups, collapsed = false }: NavTreeProps) {
+	return (
+		<div
+			className="flex flex-col gap-4"
+			data-collapsed={collapsed ? "true" : "false"}
+			data-testid="nav-tree"
+		>
+			{groups.map((group) => (
+				<div key={group.label}>
+					<p
+						className={cn(
+							"font-mono text-micro font-medium tracking-wide text-text-subtle uppercase",
+							collapsed ? "sr-only" : "px-2 pb-1.5",
+						)}
+						data-testid={`nav-group-${group.label.toLowerCase()}`}
+					>
+						{group.label}
+					</p>
+					{group.items.map((item) => (
+						<Row collapsed={collapsed} item={item} key={item.label} />
+					))}
+				</div>
+			))}
+		</div>
+	);
+}

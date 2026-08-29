@@ -1,208 +1,114 @@
-Welcome to your new TanStack Start app!
+# AVEL — Command Center
 
-# Getting Started
+The operator interface for AVEL. It turns a client brief into a deterministic
+`.avel/` package — mission, roster, conventions, process — then renders,
+freezes, gates and delivers it into a client repository.
 
-To run this application:
+**Status:** frontend only. There is no backend, no database and no export
+engine. See *What is actually built* below before assuming a screen works.
+
+---
+
+## Running it
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev            # http://localhost:3000, bound to all interfaces for WSL
 ```
 
-# Building For Production
-
-To build this application for production:
+Node 24 (`.nvmrc`). Auth is bypassed in development — the account reads `dev`
+so it is never mistaken for a real session. To exercise the session gate
+itself:
 
 ```bash
-pnpm build
+VITE_AUTH_BYPASS=0 pnpm dev
 ```
 
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
+## Checks
 
 ```bash
-pnpm lint
-pnpm format
-pnpm check
+pnpm check          # biome + the token lint
+npx tsc --noEmit
+npx vitest run      # 104 unit tests
+npx playwright test # browser tests, serial by design
 ```
 
+The browser suite runs serially on purpose. Parallel workers start runs
+mid-rebuild against the dev server and produce failures that look real and are
+not. A suite that cries wolf gets ignored.
 
-## Deploy with Nitro
+---
 
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
+## What is actually built
 
-```bash
-npm run build
-node dist/server/index.mjs
+| | |
+|---|---|
+| App shell, sidebar, nav, both themes | built |
+| Login, GitHub OAuth seam, session gate | built, identity source is a stub |
+| `gitBlobSha`, `computeBlastRadius` | built and tested, **wired to no screen** |
+| `computeCoherence` | built and tested, **wired to no screen** |
+| Golden fixture, 20 files | built, hash reproduced independently |
+| Pre-flight screen | gates section only |
+| Everything else | routes exist, each renders an empty state |
+
+Of 13 routes, 11 are empty states. Most are empty not because nothing has
+happened but because the contract defines no procedures for them — those gaps
+are tracked in `docs/ROUTES.md`.
+
+The engine and the interface both exist and **nothing connects them**. The join
+is a gateway `readTree` call against a public repository: no database, no auth,
+no export engine required.
+
+---
+
+## Layout
+
+```
+src/
+  components/
+    ui/        primitives — shadcn, adapted once at generation
+    shell/     the frame: sidebar, top bar, window chrome
+    nav/       the nav tree, behind a declared seam
+    gate/      domain — gate rows and verdicts
+    auth/      login form, GitHub button
+    device/    the capture/construction boundary
+    theme/     one theme hook, shared by shell and login
+  contract/    types, error maps, computeCoherence — imported by both sides
+  lib/         gitBlobSha, computeBlastRadius — pure, no IO
+  routes/      file-based, TanStack Router
+scripts/
+  check-tokens.mjs   fails on a literal where a token belongs
+fixtures/golden/     the package the renderer must reproduce byte-for-byte
+docs/                the specification. START-HERE.md first.
 ```
 
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
+## Design system
 
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
+Tokens live in `src/styles/`. `tokens.css` is the base layer; `patch.css` is
+`docs/patches/globals-patch.css` applied with its corrections recorded in the
+file header.
 
+Four axes are enforced by `scripts/check-tokens.mjs`, not by convention:
+**colour, type size, radius, spacing**. A literal in a component fails the
+check. Layout escape hatches are allowed — the rule is that a `className` may
+adjust layout, never appearance.
 
+Two more rules are enforced by the compiler rather than by memory: `<Surface>`
+does not compile without all four states, and interactive primitives do not
+compile without a `data-testid`.
 
-## Routing
+## Conventions
 
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+- Types come from the contract. A screen needing a shape the contract does not
+  define is a contract change, not a local interface.
+- `data-testid` ships in the same commit as the component.
+- Browser specs are `*.e2e.spec.ts`, beside the code they cover.
+- Verify the output, not the exit code. Several defects here passed a green
+  build: a stylesheet disabled by a stray comment terminator, every dark-theme
+  token tree-shaken away, a route that rendered nothing while typechecking
+  perfectly.
 
-### Adding A Route
+---
 
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Pinned: `@tanstack/react-start` 1.168.49. Its API has moved between versions —
+read release notes before upgrading.

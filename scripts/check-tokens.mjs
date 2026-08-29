@@ -13,7 +13,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOTS = ["src/components", "src/routes"];
+const ROOTS = ["src/modules", "src/ui", "src/routes"];
 const RULES = [
 	[/#[0-9a-fA-F]{6}\b/, "hex colour — use a token"],
 	[/\b(rgb|rgba|hsl|hsla)\(/, "literal colour function — use a token"],

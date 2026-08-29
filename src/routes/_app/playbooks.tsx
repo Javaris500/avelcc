@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BookMarked } from "lucide-react";
 
-import { PageEmpty } from "#/components/ui/page-empty";
+import { PageEmpty } from "#/ui/page-empty";
 
 export const Route = createFileRoute("/_app/playbooks")({
 	staticData: { device: "construction" as const },

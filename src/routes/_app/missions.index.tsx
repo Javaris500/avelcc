@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
-import { Button } from "#/components/ui/button";
-import { SkeletonRows } from "#/components/ui/skeleton";
-import { EmptyState, ErrorState } from "#/components/ui/states";
-import { Surface } from "#/components/ui/surface";
+import { Button } from "#/ui/button";
+import { SkeletonRows } from "#/ui/skeleton";
+import { EmptyState, ErrorState } from "#/ui/states";
+import { Surface } from "#/ui/surface";
 
 export const Route = createFileRoute("/_app/missions/")({
 	staticData: { device: "capture" as const },

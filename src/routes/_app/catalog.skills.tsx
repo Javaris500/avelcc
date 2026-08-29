@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Library } from "lucide-react";
 
-import { PageEmpty } from "#/components/ui/page-empty";
+import { PageEmpty } from "#/ui/page-empty";
 
 export const Route = createFileRoute("/_app/catalog/skills")({
 	staticData: { device: "construction" as const },

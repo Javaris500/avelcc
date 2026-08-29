@@ -1,12 +1,11 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-
-import { Wordmark } from "#/components/shell/wordmark";
-import { useTheme } from "#/components/theme/use-theme";
-import { Button } from "#/components/ui/button";
-import { StatusBadge } from "#/components/ui/badge";
-import { Shell } from "#/components/shell/shell";
-import { NAV } from "#/components/nav";
-import { readSession, signOut } from "#/routes/-lib/session";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { readSession, signOut } from "#/modules/auth/session";
+import { NAV } from "#/modules/nav";
+import { Shell } from "#/modules/shell/shell";
+import { Wordmark } from "#/modules/shell/wordmark";
+import { useTheme } from "#/modules/theme/use-theme";
+import { StatusBadge } from "#/ui/badge";
+import { Button } from "#/ui/button";
 
 /**
  * Home.

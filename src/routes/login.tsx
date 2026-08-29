@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-
-import { CredentialForm } from "#/components/auth/credential-form";
-import { OrDivider } from "#/components/auth/divider";
-import { GitHubButton } from "#/components/auth/github-button";
-import { Wordmark } from "#/components/shell/wordmark";
-import { useTheme } from "#/components/theme/use-theme";
 import { presentAuthError } from "#/contract/errors/auth-map";
 import { AUTH_CODES, type AuthCode } from "#/contract/shared/errors";
-import { signIn } from "#/routes/-lib/session";
+import { CredentialForm } from "#/modules/auth/credential-form";
+import { OrDivider } from "#/modules/auth/divider";
+import { GitHubButton } from "#/modules/auth/github-button";
+import { signIn } from "#/modules/auth/session";
+import { Wordmark } from "#/modules/shell/wordmark";
+import { useTheme } from "#/modules/theme/use-theme";
 
 /** Only a code the contract declares may reach the error map. */
 function toAuthCode(raw: unknown): AuthCode | null {
@@ -62,6 +61,9 @@ function Login() {
 				{/* Announced when it changes, so a failure is not silent to a
 				    screen reader. Present in the DOM at all times: a region that
 				    appears only on error is often not announced at all. */}
+				{/* biome-ignore lint/a11y/useSemanticElements: <output> is for form
+				    results. This is a live region announcing a sign-in failure, and
+				    role=status on a div is the correct ARIA pattern for that. */}
 				<div
 					aria-live="polite"
 					className={presented ? "flex flex-col gap-1" : "sr-only"}
@@ -115,7 +117,6 @@ function Login() {
 					</a>
 					<span className="font-mono text-text-subtle">avelco.dev</span>
 				</div>
-
 			</main>
 		</div>
 	);

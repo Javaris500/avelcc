@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-import { GateRow } from "#/components/gate";
-import { Button } from "#/components/ui/button";
-import { Tag } from "#/components/ui/badge";
 import { FULL_BUILD_GATES } from "#/contract/shared/playbook";
+import { GateRow } from "#/modules/gate";
+import { Tag } from "#/ui/badge";
+import { Button } from "#/ui/button";
 
 /**
  * The pre-flight screen. ROUTES.md calls it "the screen that carries the
@@ -61,7 +60,10 @@ function PreFlight() {
 	return (
 		<div className="flex max-w-[68ch] flex-col gap-4 px-6 py-5">
 			<div className="flex flex-col gap-1">
-				<h1 className="font-display text-title font-semibold" data-testid="page-title">
+				<h1
+					className="font-display text-title font-semibold"
+					data-testid="page-title"
+				>
 					Pre-flight
 				</h1>
 				<p className="flex items-center gap-2 text-sm text-text-muted">

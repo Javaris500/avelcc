@@ -1,13 +1,13 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
-
-import { Shell } from "#/components/shell/shell";
-import { Button } from "#/components/ui/button";
 import {
 	requireSession,
 	SessionRequiredError,
 	signOut,
-} from "#/routes/-lib/session";
+} from "#/modules/auth/session";
+import { DeviceGuard } from "#/modules/device/device-guard";
+import { Shell } from "#/modules/shell/shell";
+import { Button } from "#/ui/button";
 
 /**
  * The authenticated shell. Pathless layout route, so /missions is /missions and
@@ -40,7 +40,9 @@ function AppLayout() {
 			onSignOut={onSignOut}
 			session={session}
 		>
-			<Outlet />
+			<DeviceGuard>
+				<Outlet />
+			</DeviceGuard>
 		</Shell>
 	);
 }

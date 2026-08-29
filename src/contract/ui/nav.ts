@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { LucideIcon } from "lucide-react";
 
 /**
  * THE SEAM between the shell frame and the nav tree.
@@ -18,37 +18,37 @@ import type { LucideIcon } from 'lucide-react'
  */
 
 /** Per-route device class. ROUTES.md owns which route carries which. */
-export type Device = 'capture' | 'construction' | 'approve'
+export type Device = "capture" | "construction" | "approve";
 
 export type NavItem = {
-  label: string
-  /** Absent when built is false. An unbuilt item is not navigable. */
-  to?: string
-  icon: LucideIcon
-  device: Device
-  /**
-   * False renders the item dimmed, unfocusable and without an href. A nav
-   * item linking to a route that does not exist is "looks finished but isn't"
-   * shipping inside the product, which is the thing CLAUDE.md opens with.
-   */
-  built: boolean
-  /** Count pill, as the reference shows on Missions. Omitted when zero. */
-  badge?: number
-}
+	label: string;
+	/** Absent when built is false. An unbuilt item is not navigable. */
+	to?: string;
+	icon: LucideIcon;
+	device: Device;
+	/**
+	 * False renders the item dimmed, unfocusable and without an href. A nav
+	 * item linking to a route that does not exist is "looks finished but isn't"
+	 * shipping inside the product, which is the thing CLAUDE.md opens with.
+	 */
+	built: boolean;
+	/** Count pill, as the reference shows on Missions. Omitted when zero. */
+	badge?: number;
+};
 
 export type NavGroup = {
-  label: string
-  items: NavItem[]
-}
+	label: string;
+	items: NavItem[];
+};
 
 export type NavTreeProps = {
-  groups: NavGroup[]
-  /** Reserved for the collapsed rail. Not built today. */
-  collapsed?: boolean
-}
+	groups: NavGroup[];
+	/** Reserved for the collapsed rail. Not built today. */
+	collapsed?: boolean;
+};
 
 export const DEVICE_LABEL: Record<Device, string> = {
-  capture: 'Works on a phone',
-  construction: 'Desktop only',
-  approve: 'Read and approve',
-}
+	capture: "Works on a phone",
+	construction: "Desktop only",
+	approve: "Read and approve",
+};

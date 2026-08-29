@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Bookmark } from "lucide-react";
 
-import { PageEmpty } from "#/components/ui/page-empty";
+import { PageEmpty } from "#/ui/page-empty";
 
 export const Route = createFileRoute("/_app/presets")({
 	staticData: { device: "construction" as const },

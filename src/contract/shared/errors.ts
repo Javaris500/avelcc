@@ -8,21 +8,21 @@
  */
 
 export const ERROR_CODES = [
-  'REPO_NOT_FOUND',
-  'REPO_NO_ACCESS',
-  'CONNECTION_REVOKED',
-  'POLICY_FORBIDS_TARGET',
-  'BRANCH_NOT_FOUND',
-  'EMPTY_REPOSITORY',
-  'TREE_TOO_LARGE',
-  'BLAST_RADIUS_VIOLATION',
-  'PREVIEW_STALE',
-  'PREVIEW_REQUIRED',
-  'DETERMINISM_VIOLATION',
-  'EXTERNAL_GITHUB',
-] as const
+	"REPO_NOT_FOUND",
+	"REPO_NO_ACCESS",
+	"CONNECTION_REVOKED",
+	"POLICY_FORBIDS_TARGET",
+	"BRANCH_NOT_FOUND",
+	"EMPTY_REPOSITORY",
+	"TREE_TOO_LARGE",
+	"BLAST_RADIUS_VIOLATION",
+	"PREVIEW_STALE",
+	"PREVIEW_REQUIRED",
+	"DETERMINISM_VIOLATION",
+	"EXTERNAL_GITHUB",
+] as const;
 
-export type ErrorCode = (typeof ERROR_CODES)[number]
+export type ErrorCode = (typeof ERROR_CODES)[number];
 
 /**
  * The six violation codes. Deliberately a SEPARATE union from ErrorCode.
@@ -33,15 +33,15 @@ export type ErrorCode = (typeof ERROR_CODES)[number]
  * traversal as an overridable gate failure, and it is explicitly not one.
  */
 export const VIOLATION_CODES = [
-  'PATH_OUTSIDE_ALLOWED',
-  'PATH_TRAVERSAL',
-  'SPECIAL_FILE_COLLISION',
-  'CASE_COLLISION',
-  'PROTECTED_PATH',
-  'OWNERSHIP_VIOLATION',
-] as const
+	"PATH_OUTSIDE_ALLOWED",
+	"PATH_TRAVERSAL",
+	"SPECIAL_FILE_COLLISION",
+	"CASE_COLLISION",
+	"PROTECTED_PATH",
+	"OWNERSHIP_VIOLATION",
+] as const;
 
-export type ViolationCode = (typeof VIOLATION_CODES)[number]
+export type ViolationCode = (typeof VIOLATION_CODES)[number];
 
 /**
  * Exhaustiveness helper. Call it in the default branch of any switch over
@@ -49,12 +49,12 @@ export type ViolationCode = (typeof VIOLATION_CODES)[number]
  * has not handled it, rather than silently falling through at runtime.
  */
 export function assertNever(value: never, context: string): never {
-  throw new Error(`${context}: unhandled variant ${JSON.stringify(value)}`)
+	throw new Error(`${context}: unhandled variant ${JSON.stringify(value)}`);
 }
 
 /** A code that is not overridable by gate_override, per BLAST-RADIUS.md. */
 export function isOverridable(code: ErrorCode): boolean {
-  return code !== 'BLAST_RADIUS_VIOLATION' && code !== 'DETERMINISM_VIOLATION'
+	return code !== "BLAST_RADIUS_VIOLATION" && code !== "DETERMINISM_VIOLATION";
 }
 
 /**
@@ -67,25 +67,31 @@ export function isOverridable(code: ErrorCode): boolean {
  * reasoning that keeps ViolationCode separate.
  */
 export const AUTH_CODES = [
-  'INVALID_CREDENTIALS',
-  'OAUTH_NOT_CONFIGURED',
-  'OAUTH_DENIED',
-  'OAUTH_EXCHANGE_FAILED',
-  'RATE_LIMITED',
-  'SESSION_REQUIRED',
-] as const
+	"INVALID_CREDENTIALS",
+	"OAUTH_NOT_CONFIGURED",
+	"OAUTH_DENIED",
+	"OAUTH_EXCHANGE_FAILED",
+	"RATE_LIMITED",
+	"SESSION_REQUIRED",
+] as const;
 
-export type AuthCode = (typeof AUTH_CODES)[number]
+export type AuthCode = (typeof AUTH_CODES)[number];
 
 /**
  * Gate vocabulary. Closed sets — `mandatory | warn` only, "there is no
  * skippable" (CLAUDE.md).
  */
-export const GATE_POLICIES = ['mandatory', 'warn'] as const
-export type GatePolicy = (typeof GATE_POLICIES)[number]
+export const GATE_POLICIES = ["mandatory", "warn"] as const;
+export type GatePolicy = (typeof GATE_POLICIES)[number];
 
-export const GATE_STATES = ['pass', 'block', 'warn', 'pending', 'stale'] as const
-export type GateState = (typeof GATE_STATES)[number]
+export const GATE_STATES = [
+	"pass",
+	"block",
+	"warn",
+	"pending",
+	"stale",
+] as const;
+export type GateState = (typeof GATE_STATES)[number];
 
 /**
  * How a gate reached its verdict. THE distinction this product exists to make.
@@ -95,5 +101,5 @@ export type GateState = (typeof GATE_STATES)[number]
  * product." So it is a required field, not an optional flag — a gate cannot be
  * rendered without answering how it was decided.
  */
-export const GATE_SOURCES = ['mechanical', 'attested'] as const
-export type GateSource = (typeof GATE_SOURCES)[number]
+export const GATE_SOURCES = ["mechanical", "attested"] as const;
+export type GateSource = (typeof GATE_SOURCES)[number];

@@ -1,4 +1,8 @@
-import type { GatePolicy, GateSource, GateState } from "#/contract/shared/errors";
+import type {
+	GatePolicy,
+	GateSource,
+	GateState,
+} from "#/contract/shared/errors";
 
 export type Gate = {
 	name: string;
@@ -25,9 +29,24 @@ export type Gate = {
  * That single field is the most important thing on this screen.
  */
 export const FULL_BUILD_GATES: readonly Gate[] = [
-	{ name: "phase1-close", policy: "mandatory", state: "pending", source: "mechanical" },
-	{ name: "alignment", policy: "mandatory", state: "pending", source: "attested" },
+	{
+		name: "phase1-close",
+		policy: "mandatory",
+		state: "pending",
+		source: "mechanical",
+	},
+	{
+		name: "alignment",
+		policy: "mandatory",
+		state: "pending",
+		source: "attested",
+	},
 	{ name: "qa", policy: "mandatory", state: "pending", source: "mechanical" },
 	{ name: "security", policy: "warn", state: "pending", source: "mechanical" },
-	{ name: "acceptance", policy: "mandatory", state: "pending", source: "mechanical" },
+	{
+		name: "acceptance",
+		policy: "mandatory",
+		state: "pending",
+		source: "mechanical",
+	},
 ];
