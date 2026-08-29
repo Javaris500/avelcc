@@ -27,7 +27,7 @@ export const ERROR_CODES = [
 	"DETERMINISM_VIOLATION",
 	"EXTERNAL_GITHUB",
 	/**
-	 * The thirteenth, and the only one not from BLAST-RADIUS.md's table.
+	 * Not from BLAST-RADIUS.md's table. Neither is GITHUB_REJECTED below.
 	 *
 	 * That document's contract sketch names IDEMPOTENCY_REPLAY on `export.create`'s
 	 * 409 and the contract copied the line, but the code was never added here — so
@@ -93,8 +93,8 @@ export type ViolationCode = (typeof VIOLATION_CODES)[number];
 
 /**
  * Exhaustiveness helper. Call it in the default branch of any switch over
- * ErrorCode: adding a thirteenth code then fails the build at every site that
- * has not handled it, rather than silently falling through at runtime.
+ * ErrorCode: adding ANY code then fails the build at every site that has not
+ * handled it, rather than silently falling through at runtime.
  */
 export function assertNever(value: never, context: string): never {
 	throw new Error(`${context}: unhandled variant ${JSON.stringify(value)}`);
@@ -138,8 +138,8 @@ export function isOverridable(code: ErrorCode): boolean {
 /**
  * Auth codes. A SEPARATE union from ErrorCode on purpose.
  *
- * ErrorCode is export-scoped — BLAST-RADIUS.md's table plus IDEMPOTENCY_REPLAY,
- * table. Collapsing auth into it would let a failed sign-in render through the
+ * ErrorCode is export-scoped — BLAST-RADIUS.md's table, plus the codes added
+ * since. Collapsing auth into it would let a failed sign-in render through the
  * export error map, and would break ERROR_MAP's exhaustiveness guarantee by
  * mixing two vocabularies that no single screen handles together. Same
  * reasoning that keeps ViolationCode separate.

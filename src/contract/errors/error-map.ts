@@ -4,11 +4,16 @@ import { type ErrorCode, isOverridable } from "#/contract/shared/errors";
  * One table: error.code -> message + recovery action.
  *
  * EXHAUSTIVE BY CONSTRUCTION. This is a Record keyed on the ErrorCode union,
- * so adding a thirteenth code fails the build here until it is given a screen.
+ * so ADDING ANY CODE fails the build here until it is given a screen.
  * DAY-ONE-FRONTEND: "a TypeScript never check so a new code fails the build."
  *
+ * No count is stated, deliberately — this file has already carried a stale one
+ * twice, which is exactly the failure the never-check exists to make impossible
+ * in the code and cannot prevent in a comment.
+ *
  * Copy is written for the operator who has to decide what to do next, not for
- * a log. Seeded from the "Screen shows" column of docs/BLAST-RADIUS.md.
+ * a log. Seeded from the "Screen shows" column of docs/BLAST-RADIUS.md, and
+ * extended past it as codes were added.
  */
 
 export type Recovery =
@@ -115,13 +120,6 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 		severity: "recoverable",
 	},
 	/**
-	 * Deliberately NOT phrased as a failure, because nothing failed. The copy has
-	 * one job: stop the operator re-sending, and point them at the delivery that
-	 * already exists. Its id is in the envelope's `details`; the recovery is
-	 * `none` because the useful destination is that specific export and this
-	 * table is static, so a link here would have to guess a route.
-	 */
-	/**
 	 * Loud, because reaching this almost always means AVEL sent a request GitHub
 	 * does not accept, and the recognisable 422s are already mapped to codes of
 	 * their own. Recovery is `none` and the copy says so: the defining property
@@ -133,6 +131,13 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 		recovery: { kind: "none" },
 		severity: "loud",
 	},
+	/**
+	 * Deliberately NOT phrased as a failure, because nothing failed. The copy has
+	 * one job: stop the operator re-sending, and point them at the delivery that
+	 * already exists. Its id is in the envelope's `details`; the recovery is
+	 * `none` because the useful destination is that specific export and this
+	 * table is static, so a link here would have to guess a route.
+	 */
 	IDEMPOTENCY_REPLAY: {
 		title: "This delivery already ran.",
 		body: "An export with this idempotency key was created earlier, so nothing was sent a second time. The original export's id is on this response — open it to see what happened rather than retrying.",
