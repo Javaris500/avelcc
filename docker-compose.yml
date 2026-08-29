@@ -1,0 +1,87 @@
+# AVEL — Tier 0 sandbox.
+#
+# This file is SANDBOX.md's Tier 0 table expressed as configuration:
+#
+#   Per mission          one container with the client repo mounted
+#   Verification runner  a separate container with NO credential and NO egress
+#                        except the package registry
+#
+# The point is not isolation technology. SANDBOX.md:45 is explicit: "the
+# decisive mitigation is not a VM. If the runner holds no credential and has no
+# network egress, a container escape yields a container on your laptop with
+# nothing worth taking. The credential boundary is worth more than the isolation
+# technology, and it costs nothing."
+#
+# So the thing to preserve when editing this file is which service can reach a
+# secret and which can reach the network. Everything else is detail.
+#
+#   docker compose run --rm mission
+#   docker compose run --rm verifier
+
+name: avel
+
+services:
+  # The mission runner. Holds credentials, has network, mounts the client repo.
+  # An agent works here, and its writable paths are enforced by the worktree it
+  # is given rather than by this file.
+  mission:
+    image: node:24-bookworm-slim
+    working_dir: /work
+    volumes:
+      - ${CLIENT_REPO:-./}:/work
+      - pnpm-store:/pnpm-store
+    environment:
+      # Passed through from .env, never baked into an image.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DATABASE_URL: ${DATABASE_URL:-}
+      PNPM_STORE_PATH: /pnpm-store
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+
+  # The verification runner. This is the one that matters.
+  #
+  # network_mode: none is the whole mechanism — SANDBOX.md:113: "Egress is
+  # denied by default in the runner... Most supply-chain payloads need to reach
+  # the network, so this defeats the common case for almost nothing."
+  #
+  # It holds NO credential. Not a redacted one, not a scoped one — none. Adding
+  # an environment key here is the change that would matter, so it is the change
+  # to refuse in review.
+  verifier:
+    image: node:24-bookworm-slim
+    working_dir: /work
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /work/node_modules/.cache
+    volumes:
+      # Read-only: a verifier that can edit the code under test can make any
+      # failing test pass by changing the code instead of fixing the bug.
+      # CLAUDE.md states this as a mount-enforced rule, not a discipline.
+      - ${CLIENT_REPO:-./}:/work:ro
+      - pnpm-store:/pnpm-store:ro
+    environment:
+      PNPM_STORE_PATH: /pnpm-store
+      CI: "true"
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+
+  # Install phase, separated deliberately. The verifier cannot reach the
+  # network, so dependencies are fetched HERE, once, into a shared store that
+  # the verifier then mounts read-only. SANDBOX.md:113 allows the package
+  # registry and denies everything else; this is that split made concrete.
+  installer:
+    image: node:24-bookworm-slim
+    working_dir: /work
+    volumes:
+      - ${CLIENT_REPO:-./}:/work
+      - pnpm-store:/pnpm-store
+    environment:
+      PNPM_STORE_PATH: /pnpm-store
+    command: ["bash", "-lc", "corepack enable && pnpm install --frozen-lockfile"]
+
+volumes:
+  pnpm-store:

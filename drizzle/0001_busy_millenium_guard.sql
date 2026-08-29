@@ -1,0 +1,1 @@
+ALTER TABLE "agent_templates" ADD CONSTRAINT "agent_templates_feature_requires_engagement" CHECK (("agent_templates"."kind" = 'feature') = ("agent_templates"."engagement_id" IS NOT NULL));
