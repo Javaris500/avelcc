@@ -1,67 +1,101 @@
+import {
+	Activity,
+	BookMarked,
+	Bookmark,
+	Building2,
+	GitBranch,
+	Inbox,
+	Layers,
+	Library,
+	Plug,
+	Rocket,
+	UserCog,
+	Users,
+} from "lucide-react";
+
+import type { NavGroup } from "#/contract/ui/nav";
+
 /**
- * The sidebar model, transcribed from ROUTES.md's tree.
+ * The sidebar model. Item set and placement transcribed from ROUTES.md, which
+ * owns the information architecture; the visual treatment comes from
+ * avel-cc-shell.html, which owns nothing about which items exist.
  *
- * `built: false` items render dimmed and unfocusable with no href. A nav item
- * that links to a route which does not exist is "looks finished but isn't"
- * shipping inside the product — the exact thing CLAUDE.md opens with. Showing
- * the real information architecture is useful; pretending it is navigable is
- * not.
+ * Where the two disagree, ROUTES.md wins and the divergence is reported rather
+ * than reconciled here. See the session report: the reference carries a
+ * `Terminal` item with no route behind it, hoists Roster and Exports to top
+ * level when ROUTES.md nests both under /missions/:id, and offers single
+ * `Catalog` and `Settings` entries where ROUTES.md has only leaves.
  *
- * `device` mirrors the route metadata. It is duplicated here only for the
- * sidebar glyph; the route's own staticData stays authoritative.
+ * `built: false` is the honest default. Only routes that exist on disk are
+ * marked built, checked against src/routes/ rather than against ROUTES.md's
+ * status line — a nav item linking to a route that does not exist is "looks
+ * finished but isn't" shipping inside the product.
+ *
+ * `device` mirrors the route metadata for the sidebar glyph. The route's own
+ * staticData stays authoritative.
  */
-
-export type Device = "capture" | "construction" | "approve";
-
-export type NavItem = {
-	label: string;
-	to?: string;
-	device: Device;
-	built: boolean;
-};
-
-export type NavGroup = {
-	label: string;
-	items: NavItem[];
-};
-
 export const NAV: NavGroup[] = [
 	{
 		label: "Work",
 		items: [
-			{ label: "Missions", to: "/missions", device: "capture", built: true },
-			{ label: "Clients", device: "construction", built: false },
-			{ label: "Intake", device: "capture", built: false },
+			{
+				label: "Missions",
+				to: "/missions",
+				icon: Rocket,
+				device: "capture",
+				built: true,
+			},
+			{
+				label: "Clients",
+				icon: Building2,
+				device: "construction",
+				built: false,
+			},
+			{ label: "Intake", icon: Inbox, device: "capture", built: false },
 		],
 	},
 	{
 		label: "Library",
 		items: [
-			{ label: "Agent templates", device: "construction", built: false },
-			{ label: "Skills", device: "construction", built: false },
-			{ label: "Sources", device: "construction", built: false },
-			{ label: "Presets", device: "construction", built: false },
-			{ label: "Playbooks", device: "construction", built: false },
+			{
+				label: "Agent templates",
+				icon: Users,
+				device: "construction",
+				built: false,
+			},
+			{ label: "Skills", icon: Library, device: "construction", built: false },
+			{ label: "Sources", icon: Layers, device: "construction", built: false },
+			{
+				label: "Presets",
+				icon: Bookmark,
+				device: "construction",
+				built: false,
+			},
+			{
+				label: "Playbooks",
+				icon: BookMarked,
+				device: "construction",
+				built: false,
+			},
 		],
 	},
 	{
 		label: "System",
 		items: [
-			{ label: "Activity", device: "capture", built: false },
-			{ label: "Repositories", device: "construction", built: false },
-			{ label: "Connections", device: "construction", built: false },
+			{ label: "Activity", icon: Activity, device: "capture", built: false },
+			{
+				label: "Repositories",
+				icon: GitBranch,
+				device: "construction",
+				built: false,
+			},
+			{
+				label: "Connections",
+				icon: Plug,
+				device: "construction",
+				built: false,
+			},
+			{ label: "Account", icon: UserCog, device: "capture", built: false },
 		],
 	},
 ];
-
-export const DEVICE_GLYPH: Record<Device, string> = {
-	capture: "▢",
-	construction: "▣",
-	approve: "✓",
-};
-
-export const DEVICE_LABEL: Record<Device, string> = {
-	capture: "Works on a phone",
-	construction: "Desktop only",
-	approve: "Read and approve",
-};
