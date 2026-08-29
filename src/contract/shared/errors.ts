@@ -56,3 +56,23 @@ export function assertNever(value: never, context: string): never {
 export function isOverridable(code: ErrorCode): boolean {
   return code !== 'BLAST_RADIUS_VIOLATION' && code !== 'DETERMINISM_VIOLATION'
 }
+
+/**
+ * Auth codes. A SEPARATE union from ErrorCode on purpose.
+ *
+ * ErrorCode is export-scoped — it is the twelve codes from BLAST-RADIUS.md's
+ * table. Collapsing auth into it would let a failed sign-in render through the
+ * export error map, and would break ERROR_MAP's exhaustiveness guarantee by
+ * mixing two vocabularies that no single screen handles together. Same
+ * reasoning that keeps ViolationCode separate.
+ */
+export const AUTH_CODES = [
+  'INVALID_CREDENTIALS',
+  'OAUTH_NOT_CONFIGURED',
+  'OAUTH_DENIED',
+  'OAUTH_EXCHANGE_FAILED',
+  'RATE_LIMITED',
+  'SESSION_REQUIRED',
+] as const
+
+export type AuthCode = (typeof AUTH_CODES)[number]

@@ -8,12 +8,17 @@
    Every value below carries its provenance:
 
      [patch]  quoted inside globals-patch.css, usually in a contrast measurement
+     [ref]    avel-cc-shell.html, the design reference DAY-ONE-FRONTEND:68 names
      [brief]  LOGO-BRIEF.md palette block
      [derived] follows necessarily from a [patch] or [brief] value
      [INVENTED] no source anywhere in the doc set — needs review
 
-   The [INVENTED] set is listed in the session report. Do not treat those eight
-   as settled; they are placeholders with a defensible basis, not brand values.
+   avel-cc-shell.html arrived after this file was written and resolved seven of
+   the eight guesses. It disagreed with every one of them, which is the whole
+   argument for marking provenance rather than shipping confident values.
+
+   ONE token is still invented: --color-focus-ring. The reference does not
+   define it. Do not treat it as settled.
    ========================================================================== */
 
 @theme static {
@@ -33,7 +38,8 @@
   /* ── ACCENT ──────────────────────────────────────────────────────────── */
   --color-accent:      #0092ca;   /* [brief] "the only chromatic colour"      */
   --color-accent-soft: rgb(0 146 202 / 0.12);  /* [patch] state-selected      */
-  --color-accent-text: #33a9d6;   /* [INVENTED] accent lifted for AA on bg    */
+  --color-accent-text:  #0092ca;  /* [ref] avel-cc-shell.html :root           */
+  --color-accent-hover: #00a8e6;  /* [ref] avel-cc-shell.html :root           */
 
   /* ── FEEDBACK · dark ─────────────────────────────────────────────────── */
   --color-success: #22c55e;   /* [patch] "Dark values are unchanged"          */
@@ -43,8 +49,8 @@
   /* ── BORDERS · dark ──────────────────────────────────────────────────── */
   /* The patch leans on these for elevation ("a raised surface gets a stronger
      border, not just a shadow") but never gives either a value. */
-  --color-border:        #333842;   /* [INVENTED] = skeleton step             */
-  --color-border-strong: #4a5058;   /* [INVENTED] = surface-elevated step     */
+  --color-border:        #4a5058;   /* [ref] avel-cc-shell.html :root         */
+  --color-border-strong: #5e6670;   /* [ref] avel-cc-shell.html :root         */
 
   /* ── FOCUS ───────────────────────────────────────────────────────────── */
   --color-focus-ring: #0092ca;   /* [INVENTED] accent; patch only sets width  */
@@ -64,14 +70,16 @@
 .light {
   --color-bg:               #eeeeee;   /* [brief] Paper                       */
   --color-surface-muted:    #f2f4f6;   /* [derived] = patch recessed          */
-  --color-surface:          #ffffff;   /* [INVENTED] patch overrides elevated
-                                          and recessed in .light but not this */
+  --color-surface:          #ffffff;   /* [ref] avel-cc-shell.html .light —
+                                          the one guess the reference agreed
+                                          with, now sourced rather than lucky */
   --color-text:        #1a1d23;   /* [brief] Ink                              */
-  --color-text-muted:  #4a5058;   /* [INVENTED] muted step, light             */
+  --color-text-muted:  #393e46;   /* [ref] avel-cc-shell.html .light          */
   --color-text-subtle: #6e7681;   /* [patch] "4.59:1 on white — passes"       */
 
-  --color-accent-text: #0078ab;   /* [patch] "already shifts to #0078ab"      */
+  --color-accent-text:  #0078ab;  /* [patch] "already shifts to #0078ab"      */
+  --color-accent-hover: #0078ab;  /* [ref] avel-cc-shell.html .light          */
 
-  --color-border:        #d8dce1;   /* [INVENTED]                             */
-  --color-border-strong: #b9c0c8;   /* [INVENTED]                             */
+  --color-border:        #e5e7eb;   /* [ref] avel-cc-shell.html .light        */
+  --color-border-strong: #d1d5db;   /* [ref] avel-cc-shell.html .light        */
 }

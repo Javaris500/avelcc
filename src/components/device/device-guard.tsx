@@ -2,7 +2,7 @@ import { useMatches } from '@tanstack/react-router'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import { Button } from '#/components/ui/button'
-import { DEVICE_LABEL, type Device } from '#/routes/-lib/nav'
+import { DEVICE_LABEL, type Device } from '#/contract/ui/nav'
 
 /**
  * The device boundary. One guard, applied by route metadata.

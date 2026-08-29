@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { cn } from "#/components/cn";
 import { Wordmark } from "#/components/shell/wordmark";
-import { DEVICE_GLYPH, DEVICE_LABEL, NAV } from "#/routes/-lib/nav";
+import { DEVICE_GLYPH, DEVICE_LABEL, NAV } from "#/components/nav/nav";
 import type { Session } from "#/routes/-lib/session";
 
 function NavRow({
