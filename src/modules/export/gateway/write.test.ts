@@ -191,6 +191,20 @@ describe("createBlob", () => {
 		expect(err.detail).toContain("disagrees");
 	});
 
+	it("does not offer a retry on a sha disagreement", async () => {
+		// The reason this throws GITHUB_REJECTED despite that code's title being
+		// inaccurate here — see the comment at the throw. What is asserted is the
+		// half that matters: retrying re-sends the same bytes through the same
+		// encoding for the same answer, so nothing may advertise one.
+		const { fetchImpl } = replay({ sha: "0".repeat(40) });
+		const err = await createBlob({ ...base, content: UTF8, fetchImpl }).catch(
+			(e) => e,
+		);
+		expect(err.code).toBe("GITHUB_REJECTED");
+		expect(presentError(err.code).recovery.kind).toBe("none");
+		expect(presentError(err.code).severity).toBe("loud");
+	});
+
 	it("always sends the credential", async () => {
 		const { fetchImpl, calls } = replay(fixture("blob-utf8"));
 		await createBlob({ ...base, content: UTF8, fetchImpl });

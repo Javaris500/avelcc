@@ -78,12 +78,35 @@ export async function createBlob(
 	});
 
 	if (created.sha !== expected) {
-		// NO HONEST CODE EXISTS FOR THIS. ERROR_CODES is closed and holds nothing
-		// meaning "the remote stored different bytes than we sent". Filed with the
-		// orchestration session rather than adding a thirteenth code. Refusing is
-		// the safe half: a blob we cannot vouch for must not reach a tree.
+		/*
+		 * A DELIBERATE COMPROMISE, not a categorisation. Read this before changing
+		 * it, because the code is knowingly imprecise and was chosen anyway.
+		 *
+		 * GITHUB_REJECTED's title says "GitHub refused this request", and that is
+		 * FALSE here. GitHub refused nothing: it accepted the blob and answered
+		 * with a sha that disagrees with the bytes we sent. The honest code would
+		 * be a distinct one meaning "the remote stored something other than what we
+		 * sent", and ERROR_CODES does not have it.
+		 *
+		 * Of the codes that do exist, this is the least wrong. EXTERNAL_GITHUB,
+		 * which this used to throw, is wrong in the part that changes what the
+		 * operator DOES: it presents as recoverable and offers a retry, and a retry
+		 * re-sends the same bytes through the same encoding to get the same answer.
+		 * GITHUB_REJECTED is wrong only in its title, while its severity (loud),
+		 * its recovery (none) and its copy — very likely a fault in how the
+		 * delivery was built, needs filing — describe this failure exactly.
+		 *
+		 * So: wrong noun, right consequence, and the consequence is the half an
+		 * operator acts on. A distinct code is filed as a candidate; if one lands,
+		 * this is its first caller.
+		 *
+		 * Refusing is the part that is not a compromise. gitBlobSha is verified
+		 * against `git hash-object` on ten real files, so a disagreement means the
+		 * bytes GitHub stored are not the bytes we rendered, and a blob we cannot
+		 * vouch for must never reach a tree.
+		 */
 		throw new GatewayError(
-			"EXTERNAL_GITHUB",
+			"GITHUB_REJECTED",
 			`blob sha disagrees: sent ${opts.content.byteLength} bytes hashing to ${expected}, GitHub returned ${created.sha}`,
 		);
 	}
