@@ -1,0 +1,77 @@
+/* ============================================================================
+   AVEL — base brand tokens
+   ----------------------------------------------------------------------------
+   RECONSTRUCTED LAYER. The landing's globals.css is not in this repository,
+   and patches/globals-patch.css is explicitly additive to it. Applied alone
+   the patch consumes twelve tokens it never defines and renders nothing.
+
+   Every value below carries its provenance:
+
+     [patch]  quoted inside globals-patch.css, usually in a contrast measurement
+     [brief]  LOGO-BRIEF.md palette block
+     [derived] follows necessarily from a [patch] or [brief] value
+     [INVENTED] no source anywhere in the doc set — needs review
+
+   The [INVENTED] set is listed in the session report. Do not treat those eight
+   as settled; they are placeholders with a defensible basis, not brand values.
+   ========================================================================== */
+
+@theme static {
+
+  /* ── SURFACES · dark ─────────────────────────────────────────────────── */
+  --color-bg:               #1a1d23;   /* [brief] Ink · [patch] "= bg"        */
+  --color-surface-muted:    #2a2e36;   /* [patch] "= surface-muted"           */
+  --color-surface:          #393e46;   /* [brief] Mid · [patch] "#393e46"     */
+  --color-surface-elevated: #4a5058;   /* [patch] "= surface-elevated"        */
+  --color-surface-recessed: #1a1d23;   /* [derived] dark has no headroom down */
+
+  /* ── TEXT · dark ─────────────────────────────────────────────────────── */
+  --color-text:        #eeeeee;   /* [brief] Paper                            */
+  --color-text-muted:  #a0a8b0;   /* [patch] "= text-muted" · 5.65:1          */
+  --color-text-subtle: #6e7681;   /* [patch] "measures 2.96:1" · .app raises  */
+
+  /* ── ACCENT ──────────────────────────────────────────────────────────── */
+  --color-accent:      #0092ca;   /* [brief] "the only chromatic colour"      */
+  --color-accent-soft: rgb(0 146 202 / 0.12);  /* [patch] state-selected      */
+  --color-accent-text: #33a9d6;   /* [INVENTED] accent lifted for AA on bg    */
+
+  /* ── FEEDBACK · dark ─────────────────────────────────────────────────── */
+  --color-success: #22c55e;   /* [patch] "Dark values are unchanged"          */
+  --color-warning: #f59e0b;   /* [patch]                                      */
+  --color-danger:  #ef4444;   /* [patch] "danger #ef4444"                     */
+
+  /* ── BORDERS · dark ──────────────────────────────────────────────────── */
+  /* The patch leans on these for elevation ("a raised surface gets a stronger
+     border, not just a shadow") but never gives either a value. */
+  --color-border:        #333842;   /* [INVENTED] = skeleton step             */
+  --color-border-strong: #4a5058;   /* [INVENTED] = surface-elevated step     */
+
+  /* ── FOCUS ───────────────────────────────────────────────────────────── */
+  --color-focus-ring: #0092ca;   /* [INVENTED] accent; patch only sets width  */
+
+  /* ── TYPE ────────────────────────────────────────────────────────────── */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-emphasis: "Fraunces", ui-serif, Georgia, serif;
+
+  --tracking-wordmark: -0.02em;   /* [brief] Space Grotesk 700, -0.02em       */
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LIGHT — base layer only. The patch appends its own .light block after this.
+   ══════════════════════════════════════════════════════════════════════════ */
+.light {
+  --color-bg:               #eeeeee;   /* [brief] Paper                       */
+  --color-surface-muted:    #f2f4f6;   /* [derived] = patch recessed          */
+  --color-surface:          #ffffff;   /* [INVENTED] patch overrides elevated
+                                          and recessed in .light but not this */
+  --color-text:        #1a1d23;   /* [brief] Ink                              */
+  --color-text-muted:  #4a5058;   /* [INVENTED] muted step, light             */
+  --color-text-subtle: #6e7681;   /* [patch] "4.59:1 on white — passes"       */
+
+  --color-accent-text: #0078ab;   /* [patch] "already shifts to #0078ab"      */
+
+  --color-border:        #d8dce1;   /* [INVENTED]                             */
+  --color-border-strong: #b9c0c8;   /* [INVENTED]                             */
+}

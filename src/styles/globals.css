@@ -1,0 +1,33 @@
+/* ============================================================================
+   AVEL Command Center — style entry
+   ----------------------------------------------------------------------------
+   Order matters. Tailwind first, fonts second, base tokens third, patch last —
+   the patch overrides base values in .light and must win.
+   ========================================================================== */
+
+@import "tailwindcss";
+
+/* Self-hosted, latin subset only. STACK-AND-RESOURCES: "Do not hotlink fonts
+   in the app. An internal tool should not need a CDN to render text." */
+@import "@fontsource/space-grotesk/latin-500.css";
+@import "@fontsource/space-grotesk/latin-600.css";
+@import "@fontsource/space-grotesk/latin-700.css";
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/geist-mono/latin-400.css";
+@import "@fontsource/geist-mono/latin-500.css";
+@import "@fontsource/fraunces/latin-400-italic.css";
+@import "@fontsource/fraunces/latin-500-italic.css";
+
+@import "./tokens.css";
+@import "./patch.css";
+
+* { box-sizing: border-box; }
+
+html, body, #app { min-height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+}
