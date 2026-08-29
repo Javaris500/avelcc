@@ -1,0 +1,194 @@
+import { MODE } from "#/modules/export/blast/types";
+import type {
+	CreateBlobOptions,
+	CreateCommitOptions,
+	CreatedBlob,
+	CreatedCommit,
+	CreatedPullRequest,
+	CreatedTree,
+	CreatePullRequestOptions,
+	CreateTreeOptions,
+	UpdatedRef,
+	UpdateRefOptions,
+} from "#/modules/export/gateway/types";
+import { GatewayError } from "#/modules/export/gateway/types";
+import { githubWrite } from "#/modules/export/gateway/writeRequest";
+import { gitBlobSha } from "#/modules/export/git/gitBlobSha";
+
+/**
+ * The GitHub WRITE gateway: the calls that turn a rendered file map into a
+ * commit, and a commit into a pull request.
+ *
+ * The read side answers "what would delivery do". This side does it. Every
+ * function here mutates somebody else's repository, so the shape of the module
+ * is defensive on purpose: the destructive options are required or explicit,
+ * never inferred and never reachable by omission.
+ *
+ * NOTHING IN THIS FILE IS TESTED AGAINST A LIVE REPOSITORY. Every test replays
+ * a response; see __fixtures__/write/provenance.md for what those responses are
+ * and where their shapes come from.
+ */
+
+/**
+ * Base64 for the Git Blobs API, which takes no other encoding for bytes.
+ *
+ * Deliberately not Buffer, so the encoder and the decoder the tests check it
+ * with are independent implementations — a round trip through one library
+ * proves that library is self-consistent and nothing else. Chunked because
+ * String.fromCharCode(...spread) overflows the stack somewhere around a
+ * hundred thousand bytes, which is a size real files reach.
+ */
+export function toBase64(bytes: Uint8Array): string {
+	const CHUNK = 0x8000;
+	let binary = "";
+	for (let i = 0; i < bytes.length; i += CHUNK) {
+		binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+	}
+	return btoa(binary);
+}
+
+/**
+ * Write one file's bytes as a git blob.
+ *
+ * The returned sha is CHECKED against the one computed locally from the same
+ * bytes. gitBlobSha is verified against `git hash-object` on ten real files, so
+ * a disagreement means the bytes GitHub stored are not the bytes we rendered —
+ * an encoding fault somewhere between here and there. This repo has been bitten
+ * by that class twice: core.autocrlf rewriting a fixture before hashing, and a
+ * shell codepage storing U+FFFD in place of an em dash. Both were found late.
+ * This finds it at the moment it happens, on the one call where the correct
+ * bytes are still in hand.
+ */
+export async function createBlob(
+	opts: CreateBlobOptions,
+): Promise<CreatedBlob> {
+	const expected = gitBlobSha(opts.content);
+
+	const created = await githubWrite<{ sha: string }>(opts, {
+		method: "POST",
+		path: "/git/blobs",
+		body: { content: toBase64(opts.content), encoding: "base64" },
+	});
+
+	if (created.sha !== expected) {
+		// NO HONEST CODE EXISTS FOR THIS. ERROR_CODES is closed and holds nothing
+		// meaning "the remote stored different bytes than we sent". Filed with the
+		// orchestration session rather than adding a thirteenth code. Refusing is
+		// the safe half: a blob we cannot vouch for must not reach a tree.
+		throw new GatewayError(
+			"EXTERNAL_GITHUB",
+			`blob sha disagrees: sent ${opts.content.byteLength} bytes hashing to ${expected}, GitHub returned ${created.sha}`,
+		);
+	}
+
+	return { sha: created.sha };
+}
+
+/**
+ * Assemble blobs into a tree.
+ *
+ * `baseTree` carries the entire safety of this call and is required-but-
+ * nullable for that reason; see the comment on CreateTreeOptions. Passing the
+ * current commit's tree preserves every file AVEL is not writing. Passing null
+ * writes a tree containing only these entries, which is a valid commit that
+ * deletes everything else.
+ */
+export async function createTree(
+	opts: CreateTreeOptions,
+): Promise<CreatedTree> {
+	const tree = opts.entries.map((entry) => ({
+		path: entry.path,
+		mode: entry.mode,
+		// AVEL writes files. A directory is implied by a path containing a slash,
+		// never declared, and a "tree" entry here would need a tree sha instead.
+		type: "blob" as const,
+		sha: entry.sha,
+	}));
+
+	const created = await githubWrite<{ sha: string; truncated?: boolean }>(
+		opts,
+		{
+			method: "POST",
+			path: "/git/trees",
+			// Omitted rather than sent as null: GitHub rejects an explicit null
+			// base_tree, and absent is what "no base" means on the wire.
+			body:
+				opts.baseTree === null ? { tree } : { base_tree: opts.baseTree, tree },
+		},
+	);
+
+	return { sha: created.sha, truncated: created.truncated === true };
+}
+
+/** The commit object. `parents: []` is a root commit; see CreateCommitOptions. */
+export async function createCommit(
+	opts: CreateCommitOptions,
+): Promise<CreatedCommit> {
+	const created = await githubWrite<{ sha: string }>(opts, {
+		method: "POST",
+		path: "/git/commits",
+		body: { message: opts.message, tree: opts.tree, parents: opts.parents },
+	});
+	return { sha: created.sha };
+}
+
+/**
+ * `heads/main`, never `refs/heads/main`. GitHub's ref endpoints take the ref
+ * WITHOUT the leading `refs/` and 404 with it, which is a trap worth absorbing
+ * once here rather than at four call sites. Segments are encoded individually
+ * so a branch name's slashes stay structural.
+ */
+function refPath(ref: string): string {
+	return ref
+		.replace(/^refs\//, "")
+		.split("/")
+		.map(encodeURIComponent)
+		.join("/");
+}
+
+/**
+ * Move a ref to a commit. THE IRREVERSIBLE ONE.
+ *
+ * force defaults to false and is sent explicitly rather than omitted, so the
+ * request on the wire states the safe intent instead of relying on GitHub's
+ * default staying what it is today. The only way true reaches this body is a
+ * caller writing `force: true`, which is a line that shows up in a diff.
+ *
+ * A non-fast-forward rejection comes back as PREVIEW_STALE, which is the same
+ * fact the staleness re-check in BLAST-RADIUS.md guards against, discovered at
+ * the far end. The answer is identical: refuse, re-preview, never auto-retry.
+ */
+export async function updateRef(opts: UpdateRefOptions): Promise<UpdatedRef> {
+	const updated = await githubWrite<{ ref: string; object: { sha: string } }>(
+		opts,
+		{
+			method: "PATCH",
+			path: `/git/refs/${refPath(opts.ref)}`,
+			body: { sha: opts.sha, force: opts.force === true },
+		},
+	);
+	return { ref: updated.ref, sha: updated.object.sha };
+}
+
+/** Open the pull request. `head` and `base` are branches in the same repository. */
+export async function createPullRequest(
+	opts: CreatePullRequestOptions,
+): Promise<CreatedPullRequest> {
+	const created = await githubWrite<{ number: number; html_url: string }>(
+		opts,
+		{
+			method: "POST",
+			path: "/pulls",
+			body: {
+				title: opts.title,
+				head: opts.head,
+				base: opts.base,
+				...(opts.body === undefined ? {} : { body: opts.body }),
+			},
+		},
+	);
+	return { number: created.number, url: created.html_url };
+}
+
+/** Re-exported so a caller assembling tree entries never restates "100644". */
+export { MODE };

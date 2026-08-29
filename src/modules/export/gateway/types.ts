@@ -64,3 +64,132 @@ export type ReadTreeOptions = {
 	/** Carried from the root call when retrying scoped; a scoped response`s sha is the subtree`s. */
 	commitSha?: string;
 };
+
+/* ── the write side ──────────────────────────────────────────────────────── */
+
+/**
+ * The write side's injected fetch.
+ *
+ * A SEPARATE type from FetchLike, and only because FetchLike cannot express a
+ * write: its init carries headers and nothing else, so there is no way to say
+ * POST or to attach a body. FetchLike is unchanged and every existing caller is
+ * untouched; a FetchLike is assignable to this, so one replay helper serves
+ * both sides in tests. The response shape is identical on purpose.
+ */
+export type WriteFetchLike = (
+	url: string,
+	init?: {
+		method?: string;
+		headers?: Record<string, string>;
+		body?: string;
+	},
+) => Promise<{
+	ok: boolean;
+	status: number;
+	json: () => Promise<unknown>;
+	headers: { get: (k: string) => string | null };
+}>;
+
+/**
+ * Common to every write call. Mirrors ReadTreeOptions with one difference:
+ * `token` is REQUIRED.
+ *
+ * ReadTreeOptions makes it optional because a public repository is readable
+ * with no credential at all. No such case exists here — GitHub accepts no
+ * anonymous write — so an optional token would be a shape that permits a call
+ * which cannot succeed. The type refuses it instead of the server refusing it.
+ */
+export type WriteOptions = {
+	owner: string;
+	repo: string;
+	/** Server-side only. Required: there is no anonymous write. */
+	token: string;
+	fetchImpl?: WriteFetchLike;
+};
+
+/** GitHub's error body, narrowed to the two fields it documents. */
+export type GitHubErrorBody = {
+	message?: string;
+	errors?: Array<{ message?: string; field?: string; code?: string }>;
+};
+
+export type CreateBlobOptions = WriteOptions & {
+	/** The bytes as rendered. Base64 encoding happens at the edge, not here. */
+	content: Uint8Array;
+};
+
+export type CreatedBlob = { sha: string };
+
+/** One entry in a tree write. `type` is always "blob"; AVEL writes files. */
+export type TreeEntryInput = {
+	path: string;
+	/** MODE.blob for a normal file. Imported from the blast module, never restated. */
+	mode: string;
+	sha: string;
+};
+
+export type CreateTreeOptions = WriteOptions & {
+	/**
+	 * REQUIRED, and nullable rather than optional. This is the most dangerous
+	 * field in the module.
+	 *
+	 * A tree written with no base contains ONLY the entries given, so the commit
+	 * that points at it has lost every other file in the repository. That is not
+	 * a corrupted write, it is a valid commit that deletes the client's codebase,
+	 * and it is one forgotten property away. Optional would let a caller reach it
+	 * by omission; `string | null` makes the caller say which one they mean.
+	 *
+	 * null is legitimate exactly once: the first commit in an empty repository.
+	 */
+	baseTree: string | null;
+	entries: TreeEntryInput[];
+};
+
+export type CreatedTree = {
+	sha: string;
+	/**
+	 * Describes GitHub's RESPONSE LISTING, not what was created. Surfaced rather
+	 * than thrown on, because the tree is written either way and the caller is
+	 * the one that knows whether it needed to read the entries back.
+	 */
+	truncated: boolean;
+};
+
+export type CreateCommitOptions = WriteOptions & {
+	message: string;
+	/** The tree sha from createTree. */
+	tree: string;
+	/**
+	 * The commit shas this one descends from. An EMPTY array is a root commit
+	 * with no history, correct only for the first commit in an empty repository.
+	 */
+	parents: string[];
+};
+
+export type CreatedCommit = { sha: string };
+
+export type UpdateRefOptions = WriteOptions & {
+	/** `heads/main`, or `refs/heads/main` — the leading `refs/` is normalized off. */
+	ref: string;
+	sha: string;
+	/**
+	 * FORCE DESTROYS HISTORY IN SOMEBODY ELSE'S REPOSITORY AND CANNOT BE UNDONE.
+	 *
+	 * Optional, defaulting to false, and never inferred from anything. The only
+	 * way this reaches GitHub as true is a caller writing `force: true` at the
+	 * call site, which is a line a reviewer can see.
+	 */
+	force?: boolean;
+};
+
+export type UpdatedRef = { ref: string; sha: string };
+
+export type CreatePullRequestOptions = WriteOptions & {
+	/** A branch in the SAME repository. Cross-repo `owner:branch` is not supported. */
+	head: string;
+	base: string;
+	title: string;
+	body?: string;
+};
+
+export type CreatedPullRequest = { number: number; url: string };

@@ -1,0 +1,12 @@
+{
+	"message": "Validation Failed",
+	"errors": [
+		{
+			"resource": "Tree",
+			"code": "custom",
+			"message": "tree.sha is not a valid tree"
+		}
+	],
+	"documentation_url": "https://docs.github.com/rest/git/trees#create-a-tree",
+	"status": "422"
+}
