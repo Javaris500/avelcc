@@ -41,3 +41,22 @@ export function topLevelSegment(path: string): string {
 export function byCodepoint(a: string, b: string): number {
 	return a < b ? -1 : a > b ? 1 : 0;
 }
+
+/**
+ * Escape non-printable and non-ASCII codepoints for display.
+ *
+ * A normalization violation otherwise renders as two visually identical paths
+ * ("becomes .avel/café.md" next to ".avel/café.md"), which tells the operator
+ * nothing. The escaped form shows where the difference actually is.
+ */
+export function escapeNonAscii(value: string): string {
+	return [...value]
+		.map((char) => {
+			const code = char.codePointAt(0) ?? 0;
+			if (code >= 0x20 && code <= 0x7e) return char;
+			return code > 0xffff
+				? `\\u{${code.toString(16)}}`
+				: `\\u${code.toString(16).padStart(4, "0")}`;
+		})
+		.join("");
+}
