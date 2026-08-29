@@ -228,11 +228,7 @@ async function prepare(
 	 * still worked, because it compared this value against itself — which is
 	 * exactly why the disagreement went unnoticed.
 	 */
-	const packageHash = packageSha256(
-		[...files.entries()]
-			.filter(([path]) => path !== "manifest.json")
-			.map(([path, bytes]) => ({ path, sha256: sha256Hex(bytes) })),
-	);
+	const packageHash = packageHashOf(files);
 
 	current = await advance(db, current, "verifying");
 
@@ -408,6 +404,83 @@ function isUniqueViolation(error: unknown): boolean {
 		"code" in error &&
 		(error as { code?: unknown }).code === "23505"
 	);
+}
+
+/**
+ * The package hash: the SAME preimage manifest.json uses, which means
+ * manifest.json is excluded from it.
+ *
+ * `packagePreimage` skips it (a manifest cannot hash itself) and `render()`
+ * puts it into the returned map, so hashing every entry produced a number that
+ * could never equal the one printed inside the artifact. That value was
+ * persisted for querying and published into PR bodies as "Package sha256".
+ *
+ * The determinism gate did not catch it, and could not: it compares this value
+ * against itself, so a consistently wrong number passes. That is exactly why
+ * this is extracted and pinned against `manifestJson` rather than left inside
+ * `prepare` where only an end-to-end run would exercise it.
+ */
+export function packageHashOf(files: ReadonlyMap<string, Uint8Array>): string {
+	return packageSha256(
+		[...files.entries()]
+			.filter(([path]) => path !== "manifest.json")
+			.map(([path, bytes]) => ({ path, sha256: sha256Hex(bytes) })),
+	);
+}
+
+/** Just enough of an Export row to decide whether it can authorize a delivery. */
+export type ApprovableRow = {
+	id: string;
+	dryRun: boolean;
+	status: ExportStatus;
+	targetKind: ExportTargetKind;
+};
+
+/**
+ * Can this row authorize a delivery? Returns the refusal, or null to allow.
+ *
+ * THE DEVICE BOUNDARY LIVES HERE. Only the id was checked before, so any
+ * earlier row carrying a package hash satisfied `checkPreviewRequired` — a
+ * completed github_pr delivery, or a failed row that got as far as
+ * `previewing`. A github_push could be authorized by something no operator ever
+ * reviewed as a blast radius, which is the precise rule the guard exists to
+ * enforce.
+ *
+ * Extracted from `createExport` because that function needs a database and this
+ * decision does not. A safety rule that can only be exercised by an end-to-end
+ * run is a safety rule with no regression test.
+ */
+export function refuseUnapprovablePreview(
+	row: ApprovableRow,
+	target: ExportTargetKind,
+): string | null {
+	if (!row.dryRun || row.status !== "previewed") {
+		return `Export ${row.id} is not an approved preview (dryRun=${row.dryRun}, status=${row.status}). A delivery must be approved from a preview that reached 'previewed'.`;
+	}
+	if (row.targetKind !== target) {
+		return `Preview ${row.id} was computed for a ${row.targetKind}, not a ${target}. A blast radius for one target does not authorize another.`;
+	}
+	return null;
+}
+
+/**
+ * Which ref a delivery renders against.
+ *
+ * A LINKED PREVIEW'S REF WINS OUTRIGHT. `createExport` hardcoded "main" while
+ * `previewExport` honoured the caller's ref, so a preview taken against
+ * `develop` and then approved re-read main's tree. Usually that failed the
+ * staleness check; where the two tips coincided it PASSED, and the delivery
+ * branch was also "main" — a github_push approved against develop writing to
+ * main.
+ *
+ * The point of approving from a preview is that the delivery matches what was
+ * reviewed, so a request cannot re-specify the branch afterwards.
+ */
+export function refForDelivery(
+	previewRef: string | null,
+	requestedRef: string | undefined,
+): string {
+	return previewRef ?? requestedRef ?? "main";
 }
 
 async function loadMission(db: Db, id: string) {
@@ -635,20 +708,8 @@ export async function createExport(
 		 * as a blast radius. checkPreviewMatchesMission catches the wrong mission
 		 * downstream; nothing caught the wrong KIND of row.
 		 */
-		if (!p.dryRun || p.status !== "previewed") {
-			return fail(
-				"PREVIEW_REQUIRED",
-				422,
-				`Export ${p.id} is not an approved preview (dryRun=${p.dryRun}, status=${p.status}). A delivery must be approved from a preview that reached 'previewed'.`,
-			);
-		}
-		if (p.targetKind !== input.target) {
-			return fail(
-				"PREVIEW_REQUIRED",
-				422,
-				`Preview ${p.id} was computed for a ${p.targetKind}, not a ${input.target}. A blast radius for one target does not authorize another.`,
-			);
-		}
+		const unapprovable = refuseUnapprovablePreview(p, input.target);
+		if (unapprovable) return fail("PREVIEW_REQUIRED", 422, unapprovable);
 
 		/**
 		 * An export with no recorded package hash cannot be approved from.
@@ -723,7 +784,7 @@ export async function createExport(
 		 * request re-specify the branch afterwards is exactly the drift the link
 		 * exists to prevent.
 		 */
-		const ref = previewRef ?? input.ref ?? "main";
+		const ref = refForDelivery(previewRef, input.ref);
 		const prepared = await prepare(deps, row, mission, resolved.repo, ref);
 		row = prepared.row;
 
