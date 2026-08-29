@@ -19,6 +19,10 @@ const RULES = [
 	[/\b(rgb|rgba|hsl|hsla)\(/, "literal colour function — use a token"],
 	[/\btext-\[[^\]]*\d+(px|rem|em)[^\]]*\]/, "arbitrary font size — use the type scale"],
 	[/\brounded-\[(?!var\()[^\]]+\]/, "arbitrary radius — use the radius scale"],
+	// Spacing: flag an arbitrary pixel nudge, allow a named token or a unit that
+	// is genuinely content-relative (ch, ex, em) rather than a guess.
+	[/\b(p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y)-\[(?!var\()[^\]]*\d+(px|rem)[^\]]*\]/,
+		"arbitrary spacing — use the 4px grid or a named frame token"],
 ];
 
 function walk(dir) {

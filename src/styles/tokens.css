@@ -109,6 +109,34 @@
   --icon-control: 16px;   /* buttons, toolbar controls, standalone affordance */
   --icon-header:  20px;   /* section and page headers                        */
 
+  /* ── shadcn RADIUS BASE ─────────────────────────────────────────────────
+     shadcn derives rounded-sm/md/lg/xl from a single --radius. Pointing it at
+     our card step makes every generated component inherit OUR hierarchy
+     instead of shipping its own opinion. Radius encodes hierarchy here: chips
+     4, buttons 6, cards 10, windows 14, modals 18. */
+  --radius: var(--radius-md);
+
+  /* ── SPACING ────────────────────────────────────────────────────────────
+     The last ungoverned axis, and the one that most makes an interface read
+     as unconsidered. Tailwind derives p-1, gap-2 and so on from --spacing, so
+     setting it here means the whole utility family lands on one grid.
+
+     4px, so the scale is 4 / 8 / 12 / 16 / 20 / 24. avel-cc-shell.html uses
+     5, 7, 9, 11, 13, 22 and 26 — off any grid, because a prototype nudges
+     pixels until it looks right and never has to explain itself.
+
+     FRAME CONSTANTS below are the exception, and the distinction matters: a
+     value used once, deliberately, as a structural constant is a NAMED TOKEN.
+     A value that is an ad-hoc nudge belongs on the grid. Naming them is what
+     separates "26px because the frame is inset by a mat" from "26px because
+     it looked right". */
+  --spacing: 4px;
+
+  --frame-mat:     26px;   /* the desktop inset around the app window        */
+  --frame-sidebar: 238px;  /* sidebar column                                 */
+  --frame-max:    1440px;  /* app window cap                                 */
+  --frame-topbar:   52px;  /* top bar height                                 */
+
   /* ── shadcn ALIAS LAYER ─────────────────────────────────────────────────
      Tokens flow ONE DIRECTION. Brand is the source; these are aliases that
      point at it. Never the reverse, and never a literal value here.

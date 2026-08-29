@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "#/components/ui/button";
 import { SkeletonRows } from "#/components/ui/skeleton";
 import { EmptyState, ErrorState } from "#/components/ui/states";
 import { Surface } from "#/components/ui/surface";
 
-export const Route = createFileRoute("/_app/missions")({
+export const Route = createFileRoute("/_app/missions/")({
 	staticData: { device: "capture" as const },
 	component: Missions,
 });
@@ -33,6 +33,20 @@ function Missions() {
 			>
 				Missions
 			</h1>
+
+			{/* The only other built route today. Linked so it is reachable rather
+			    than needing the URL typed. */}
+			<p className="pt-1 pb-3 text-sm text-text-muted">
+				The pre-flight screen is partly built:{" "}
+				<Link
+					className="text-accent-text hover:text-accent-hover"
+					data-testid="link-preflight"
+					params={{ missionId: "01J8Z4K2QW3E5R7T9Y1V3J5P7A" }}
+					to="/missions/$missionId/exports/new"
+				>
+					gates, from the golden fixture
+				</Link>
+			</p>
 
 			<Surface
 				empty={

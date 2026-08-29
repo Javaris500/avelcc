@@ -12,9 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppMissionsRouteImport } from './routes/_app/missions'
+import { Route as AppMissionsIndexRouteImport } from './routes/_app/missions.index'
 import { Route as ApiAuthGithubRouteImport } from './routes/api/auth/github'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github.callback'
+import { Route as AppMissionsMissionIdExportsNewRouteImport } from './routes/_app/missions.$missionId.exports.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -30,9 +31,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppMissionsRoute = AppMissionsRouteImport.update({
-  id: '/missions',
-  path: '/missions',
+const AppMissionsIndexRoute = AppMissionsIndexRouteImport.update({
+  id: '/missions/',
+  path: '/missions/',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiAuthGithubRoute = ApiAuthGithubRouteImport.update({
@@ -45,53 +46,65 @@ const ApiAuthGithubCallbackRoute = ApiAuthGithubCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGithubRoute,
 } as any)
+const AppMissionsMissionIdExportsNewRoute =
+  AppMissionsMissionIdExportsNewRouteImport.update({
+    id: '/missions/$missionId/exports/new',
+    path: '/missions/$missionId/exports/new',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/missions': typeof AppMissionsRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/missions': typeof AppMissionsRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/missions': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/missions': typeof AppMissionsRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/_app/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/_app/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
-    | '/missions'
     | '/api/auth/github'
+    | '/missions/'
     | '/api/auth/github/callback'
+    | '/missions/$missionId/exports/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/missions'
     | '/api/auth/github'
+    | '/missions'
     | '/api/auth/github/callback'
+    | '/missions/$missionId/exports/new'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/login'
-    | '/_app/missions'
     | '/api/auth/github'
+    | '/_app/missions/'
     | '/api/auth/github/callback'
+    | '/_app/missions/$missionId/exports/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -124,11 +137,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/missions': {
-      id: '/_app/missions'
+    '/_app/missions/': {
+      id: '/_app/missions/'
       path: '/missions'
-      fullPath: '/missions'
-      preLoaderRoute: typeof AppMissionsRouteImport
+      fullPath: '/missions/'
+      preLoaderRoute: typeof AppMissionsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/auth/github': {
@@ -145,15 +158,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGithubCallbackRouteImport
       parentRoute: typeof ApiAuthGithubRoute
     }
+    '/_app/missions/$missionId/exports/new': {
+      id: '/_app/missions/$missionId/exports/new'
+      path: '/missions/$missionId/exports/new'
+      fullPath: '/missions/$missionId/exports/new'
+      preLoaderRoute: typeof AppMissionsMissionIdExportsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
-  AppMissionsRoute: typeof AppMissionsRoute
+  AppMissionsIndexRoute: typeof AppMissionsIndexRoute
+  AppMissionsMissionIdExportsNewRoute: typeof AppMissionsMissionIdExportsNewRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppMissionsRoute: AppMissionsRoute,
+  AppMissionsIndexRoute: AppMissionsIndexRoute,
+  AppMissionsMissionIdExportsNewRoute: AppMissionsMissionIdExportsNewRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

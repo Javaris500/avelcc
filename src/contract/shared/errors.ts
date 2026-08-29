@@ -76,3 +76,24 @@ export const AUTH_CODES = [
 ] as const
 
 export type AuthCode = (typeof AUTH_CODES)[number]
+
+/**
+ * Gate vocabulary. Closed sets — `mandatory | warn` only, "there is no
+ * skippable" (CLAUDE.md).
+ */
+export const GATE_POLICIES = ['mandatory', 'warn'] as const
+export type GatePolicy = (typeof GATE_POLICIES)[number]
+
+export const GATE_STATES = ['pass', 'block', 'warn', 'pending', 'stale'] as const
+export type GateState = (typeof GATE_STATES)[number]
+
+/**
+ * How a gate reached its verdict. THE distinction this product exists to make.
+ *
+ * BLAST-RADIUS.md: "An attestation rendered identically to a mechanical pass
+ * is the failure mode this project exists to prevent, appearing inside the
+ * product." So it is a required field, not an optional flag — a gate cannot be
+ * rendered without answering how it was decided.
+ */
+export const GATE_SOURCES = ['mechanical', 'attested'] as const
+export type GateSource = (typeof GATE_SOURCES)[number]
