@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { presentError } from "#/contract/errors/error-map";
 import { MODE } from "#/modules/export/blast/types";
 import {
 	type FetchLike,
@@ -389,6 +390,9 @@ describe("createRef", () => {
 		const err = await createRef({ ...make, fetchImpl }).catch((e) => e);
 		expect(err.code).not.toBe("PREVIEW_STALE");
 		expect(err.code).not.toBe("BRANCH_NOT_FOUND");
+		// GitHub understood this request and refused it, and will refuse it the
+		// same way forever, so it is a rejection rather than an outage.
+		expect(err.code).toBe("GITHUB_REJECTED");
 		expect(err.detail).toContain("already present");
 	});
 
@@ -595,15 +599,21 @@ describe("write failure mapping", () => {
 		});
 	});
 
-	it("labels an unmapped 422 as unmapped and not retryable", async () => {
-		// ERROR_CODES is closed and holds nothing meaning "rejected as invalid".
-		// The detail carries what the code cannot, rather than a code being
-		// invented to carry it.
+	it("maps a 422 it cannot name to GITHUB_REJECTED, which offers no retry", async () => {
+		// This branch used to borrow EXTERNAL_GITHUB and say "NOT retryable" in a
+		// detail string nothing reads, because no code meant "understood and
+		// refused". GITHUB_REJECTED now does, so the meaning lives where the screen
+		// actually looks.
 		const { fetchImpl } = replay(fixture("error-unmapped"), 422);
 		const err = await blob(fetchImpl).catch((e) => e);
-		expect(err.code).toBe("EXTERNAL_GITHUB");
-		expect(err.detail).toContain("unmapped 422");
-		expect(err.detail).toContain("NOT retryable");
+
+		expect(err.code).toBe("GITHUB_REJECTED");
+		expect(err.code).not.toBe("EXTERNAL_GITHUB");
+		// The consequence, not just the name: an operator is never told to try
+		// again on bytes that will be refused identically. This is the entire
+		// reason the code was added, so it is asserted here and not assumed.
+		expect(presentError(err.code).recovery.kind).toBe("none");
+		// GitHub's own words still travel, for whoever has to work out why.
 		expect(err.detail).toContain("tree.sha is not a valid tree");
 	});
 

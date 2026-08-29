@@ -15,9 +15,10 @@ const API = "https://api.github.com";
  * retried delivery finds its own branch from the first attempt — and the only
  * signal GitHub gives is a message. Sniffing that message once, here, and
  * handing downstream a marker this project controls is the difference between
- * one place parsing GitHub's wording and every call site doing it. The code
- * stays EXTERNAL_GITHUB because ERROR_CODES has nothing for "already exists";
- * see isRefAlreadyExists in write.ts for the predicate callers should use.
+ * one place parsing GitHub's wording and every call site doing it. The code is
+ * GITHUB_REJECTED: GitHub understood the request and refused it, and asking a
+ * second time is refused identically. See isRefAlreadyExists in write.ts for
+ * the predicate callers should branch on rather than reading this string.
  */
 export const REF_ALREADY_EXISTS = "ref already exists";
 
@@ -152,7 +153,7 @@ async function toWriteGatewayError(
 		return new GatewayError("EMPTY_REPOSITORY", `${where} has no commits`);
 	}
 
-	if (res.status === 422) return classifyUnprocessable(said, where);
+	if (res.status === 422) return classifyUnprocessable(said, where, request);
 
 	return new GatewayError(
 		"EXTERNAL_GITHUB",
@@ -167,14 +168,21 @@ async function toWriteGatewayError(
  * That is against the project's own rule — "codes are the contract; messages
  * change freely" — and it is done because GitHub gives no machine-readable
  * discriminator here. One status covers "somebody pushed since you read the
- * tip" and "that branch does not exist", which are a re-preview and a
- * configuration error respectively. The status alone cannot tell them apart.
+ * tip", "that branch does not exist" and "that branch already exists", which
+ * are a re-preview, a configuration error and a resumed delivery respectively.
+ * The status alone cannot tell them apart.
  *
  * So: match on the phrases GitHub documents, and when nothing matches, fall
- * through to EXTERNAL_GITHUB rather than guess a specific code. A wrong
- * specific code sends the operator to fix the wrong thing.
+ * through to GITHUB_REJECTED rather than guess a specific code. Guessing sends
+ * the operator to fix the wrong thing; GITHUB_REJECTED claims only what the
+ * status itself already established, which is that the request was understood
+ * and refused.
  */
-function classifyUnprocessable(said: string, where: string): GatewayError {
+function classifyUnprocessable(
+	said: string,
+	where: string,
+	request: { method: string; path: string },
+): GatewayError {
 	const text = said.toLowerCase();
 
 	if (text.includes("not a fast forward")) {
@@ -193,7 +201,7 @@ function classifyUnprocessable(said: string, where: string): GatewayError {
 		// and reading it as PREVIEW_STALE would send the operator to re-run a
 		// preview over a repository that has not moved.
 		return new GatewayError(
-			"EXTERNAL_GITHUB",
+			"GITHUB_REJECTED",
 			`${REF_ALREADY_EXISTS}: the ref this request tried to create is already present in ${where}`,
 		);
 	}
@@ -209,13 +217,12 @@ function classifyUnprocessable(said: string, where: string): GatewayError {
 		);
 	}
 
-	// UNMAPPED, and labelled as such rather than dressed up. ERROR_CODES is a
-	// closed set with an exhaustiveness assertion behind it and holds no code
-	// meaning "the request was rejected as invalid", so this borrows the only
-	// catch-all there is. The detail says so, because EXTERNAL_GITHUB's own copy
-	// promises the operator this is retryable and a 422 is not.
+	// The ones this cannot name. GITHUB_REJECTED carries the meaning the detail
+	// string used to have to spell out: understood, refused, and refused the same
+	// way if sent again. The editorial is gone because the code says it now, and
+	// the screen switches on the code and never reads this.
 	return new GatewayError(
-		"EXTERNAL_GITHUB",
-		`unmapped 422 from GitHub, which is NOT retryable: ${said || "no message given"}`,
+		"GITHUB_REJECTED",
+		`GitHub refused ${request.method} ${request.path}: ${said || "no message given"}`,
 	);
 }
