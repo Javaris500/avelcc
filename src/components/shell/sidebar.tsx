@@ -37,7 +37,7 @@ export function Sidebar({
 			data-testid="sidebar"
 		>
 			{/* Brand */}
-			<div className="flex items-center gap-[9px] px-1.5 pt-1 pb-3.5">
+			<div className="flex items-center gap-2 px-1.5 pt-1 pb-3.5">
 				<BrandMark />
 				<Wordmark />
 				<button
@@ -52,7 +52,7 @@ export function Sidebar({
 
 			{/* Workspace switcher */}
 			<button
-				className="interactive mb-[9px] flex items-center gap-[9px] rounded-sm border border-[var(--elevation-border-rest)] bg-app-raised px-2.5 py-2 text-left hover:border-[var(--elevation-border-raised)]"
+				className="interactive mb-2 flex items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-raised px-2.5 py-2 text-left hover:border-[var(--elevation-border-raised)]"
 				data-testid="workspace-switcher"
 				type="button"
 			>
@@ -83,7 +83,7 @@ export function Sidebar({
 				/>
 				<span className="flex-1 text-sm text-text-subtle">Find…</span>
 				<kbd
-					className="rounded-xs border border-[var(--elevation-border-rest)] px-[5px] py-px font-mono text-micro text-text-subtle"
+					className="rounded-xs border border-[var(--elevation-border-rest)] px-1 py-px font-mono text-micro text-text-subtle"
 					data-testid="search-hint"
 				>
 					F
@@ -106,7 +106,7 @@ export function Sidebar({
 			{/* Account, pinned bottom */}
 			<div className="mt-auto border-t border-[var(--elevation-border-rest)] pt-3">
 				<button
-					className="interactive flex w-full items-center gap-[9px] rounded-sm px-2 py-[7px] text-left"
+					className="interactive flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left"
 					data-testid="account"
 					onClick={onSignOut}
 					type="button"

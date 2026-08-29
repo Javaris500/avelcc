@@ -50,14 +50,14 @@ export function Shell({
 	return (
 		<div
 			className={cn(
-				"app min-h-screen bg-app-bg p-[26px] text-text",
+				"app min-h-screen bg-app-bg p-(--frame-mat) text-text",
 				theme === "light" && "light",
 			)}
 			data-testid="app-shell"
 			data-theme={theme}
 		>
 			<div
-				className="mx-auto grid h-[calc(100vh-52px)] max-w-[1440px] grid-cols-[238px_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-[1000px]:h-auto max-[1000px]:grid-cols-1"
+				className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[var(--frame-sidebar)_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-[1000px]:h-auto max-[1000px]:grid-cols-1"
 				data-testid="app-window"
 			>
 				<Sidebar
@@ -76,7 +76,7 @@ export function Shell({
 						theme={theme}
 					/>
 					<main
-						className="app-scroll min-h-0 flex-1 overflow-y-auto p-[22px]"
+						className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
 						data-testid="main"
 					>
 						{children}

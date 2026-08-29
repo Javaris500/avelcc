@@ -23,7 +23,7 @@ function Control({
 }) {
 	return (
 		<button
-			className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[13px] py-1.5 text-xs text-text-muted transition-[color,border-color] duration-[var(--duration-micro)] hover:border-[var(--elevation-border-raised)] hover:text-text"
+			className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted transition-[color,border-color] duration-[var(--duration-micro)] hover:border-[var(--elevation-border-raised)] hover:text-text"
 			data-testid={testId}
 			onClick={onClick}
 			type="button"
@@ -44,12 +44,12 @@ export function TopBar({
 }) {
 	return (
 		<header
-			className="flex flex-wrap items-center gap-3 border-b border-[var(--elevation-border-rest)] px-[22px] py-3.5"
+			className="flex flex-wrap items-center gap-3 border-b border-[var(--elevation-border-rest)] px-6 py-3.5"
 			data-testid="topbar"
 		>
 			{/* Live pill. Not a control — it reports, it does not act. */}
 			<span
-				className="inline-flex items-center gap-[7px] rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[11px] py-1 text-xs text-text-muted"
+				className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1 text-xs text-text-muted"
 				data-testid="live-pill"
 			>
 				<span
