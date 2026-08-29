@@ -1,8 +1,18 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { presentError } from "#/contract/errors/error-map";
+import { ERROR_CODES, type ErrorCode } from "#/contract/shared/errors";
 import { FULL_BUILD_GATES } from "#/contract/shared/playbook";
+import {
+	BlastRadius,
+	type BlastRadiusView,
+} from "#/modules/blast/blast-radius";
 import { GateRow } from "#/modules/gate";
 import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
+import { SkeletonRows } from "#/ui/skeleton";
+import { ErrorState } from "#/ui/states";
+import { Surface } from "#/ui/surface";
 
 /**
  * The pre-flight screen. ROUTES.md calls it "the screen that carries the
@@ -57,6 +67,26 @@ function NotBuilt({ what }: { what: string }) {
 function PreFlight() {
 	const { missionId } = Route.useParams();
 
+	/**
+	 * The first query in this app that reads something real. The rendered side is
+	 * the golden fixture on disk; the remote side is one live GitHub Trees call.
+	 * No database, no auth, no export engine — which is exactly the demo
+	 * DAY-ONE-FRONTEND asked for: "the actual mechanism, running in a browser".
+	 */
+	const blast = useQuery<BlastRadiusView>({
+		queryKey: ["blast-radius", "octocat", "Spoon-Knife", "main"],
+		queryFn: async () => {
+			const res = await fetch("/api/preflight/blast-radius");
+			const body = await res.json();
+			if (!body.success) throw new Error(body.error.code);
+			return body.data as BlastRadiusView;
+		},
+		// A tree is immutable for a given commit sha, so refetching on focus
+		// spends rate limit for an identical answer.
+		refetchOnWindowFocus: false,
+		retry: false,
+	});
+
 	return (
 		<div className="flex max-w-[68ch] flex-col gap-4 px-6 py-5">
 			<div className="flex flex-col gap-1">
@@ -93,8 +123,25 @@ function PreFlight() {
 				<NotBuilt what="Needs the export engine to produce a verification record." />
 			</Section>
 
-			<Section n={4} title="Blast radius" built={false}>
-				<NotBuilt what="computeBlastRadius is built and tested; this needs a gateway read of a real repository tree." />
+			<Section n={4} title="Blast radius">
+				<Surface
+					query={blast}
+					loading={<SkeletonRows count={5} />}
+					empty={
+						<NotBuilt what="The tree read returned nothing to classify." />
+					}
+					error={({ error }) => {
+						// Codes are the contract; messages change freely. Nothing here
+						// parses a message — the query throws the CODE.
+						const code = ERROR_CODES.includes(error.message as ErrorCode)
+							? (error.message as ErrorCode)
+							: "EXTERNAL_GITHUB";
+						const p = presentError(code);
+						return <ErrorState body={p.body} code={code} title={p.title} />;
+					}}
+				>
+					{(data) => <BlastRadius data={data} />}
+				</Surface>
 			</Section>
 
 			{/* Disabled by STATE, never by styling. Nothing has been previewed, so

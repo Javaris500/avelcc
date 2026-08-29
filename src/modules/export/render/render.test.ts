@@ -11,18 +11,6 @@ import { render } from "#/modules/export/render/render";
 
 const GOLDEN = path.resolve("fixtures/golden/slice-1/.avel");
 
-/**
- * The three files D5 blocks. GOLDEN-FIXTURE puts skills under
- * `roster/<agent>/skills/`; DATA-CONTRACTS-V2 renders them to `.avel/skills/`
- * and `.avel/capabilities/`. The content is settled, the path is not, and
- * guessing would produce a package that looks complete and hashes wrong.
- */
-const D5_BLOCKED = [
-	"roster/nemi/skills/playwright-gate.md",
-	"roster/transactions/skills/drizzle-migrate.md",
-	"roster/transactions/skills/nestjs-module.md",
-];
-
 function loadGolden(): Map<string, Uint8Array> {
 	const out = new Map<string, Uint8Array>();
 	const walk = (dir: string) => {
@@ -47,10 +35,8 @@ describe("render(mission)", () => {
 		expect(golden.size).toBe(20);
 	});
 
-	test("renders every file D5 does not block, and no others", () => {
-		const expected = [...golden.keys()]
-			.filter((p) => !D5_BLOCKED.includes(p))
-			.sort(byCodepoint);
+	test("renders every file the golden package declares, and no others", () => {
+		const expected = [...golden.keys()].sort(byCodepoint);
 		expect([...render(fixtureMission).keys()].sort(byCodepoint)).toEqual(
 			expected,
 		);
@@ -70,56 +56,22 @@ describe("render(mission)", () => {
 	 * would pass on exactly the differences this is here to catch.
 	 */
 	test.each(
-		[...golden.keys()]
-			.filter((p) => !D5_BLOCKED.includes(p) && p !== "manifest.json")
-			.sort(byCodepoint),
+		[...golden.keys()].filter((p) => p !== "manifest.json").sort(byCodepoint),
 	)("%s renders byte-for-byte", (file) => {
 		expect(render(fixtureMission).get(file)).toEqual(golden.get(file));
 	});
 
 	/**
-	 * manifest.json CANNOT match while D5 is unruled, and this asserts the
-	 * shape of the difference rather than skipping it. Its `files` array hashes
-	 * every other file in the package, so three unrenderable paths make three
-	 * missing entries and a different package_sha256. Everything else in it is
-	 * expected to agree.
+	 * manifest.json hashes every other file in the package, so it is the file
+	 * that can only match once all nineteen others do. Byte-for-byte equality
+	 * here is the whole-package assertion: every path present, every per-file
+	 * hash agreeing, and the package_sha256 over all of them landing on the
+	 * golden value.
 	 */
-	test("manifest.json differs only by the three files D5 blocks", () => {
-		const mine = JSON.parse(
-			new TextDecoder().decode(render(fixtureMission).get("manifest.json")),
+	test("manifest.json renders byte-for-byte", () => {
+		expect(render(fixtureMission).get("manifest.json")).toEqual(
+			golden.get("manifest.json"),
 		);
-		const theirs = JSON.parse(
-			new TextDecoder().decode(golden.get("manifest.json") as Uint8Array),
-		);
-
-		const minePaths = mine.files.map((f: { path: string }) => f.path);
-		const theirPaths = theirs.files.map((f: { path: string }) => f.path);
-		expect(theirPaths.filter((p: string) => !minePaths.includes(p))).toEqual(
-			D5_BLOCKED,
-		);
-
-		// Every file both sides render agrees on its hash.
-		for (const entry of mine.files as { path: string; sha256: string }[]) {
-			const match = (theirs.files as { path: string; sha256: string }[]).find(
-				(f) => f.path === entry.path,
-			);
-			expect(match?.sha256, entry.path).toBe(entry.sha256);
-		}
-
-		// Fields that do not depend on the blocked files agree exactly.
-		for (const key of [
-			"avel_version",
-			"cut",
-			"cut_source",
-			"mission_id",
-			"sprint",
-		]) {
-			expect(mine[key], key).toEqual(theirs[key]);
-		}
-		expect(mine.gate).toEqual(theirs.gate);
-
-		// And the package hash differs, because three files are missing from it.
-		expect(mine.package_sha256).not.toBe(theirs.package_sha256);
 	});
 
 	test("the package preimage is path + LF + hex + LF, concatenated", () => {
@@ -203,7 +155,7 @@ describe("determinism", () => {
 	}, 60_000);
 
 	/**
-	 * The check above cannot fail on the slice-1 fixture: none of its 17 paths
+	 * The check above cannot fail on the slice-1 fixture: none of its 20 paths
 	 * contains a character pair Turkish and root collation disagree about.
 	 * Proven by mutation — swapping byCodepoint for localeCompare left every
 	 * test green. This renders a mission that DOES contain such a pair, so a

@@ -20,12 +20,10 @@ import type { RenderMission } from "#/modules/export/render/types";
  * evidence/ is deliberately absent. The gate produces it at verification time;
  * a renderer that created it would put the two permanently out of step.
  *
- * SKILLS ARE NOT RENDERED. D5 is unruled: DATA-CONTRACTS-V2 renders a skill to
- * `.avel/skills/[agent]/[slug].md` and a capability to
- * `.avel/capabilities/[agent]/[slug].md`, while GOLDEN-FIXTURE files both under
- * `roster/<agent>/skills/`. The CONTENT is settled; only the path is not.
- * Guessing would produce a package that looks complete and hashes wrong, so
- * this stops short and says so.
+ * Skills render to `roster/<agent>/skills/<slug>.md` (D5, resolved in favour of
+ * GOLDEN-FIXTURE over DATA-CONTRACTS-V2's `.avel/skills/` split). Each is stored
+ * prose the same way identity.md is, so the renderer places bytes and does not
+ * synthesise the frontmatter from the metadata fields.
  */
 export function render(m: RenderMission): Map<string, Uint8Array> {
 	const files = new Map<string, Uint8Array>();
@@ -43,6 +41,9 @@ export function render(m: RenderMission): Map<string, Uint8Array> {
 		}
 		if (agent.depthMd !== undefined) {
 			put(`roster/${agent.slug}/depth.md`, agent.depthMd);
+		}
+		for (const skill of sorted(agent.skills, (s) => s.slug)) {
+			put(`roster/${agent.slug}/skills/${skill.slug}.md`, skill.body);
 		}
 	}
 

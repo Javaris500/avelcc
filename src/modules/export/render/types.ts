@@ -43,6 +43,13 @@ export type RenderAgent = {
 	/** Model context. Absent when runtime is not "model". */
 	identityMd?: string;
 	depthMd?: string;
+	/**
+	 * Granted skills, one file each under `roster/<slug>/skills/`. Stored prose,
+	 * frontmatter and all, exactly like identityMd — the body IS the data, not
+	 * something the renderer derives from the frontmatter fields. Empty for an
+	 * agent granted none.
+	 */
+	skills: { slug: string; body: string }[];
 };
 
 /** A declared artifact handoff. No entity models edges at all. */

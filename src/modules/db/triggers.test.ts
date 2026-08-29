@@ -31,9 +31,28 @@ try {
 const URL = process.env.DATABASE_URL_DIRECT;
 
 /**
- * Skipped rather than failed when there is no database to ask. The skip is
- * LOUD — vitest reports it — because a guard that silently passes when it
- * cannot run is the thing this file exists to prevent.
+ * IN CI, NO DATABASE IS A FAILURE, NOT A SKIP.
+ *
+ * Without this the describe below skips all four assertions and vitest exits
+ * green, so on a runner with no database this file is decoration and nothing
+ * ever says so. That is the same shape as the gap the file itself guards: the
+ * mechanism exists, and whether it FIRES was an environment fact rather than a
+ * guarantee.
+ *
+ * Precedent is already in the repo — playwright.config.ts sets
+ * `forbidOnly: !!process.env.CI`, because a committed `.only` silently shrinks
+ * a suite to one test and still reports green. Same failure, same fix.
+ */
+if (process.env.CI && !URL) {
+	throw new Error(
+		"DATABASE_URL_DIRECT is required in CI: the updated_at trigger guard " +
+			"cannot run without a database, and a skipped guard protects nothing.",
+	);
+}
+
+/**
+ * Skipped rather than failed LOCALLY, so anyone working without credentials is
+ * not blocked. The skip is loud — vitest reports it — and CI refuses it above.
  */
 describe.skipIf(!URL)("updated_at triggers", () => {
 	const sql = neon(URL ?? "");
