@@ -22,7 +22,19 @@ function Icon({ item }: { item: NavItem }) {
 	return (
 		<Glyph
 			aria-hidden="true"
-			className="size-(--icon-inline) shrink-0 opacity-90"
+			className={cn(
+				"size-(--icon-inline) shrink-0",
+				// The availability cue lives here rather than on the label.
+				// Tone is fully spent carrying hierarchy — group label, unbuilt
+				// item and built item occupy all three steps — so dimming the
+				// label to signal availability would cost the legibility that
+				// was just won. The icon is aria-hidden decoration, so dimming
+				// it costs a screen reader nothing while giving a sighted
+				// reader scanning the column an at-a-glance signal. It is a
+				// luminance difference, not a hue one, so it survives colour
+				// blindness. aria-disabled carries the same fact non-visually.
+				item.built ? "opacity-90" : "opacity-[var(--opacity-disabled)]",
+			)}
 			strokeWidth={1.8}
 		/>
 	);

@@ -154,13 +154,23 @@ test("every interactive element in the sidebar carries a data-testid", async ({
  * dark and 1.56:1 light, and eleven of twelve items are in this state, so a
  * reader could not resolve the information architecture at all.
  */
-test("unbuilt items are muted by tone, never by reduced opacity", async ({
+test("the label is never dimmed and the icon always carries the cue", async ({
 	page,
 }) => {
 	for (const label of UNBUILT) {
-		const opacity = await page
-			.getByTestId(id(label))
-			.evaluate((el) => getComputedStyle(el).opacity);
-		expect(opacity, `${label} must not be dimmed by opacity`).toBe("1");
+		const o = await page.getByTestId(id(label)).evaluate((el) => ({
+			label: getComputedStyle(el).opacity,
+			icon: getComputedStyle(el.querySelector("svg") as Element).opacity,
+		}));
+		expect(o.label, `${label} label must stay legible`).toBe("1");
+		expect(o.icon, `${label} icon must carry the availability cue`).toBe(
+			"0.35",
+		);
 	}
+	const built = await page.getByTestId("nav-missions").evaluate((el) => ({
+		label: getComputedStyle(el).opacity,
+		icon: getComputedStyle(el.querySelector("svg") as Element).opacity,
+	}));
+	expect(built.label).toBe("1");
+	expect(built.icon, "a built icon must not read as unavailable").toBe("0.9");
 });
