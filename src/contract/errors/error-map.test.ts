@@ -16,12 +16,28 @@ describe("error map", () => {
 		expect(Object.keys(ERROR_MAP).sort()).toEqual([...ERROR_CODES].sort());
 	});
 
-	it("carries BLAST-RADIUS's twelve, plus IDEMPOTENCY_REPLAY", () => {
-		expect(ERROR_CODES).toHaveLength(13);
-		// Named explicitly: the count alone would be satisfied by any thirteenth,
-		// and this one exists because the contract declared it before the union
-		// could express it.
+	it("carries BLAST-RADIUS's twelve, plus the two added since", () => {
+		expect(ERROR_CODES).toHaveLength(14);
+		// Named, not just counted: a count is satisfied by any two additions, and
+		// each of these exists for a reason worth asserting. IDEMPOTENCY_REPLAY
+		// was declared by the contract before the union could express it;
+		// GITHUB_REJECTED separates a refusal from an outage.
 		expect(ERROR_CODES).toContain("IDEMPOTENCY_REPLAY");
+		expect(ERROR_CODES).toContain("GITHUB_REJECTED");
+	});
+
+	/**
+	 * The distinction this code exists for. EXTERNAL_GITHUB tells the operator
+	 * to retry; GITHUB_REJECTED must never do that, because the same request
+	 * will be refused identically. If these two ever offer the same recovery,
+	 * the second code has stopped earning its place.
+	 */
+	it("does not offer a retry for a request GitHub refused", () => {
+		expect(presentError("EXTERNAL_GITHUB").recovery.kind).toBe("retry");
+		expect(presentError("GITHUB_REJECTED").recovery.kind).toBe("none");
+		expect(presentError("GITHUB_REJECTED").body).toMatch(/same answer/i);
+		expect(blocksDelivery("GITHUB_REJECTED")).toBe(true);
+		expect(isOverridable("GITHUB_REJECTED")).toBe(false);
 	});
 
 	/**

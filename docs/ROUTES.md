@@ -132,7 +132,7 @@ Hub. Brief summary · roster summary · playbook in effect · last export state 
 
 **The screen that carries the product.** Preconditions → gates → verification → blast radius → one button.
 
-Fully specified in **`BLAST-RADIUS.md`**, including the wireframe, the error codes, and the staleness rules. Do not re-derive it here. `ERROR_CODES` now carries **thirteen** — that document's twelve plus `IDEMPOTENCY_REPLAY`, which its own contract sketch named on `export.create`'s 409 without ever adding to the table.
+Fully specified in **`BLAST-RADIUS.md`**, including the wireframe, the error codes, and the staleness rules. Do not re-derive it here. Note that `ERROR_CODES` has grown past that document's table — `IDEMPOTENCY_REPLAY`, which its own contract sketch named without ever adding, and `GITHUB_REJECTED`, which separates a request GitHub refused from one it failed to answer. **Read the union, not the table**; the union is what the exhaustiveness check is keyed on.
 
 **Non-negotiables:** deliver is disabled by state, never by styling · the base SHA and read age are always visible · attested gates are visually distinct from mechanical ones · initiation is desktop-only.
 

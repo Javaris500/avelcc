@@ -121,6 +121,18 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 	 * `none` because the useful destination is that specific export and this
 	 * table is static, so a link here would have to guess a route.
 	 */
+	/**
+	 * Loud, because reaching this almost always means AVEL sent a request GitHub
+	 * does not accept, and the recognisable 422s are already mapped to codes of
+	 * their own. Recovery is `none` and the copy says so: the defining property
+	 * of this code is that retrying cannot work.
+	 */
+	GITHUB_REJECTED: {
+		title: "GitHub refused this request.",
+		body: "The request reached GitHub intact and was rejected as something it will not accept, so sending it again produces the same answer. Nothing was written. This is very likely a fault in how the delivery was built rather than anything you did, and it needs filing.",
+		recovery: { kind: "none" },
+		severity: "loud",
+	},
 	IDEMPOTENCY_REPLAY: {
 		title: "This delivery already ran.",
 		body: "An export with this idempotency key was created earlier, so nothing was sent a second time. The original export's id is on this response — open it to see what happened rather than retrying.",

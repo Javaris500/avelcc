@@ -5,7 +5,12 @@
  *   — DAY-ONE-FRONTEND.md
  *
  * Seeded from the twelve codes in docs/BLAST-RADIUS.md's error table, plus
- * IDEMPOTENCY_REPLAY — see its comment below.
+ * IDEMPOTENCY_REPLAY and GITHUB_REJECTED — each commented where it is declared.
+ *
+ * NO COUNT IS WRITTEN DOWN HERE ON PURPOSE. Two rounds of adding a code left
+ * stale "twelve codes" prose scattered across the source and the docs, some of
+ * it inside the very file being edited. The union is the count; anything that
+ * needs one reads it from here.
  */
 
 export const ERROR_CODES = [
@@ -42,6 +47,27 @@ export const ERROR_CODES = [
 	 * always "then where is the one that ran?".
 	 */
 	"IDEMPOTENCY_REPLAY",
+	/**
+	 * GitHub understood the request and REFUSED it.
+	 *
+	 * The distinction from EXTERNAL_GITHUB is retryability, and it is the whole
+	 * reason this code exists. EXTERNAL_GITHUB means GitHub failed to answer — a
+	 * timeout, a rate limit, an outage — so nothing was written and trying again
+	 * is the correct move, which is what its copy tells the operator.
+	 *
+	 * An unprocessable request is the opposite: the same bytes will be refused
+	 * identically forever. Routing it through EXTERNAL_GITHUB promised a retry
+	 * that could never work, which is worse than having no code at all, because
+	 * the operator burns attempts on the advice we gave them.
+	 *
+	 * The write gateway maps every 422 it can recognise to something specific —
+	 * a non-fast-forward becomes PREVIEW_STALE, a missing ref becomes
+	 * BRANCH_NOT_FOUND, an existing ref becomes a marker the caller branches on.
+	 * This is the fallthrough for the ones it cannot name, and reaching it
+	 * usually means AVEL built a request GitHub does not accept: our bug, not
+	 * the operator's, which is why it presents as loud.
+	 */
+	"GITHUB_REJECTED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -75,21 +101,38 @@ export function assertNever(value: never, context: string): never {
 }
 
 /**
- * A code that is not overridable by gate_override, per BLAST-RADIUS.md.
+ * Codes a gate_override must never clear, for three different reasons.
  *
- * IDEMPOTENCY_REPLAY is listed beside the two the doc names, and it is a
- * different KIND of un-overridable. Those two are refusals a justification must
- * not clear. This one is not a refusal at all: the delivery already happened,
- * and there is nothing for an override to permit. A gate override expresses an
- * operator accepting a risk in their own work; it cannot make a completed write
- * un-happen.
+ * A set rather than a chain of !== because the list has grown past the point
+ * where a boolean expression documents itself, and because each entry is here
+ * for its own reason rather than as more of the same:
+ *
+ *   BLAST_RADIUS_VIOLATION · DETERMINISM_VIOLATION
+ *     The two BLAST-RADIUS.md names. Real refusals, where a justification must
+ *     not be allowed to buy passage. "A justification does not make a path
+ *     traversal acceptable."
+ *
+ *   IDEMPOTENCY_REPLAY
+ *     Not a refusal at all. The delivery already happened and there is nothing
+ *     for an override to permit — a gate override expresses an operator
+ *     accepting risk in their own work, and it cannot make a completed write
+ *     un-happen.
+ *
+ *   GITHUB_REJECTED
+ *     Not ours to override. GitHub refused the request; our opinion about
+ *     whether it should have is not part of the exchange, and an override would
+ *     re-send bytes that will be refused identically.
  */
+const NON_OVERRIDABLE: ReadonlySet<ErrorCode> = new Set([
+	"BLAST_RADIUS_VIOLATION",
+	"DETERMINISM_VIOLATION",
+	"IDEMPOTENCY_REPLAY",
+	"GITHUB_REJECTED",
+]);
+
+/** A code that is not overridable by gate_override. See NON_OVERRIDABLE. */
 export function isOverridable(code: ErrorCode): boolean {
-	return (
-		code !== "BLAST_RADIUS_VIOLATION" &&
-		code !== "DETERMINISM_VIOLATION" &&
-		code !== "IDEMPOTENCY_REPLAY"
-	);
+	return !NON_OVERRIDABLE.has(code);
 }
 
 /**
