@@ -1,7 +1,11 @@
 import { relations, sql } from "drizzle-orm";
 import {
+	boolean,
 	check,
 	index,
+	integer,
+	jsonb,
+	numeric,
 	pgEnum,
 	pgTable,
 	primaryKey,
@@ -206,6 +210,235 @@ export const agentTemplateSkills = pgTable(
 	(t) => [primaryKey({ columns: [t.agentTemplateId, t.skillId] })],
 );
 
+/* ── step 2 · mission, process and squad ────────────────────────────────── */
+
+/**
+ * DERIVED, not chosen. DATA-CONTRACTS-V2:230 — at setup the system reads the
+ * repository's directory structure and determines which boundary is a
+ * directory. An operator may override, and an override requires a written
+ * rationale that renders into the delivery.
+ *
+ * The reason is specific: the original roster defect came from applying the
+ * decomposition rule to a roster that had already been decided. A free-choice
+ * field permits exactly that failure; a derived field with a written-rationale
+ * override does not.
+ */
+export const missionCut = pgEnum("mission_cut", ["horizontal", "vertical"]);
+export const missionCutSource = pgEnum("mission_cut_source", [
+	"derived",
+	"overridden",
+]);
+
+/** Code branches on this: each value is a different delivery path. */
+export const playbookDeliverable = pgEnum("playbook_deliverable", [
+	"pr",
+	"report",
+	"recommendation",
+]);
+
+export const missions = pgTable(
+	"missions",
+	{
+		...identity,
+		engagementId: uuid("engagement_id")
+			.notNull()
+			.references(() => engagements.id),
+		/**
+		 * Matches Playbook.mission_type. TEXT, not an enum: the contract types it
+		 * `z.string()` and no closed vocabulary is defined anywhere. Code looks a
+		 * playbook UP by this value rather than branching on it, which is the
+		 * doc's own enum-vs-catalogue test.
+		 */
+		type: text("type").notNull(),
+		/** Structured, shape owned by the mission type. */
+		brief: jsonb("brief")
+			.$type<Record<string, unknown>>()
+			.notNull()
+			.default({}),
+		sprintN: integer("sprint_n").notNull().default(1),
+		/** TEXT for the same reason as `type`, and see the reported gap. */
+		status: text("status").notNull(),
+		cut: missionCut("cut").notNull(),
+		cutSource: missionCutSource("cut_source").notNull().default("derived"),
+		cutRationale: text("cut_rationale"),
+		/** A DEFAULT, not the binding destination. The Export names that. */
+		repoUrl: text("repo_url"),
+		/**
+		 * Modelled now so cost governance is a gate check rather than a migration
+		 * later. Read by nothing today. `numeric` not a float: money.
+		 */
+		spendCeilingUsd: numeric("spend_ceiling_usd", { precision: 12, scale: 2 }),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		index("missions_engagement_idx").on(t.engagementId),
+		// An override without a written rationale is the failure this whole
+		// mechanism exists to prevent, so it is refused by the database rather
+		// than by a service that can be bypassed. `derived` may still carry one.
+		check(
+			"missions_override_requires_rationale",
+			sql`${t.cutSource} <> 'overridden' or (${t.cutRationale} is not null and length(btrim(${t.cutRationale})) > 0)`,
+		),
+		// A sprint is 1-based and counts upward.
+		check("missions_sprint_n_positive", sql`${t.sprintN} >= 1`),
+	],
+);
+
+/**
+ * A saved squad. Applying it MATERIALIZES RosterEntries — copy-then-edit — and
+ * the preset itself holds no mission state.
+ *
+ * SHAPE INCOMPLETE, AND DELIBERATELY SO. DATA-CONTRACTS-V2:267 gives this
+ * entity two sentences of prose and NO field list, and no schema for it exists
+ * in src/contract either. Every other entity in that document has a field
+ * block. What is here is only what something else already references:
+ * Playbook.default_preset_id needs the id, and `preset.ts — list · get ·
+ * create · update · apply` needs a name to list by.
+ *
+ * What is NOT here is the squad itself — which agent templates, at which
+ * waves, with which priorities. That is the entire point of the entity and it
+ * is undefined. Filed as a contract request rather than invented, because a
+ * roster_preset_entries table I made up would be a shape nobody agreed to,
+ * sitting under a materialize-into-RosterEntry operation.
+ */
+export const rosterPresets = pgTable(
+	"roster_presets",
+	{
+		...identity,
+		name: text("name").notNull(),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		uniqueIndex("roster_presets_name_live_unique")
+			.on(t.name)
+			.where(sql`${t.deletedAt} is null`),
+	],
+);
+
+/**
+ * The process, not the squad. DATA-CONTRACTS-V2:251 — "References a preset;
+ * never lists agents." Composition is RosterPreset's; the Playbook owns gates,
+ * waves and the deliverable.
+ */
+export const playbooks = pgTable(
+	"playbooks",
+	{
+		...identity,
+		/** Unique. A mission type resolves to exactly one playbook. */
+		missionType: text("mission_type").notNull(),
+		name: text("name").notNull(),
+		wavesApplicable: text("waves_applicable").array().notNull().default([]),
+		/**
+		 * `{ gate, policy }[]`. jsonb rather than two columns or a join table
+		 * because it is an ordered list read as a whole and never queried by
+		 * element. Gate vocabulary is CLOSED — phase1-close · alignment · qa ·
+		 * security · rollback · acceptance — and policy is `mandatory` or `warn`
+		 * only; there is no skippable. Both are enforced by the zod schema in
+		 * src/contract/playbook.ts, which is the one definition all three
+		 * consumers share.
+		 */
+		gates: jsonb("gates")
+			.$type<{ gate: string; policy: "mandatory" | "warn" }[]>()
+			.notNull()
+			.default([]),
+		deliverable: playbookDeliverable("deliverable").notNull(),
+		requiredFields: text("required_fields").array().notNull().default([]),
+		/**
+		 * NULLABLE, and that is what makes the migration order work. The doc's
+		 * order builds Playbook before RosterPreset while Playbook references it;
+		 * a nullable FK means a playbook can exist before any preset does, which
+		 * is also true in the product — a process can be defined before anyone
+		 * has saved a squad for it.
+		 */
+		defaultPresetId: uuid("default_preset_id").references(
+			() => rosterPresets.id,
+		),
+		/** Counter-only. No version-history table, deliberately. */
+		version: integer("version").notNull().default(1),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		uniqueIndex("playbooks_mission_type_live_unique")
+			.on(t.missionType)
+			.where(sql`${t.deletedAt} is null`),
+		index("playbooks_default_preset_idx").on(t.defaultPresetId),
+		check("playbooks_version_positive", sql`${t.version} >= 1`),
+	],
+);
+
+/**
+ * One agent customized for one mission.
+ *
+ * NO SOFT DELETE, and that is deliberate rather than an omission. The doc's
+ * field list ends at `timestamps`, and rosterEntrySchema in src/contract
+ * carries no deletedAt either. `active` already expresses "off the mission"
+ * without destroying the row, which is what soft delete would have been for.
+ *
+ * This does sit in tension with the cross-cutting invariant at
+ * DATA-CONTRACTS-V2:399 — soft delete on anything an Export can reach — and a
+ * roster entry is rendered into the export. Reported, not resolved here: two
+ * sources agree on the field list, so following them is the smaller
+ * assumption.
+ */
+export const rosterEntries = pgTable(
+	"roster_entries",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id, { onDelete: "cascade" }),
+		agentTemplateId: uuid("agent_template_id")
+			.notNull()
+			.references(() => agentTemplates.id),
+		/** Whether the agent is ON the mission. Not a delete. */
+		active: boolean("active").notNull().default(true),
+		waves: text("waves").array().notNull().default([]),
+		/** wezterm pane priority. Nullable per the contract schema. */
+		monitorPriority: integer("monitor_priority"),
+		customizedMd: text("customized_md"),
+		/**
+		 * OVERRIDES the template's, per mission. Nullable, and null means "use
+		 * the template's" — distinct from `[]`, which would mean "this agent may
+		 * write nothing". An empty array is a real, different instruction.
+		 */
+		writablePaths: text("writable_paths").array(),
+		...timestamps,
+	},
+	(t) => [
+		// One entry per agent per mission. Whether an agent is on a mission is
+		// whether its entry exists, so two entries for one agent makes that
+		// question ambiguous and lets one row's `active` contradict the other's.
+		// Not partial: this table has no soft delete to exclude.
+		uniqueIndex("roster_entries_mission_agent_unique").on(
+			t.missionId,
+			t.agentTemplateId,
+		),
+		index("roster_entries_mission_idx").on(t.missionId),
+		index("roster_entries_agent_template_idx").on(t.agentTemplateId),
+		check(
+			"roster_entries_monitor_priority_positive",
+			sql`${t.monitorPriority} is null or ${t.monitorPriority} >= 0`,
+		),
+	],
+);
+
+/** `skillIds` on the contract's RosterEntry. Skills are a relation. */
+export const rosterEntrySkills = pgTable(
+	"roster_entry_skills",
+	{
+		rosterEntryId: uuid("roster_entry_id")
+			.notNull()
+			.references(() => rosterEntries.id, { onDelete: "cascade" }),
+		skillId: uuid("skill_id")
+			.notNull()
+			.references(() => skills.id, { onDelete: "cascade" }),
+	},
+	(t) => [primaryKey({ columns: [t.rosterEntryId, t.skillId] })],
+);
+
 /* ── relations ──────────────────────────────────────────────────────────── */
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -248,6 +481,54 @@ export const agentTemplateSkillsRelations = relations(
 		}),
 		skill: one(skills, {
 			fields: [agentTemplateSkills.skillId],
+			references: [skills.id],
+		}),
+	}),
+);
+
+export const missionsRelations = relations(missions, ({ one, many }) => ({
+	engagement: one(engagements, {
+		fields: [missions.engagementId],
+		references: [engagements.id],
+	}),
+	rosterEntries: many(rosterEntries),
+}));
+
+export const rosterPresetsRelations = relations(rosterPresets, ({ many }) => ({
+	playbooks: many(playbooks),
+}));
+
+export const playbooksRelations = relations(playbooks, ({ one }) => ({
+	defaultPreset: one(rosterPresets, {
+		fields: [playbooks.defaultPresetId],
+		references: [rosterPresets.id],
+	}),
+}));
+
+export const rosterEntriesRelations = relations(
+	rosterEntries,
+	({ one, many }) => ({
+		mission: one(missions, {
+			fields: [rosterEntries.missionId],
+			references: [missions.id],
+		}),
+		agentTemplate: one(agentTemplates, {
+			fields: [rosterEntries.agentTemplateId],
+			references: [agentTemplates.id],
+		}),
+		skills: many(rosterEntrySkills),
+	}),
+);
+
+export const rosterEntrySkillsRelations = relations(
+	rosterEntrySkills,
+	({ one }) => ({
+		rosterEntry: one(rosterEntries, {
+			fields: [rosterEntrySkills.rosterEntryId],
+			references: [rosterEntries.id],
+		}),
+		skill: one(skills, {
+			fields: [rosterEntrySkills.skillId],
 			references: [skills.id],
 		}),
 	}),
