@@ -55,7 +55,7 @@ No product screen until all six exist. Skipping any of them means rewriting ever
 ### 4 · Error map
 - [ ] One table: `error.code` → message + recovery action
 - [ ] Exhaustive over the code union — a TypeScript `never` check so a new code fails the build
-- [ ] Seed it from the twelve codes in `BLAST-RADIUS.md`
+- [ ] Seed it from `ERROR_CODES` — BLAST-RADIUS.md's twelve plus `IDEMPOTENCY_REPLAY`. Seed from the union, not the document: the union is what the exhaustiveness check is keyed on.
 
 **Never parse `message`.** Codes are the contract; messages change freely.
 

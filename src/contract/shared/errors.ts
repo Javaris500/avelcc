@@ -4,7 +4,8 @@
  * "Never parse `message`. Codes are the contract; messages change freely."
  *   — DAY-ONE-FRONTEND.md
  *
- * Seeded from the twelve codes in docs/BLAST-RADIUS.md's error table.
+ * Seeded from the twelve codes in docs/BLAST-RADIUS.md's error table, plus
+ * IDEMPOTENCY_REPLAY — see its comment below.
  */
 
 export const ERROR_CODES = [
@@ -20,6 +21,27 @@ export const ERROR_CODES = [
 	"PREVIEW_REQUIRED",
 	"DETERMINISM_VIOLATION",
 	"EXTERNAL_GITHUB",
+	/**
+	 * The thirteenth, and the only one not from BLAST-RADIUS.md's table.
+	 *
+	 * That document's contract sketch names IDEMPOTENCY_REPLAY on `export.create`'s
+	 * 409 and the contract copied the line, but the code was never added here — so
+	 * the response was typed with an envelope that could not express the one thing
+	 * it was declared to say. That is the same defect errors.ts already records
+	 * about roster.ts naming PRECONDITION_FAILED in a comment, found a second time
+	 * on a route that had not been implemented yet.
+	 *
+	 * It belongs in THIS union rather than CRUD_CODES: a replayed key on
+	 * `export.create` is a statement about a delivery, reaches the pre-flight
+	 * screen, and is handled beside PREVIEW_STALE — not about a Command Center
+	 * resource, which is what CRUD_CODES scopes.
+	 *
+	 * Meaning: this idempotency key already produced an Export, and no second
+	 * delivery was performed. It is NOT a failure. The original export's id
+	 * travels in the envelope's `details`, because an operator's next question is
+	 * always "then where is the one that ran?".
+	 */
+	"IDEMPOTENCY_REPLAY",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -52,15 +74,28 @@ export function assertNever(value: never, context: string): never {
 	throw new Error(`${context}: unhandled variant ${JSON.stringify(value)}`);
 }
 
-/** A code that is not overridable by gate_override, per BLAST-RADIUS.md. */
+/**
+ * A code that is not overridable by gate_override, per BLAST-RADIUS.md.
+ *
+ * IDEMPOTENCY_REPLAY is listed beside the two the doc names, and it is a
+ * different KIND of un-overridable. Those two are refusals a justification must
+ * not clear. This one is not a refusal at all: the delivery already happened,
+ * and there is nothing for an override to permit. A gate override expresses an
+ * operator accepting a risk in their own work; it cannot make a completed write
+ * un-happen.
+ */
 export function isOverridable(code: ErrorCode): boolean {
-	return code !== "BLAST_RADIUS_VIOLATION" && code !== "DETERMINISM_VIOLATION";
+	return (
+		code !== "BLAST_RADIUS_VIOLATION" &&
+		code !== "DETERMINISM_VIOLATION" &&
+		code !== "IDEMPOTENCY_REPLAY"
+	);
 }
 
 /**
  * Auth codes. A SEPARATE union from ErrorCode on purpose.
  *
- * ErrorCode is export-scoped — it is the twelve codes from BLAST-RADIUS.md's
+ * ErrorCode is export-scoped — BLAST-RADIUS.md's table plus IDEMPOTENCY_REPLAY,
  * table. Collapsing auth into it would let a failed sign-in render through the
  * export error map, and would break ERROR_MAP's exhaustiveness guarantee by
  * mixing two vocabularies that no single screen handles together. Same
@@ -79,7 +114,7 @@ export type AuthCode = (typeof AUTH_CODES)[number];
 
 /**
  * CRUD codes. A SEPARATE union again, for the reason AUTH_CODES and
- * VIOLATION_CODES are separate: ErrorCode is export-scoped — the twelve codes
+ * VIOLATION_CODES are separate: ErrorCode is export-scoped — the codes
  * from BLAST-RADIUS.md's delivery flow — and "this mission does not exist" or
  * "this field failed validation" is not one of them. The Command Center's own
  * resource routes (mission · roster · playbook) speak this vocabulary.

@@ -129,7 +129,7 @@ export const exportContract = c.router({
 			201: success(exportSchema),
 			404: errorEnvelope, // REPO_NOT_FOUND
 			403: errorEnvelope, // REPO_NO_ACCESS · POLICY_FORBIDS_TARGET
-			422: errorEnvelope, // PRECONDITION_FAILED · BLAST_RADIUS_VIOLATION
+			422: errorEnvelope, // BLAST_RADIUS_VIOLATION
 			502: errorEnvelope, // EXTERNAL_GITHUB · TREE_TOO_LARGE
 		},
 	},
@@ -152,11 +152,26 @@ export const exportContract = c.router({
 			repoUrl: z.string().url().optional(),
 			gateOverride: gateOverride.optional(),
 		}),
+		/**
+		 * PRECONDITION_FAILED USED TO BE LISTED ON THE 422 AND IS GONE.
+		 *
+		 * It was copied from BLAST-RADIUS.md:254 and `errorEnvelope` could never
+		 * carry it: the code lives in CRUD_CODES, a deliberately separate union.
+		 * It was not moved into ERROR_CODES, because two unions holding the same
+		 * name is worse than a missing one — a screen switching on the code would
+		 * have no way to tell which vocabulary it came from, and the separation
+		 * exists precisely so a mission 404 cannot route through the export map.
+		 *
+		 * Nothing was lost. Every 422 this route actually raises has a code that
+		 * fits: a violation, a failed re-render, or a push with no linked preview.
+		 * IDEMPOTENCY_REPLAY, by contrast, WAS added — it named a real state this
+		 * route reaches and nothing else could express it.
+		 */
 		responses: {
 			201: success(exportSchema),
 			409: errorEnvelope, // IDEMPOTENCY_REPLAY · PREVIEW_STALE
-			422: errorEnvelope, // PRECONDITION_FAILED · BLAST_RADIUS_VIOLATION
-			//                     · DETERMINISM_VIOLATION · PREVIEW_REQUIRED
+			422: errorEnvelope, // BLAST_RADIUS_VIOLATION · DETERMINISM_VIOLATION
+			//                     · PREVIEW_REQUIRED
 			502: errorEnvelope, // EXTERNAL_GITHUB
 		},
 	},

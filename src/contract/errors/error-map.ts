@@ -114,6 +114,19 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 		recovery: { kind: "retry", label: "Try again" },
 		severity: "recoverable",
 	},
+	/**
+	 * Deliberately NOT phrased as a failure, because nothing failed. The copy has
+	 * one job: stop the operator re-sending, and point them at the delivery that
+	 * already exists. Its id is in the envelope's `details`; the recovery is
+	 * `none` because the useful destination is that specific export and this
+	 * table is static, so a link here would have to guess a route.
+	 */
+	IDEMPOTENCY_REPLAY: {
+		title: "This delivery already ran.",
+		body: "An export with this idempotency key was created earlier, so nothing was sent a second time. The original export's id is on this response — open it to see what happened rather than retrying.",
+		recovery: { kind: "none" },
+		severity: "blocking",
+	},
 };
 
 export function presentError(code: ErrorCode): ErrorPresentation {

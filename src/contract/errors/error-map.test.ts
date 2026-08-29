@@ -16,8 +16,26 @@ describe("error map", () => {
 		expect(Object.keys(ERROR_MAP).sort()).toEqual([...ERROR_CODES].sort());
 	});
 
-	it("carries the twelve codes BLAST-RADIUS declares", () => {
-		expect(ERROR_CODES).toHaveLength(12);
+	it("carries BLAST-RADIUS's twelve, plus IDEMPOTENCY_REPLAY", () => {
+		expect(ERROR_CODES).toHaveLength(13);
+		// Named explicitly: the count alone would be satisfied by any thirteenth,
+		// and this one exists because the contract declared it before the union
+		// could express it.
+		expect(ERROR_CODES).toContain("IDEMPOTENCY_REPLAY");
+	});
+
+	/**
+	 * A replay is not a failure and must not be dressed as one, but it must also
+	 * not leave the deliver button live — the delivery already happened, and an
+	 * override cannot make a completed write un-happen.
+	 */
+	it("treats a replay as un-overridable without calling it a failure", () => {
+		expect(isOverridable("IDEMPOTENCY_REPLAY")).toBe(false);
+		expect(blocksDelivery("IDEMPOTENCY_REPLAY")).toBe(true);
+		expect(presentError("IDEMPOTENCY_REPLAY").severity).not.toBe("loud");
+		expect(presentError("IDEMPOTENCY_REPLAY").body).not.toMatch(
+			/fail|error|wrong/i,
+		);
 	});
 
 	it("keeps the six violation codes as a separate union", () => {
