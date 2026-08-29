@@ -11,6 +11,10 @@
         variables that no utility references, which silently deleted every
         gate, diff, radius, z-index and motion token from the dark theme while
         leaving the .light block intact.
+     4. The two --elevation-border-* aliases are re-declared inside .light.
+        As written they are declared only in @theme, which resolves them
+        against the dark border on :root and leaves every border in the app
+        dark grey in light mode. Found by session 2 driving the real page.
    -------------------------------------------------------------------------- */
 
 /* ============================================================================
@@ -218,6 +222,17 @@
   --color-app-panel:    #ffffff;
   --color-app-raised:   #ffffff;   /* + elevation-border-raised + shadow-e2 */
   --color-app-float:    #ffffff;   /* + elevation-border-raised + shadow-e3 */
+
+  /* CORRECTION 4 (see header): re-resolve the elevation border aliases.
+     @theme static declares them on :root as var(--color-border), and CSS
+     substitutes var() inside a custom property at computed-value time ON THE
+     DECLARING ELEMENT. So :root resolved them against the DARK border and
+     descendants inherited the substituted literal. Redefining --color-border
+     in .light did not re-resolve the aliases, so EVERY border in the app —
+     sidebar, window, topbar, cards, inputs — stayed dark grey in light mode.
+     Measured, both themes, before and after. */
+  --elevation-border-rest:    var(--color-border);
+  --elevation-border-raised:  var(--color-border-strong);
 
   /* Elevation — light shadows are far softer; the border does more work. */
   --shadow-e1: 0 1px 2px  rgb(26 29 35 / 0.07);

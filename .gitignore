@@ -14,3 +14,7 @@ todos.json
 
 # Windows alternate-data-stream junk from zip extracts
 *:Zone.Identifier
+
+# playwright
+test-results
+playwright-report
