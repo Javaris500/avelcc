@@ -56,7 +56,7 @@ function Row({ item }: { item: NavItem }) {
 		return (
 			<span
 				aria-disabled="true"
-				className={cn(ROW, "text-text-subtle")}
+				className={cn(ROW, "text-text-muted")}
 				data-built="false"
 				data-testid={testId(item.label)}
 				title="Not built yet"
@@ -72,7 +72,7 @@ function Row({ item }: { item: NavItem }) {
 			activeProps={{ "aria-current": "page" }}
 			className={cn(
 				ROW,
-				"interactive text-text-muted",
+				"interactive text-text",
 				"aria-[current=page]:bg-app-raised aria-[current=page]:text-text",
 			)}
 			data-built="true"
@@ -83,7 +83,7 @@ function Row({ item }: { item: NavItem }) {
 			{label}
 			{item.badge ? (
 				<span
-					className="ml-auto font-mono text-micro text-text-subtle"
+					className="ml-auto font-mono text-micro text-text-muted"
 					data-testid={`${testId(item.label)}-badge`}
 				>
 					{item.badge}
@@ -107,7 +107,7 @@ export function NavTree({ groups, collapsed = false }: NavTreeProps) {
 			{groups.map((group) => (
 				<div key={group.label}>
 					<p
-						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-muted uppercase"
+						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-subtle uppercase"
 						data-testid={`nav-group-${group.label.toLowerCase()}`}
 					>
 						{group.label}
