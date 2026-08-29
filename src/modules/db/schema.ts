@@ -256,9 +256,31 @@ export const missions = pgTable(
 			.notNull()
 			.default({}),
 		sprintN: integer("sprint_n").notNull().default(1),
-		/** TEXT for the same reason as `type`, and see the reported gap. */
-		status: text("status").notNull(),
-		cut: missionCut("cut").notNull(),
+		/**
+		 * TEXT for the same reason as `type`. The vocabulary is still undefined —
+		 * every other status in DATA-CONTRACTS-V2 is a closed enum, Mission's
+		 * field block says only `status` — so the default exists to make a row
+		 * insertable, NOT to declare a lifecycle. Zero missions have run; any
+		 * enum written today would be a guess about states nobody has observed.
+		 * Promote to a pgEnum once mission 001 shows what the real states are.
+		 */
+		status: text("status").notNull().default("draft"),
+		/**
+		 * NULLABLE, and that is the honest shape rather than a weakening.
+		 *
+		 * The cut is DERIVED — at mission setup the system reads the connected
+		 * repository's directory structure and sees which boundary is a
+		 * directory. At create time there is no connected repository: Connection
+		 * has no table, and `repo_url` is a default rather than the binding
+		 * destination. So the cut is genuinely not knowable yet, and NULL says
+		 * exactly that.
+		 *
+		 * A DEFAULT here would be the failure this whole mechanism exists to
+		 * prevent — it writes a derived-looking value that nobody derived, which
+		 * is the original roster defect wearing a different hat. NULL cannot be
+		 * mistaken for a derivation. See DECISIONS-V2.md:246.
+		 */
+		cut: missionCut("cut"),
 		cutSource: missionCutSource("cut_source").notNull().default("derived"),
 		cutRationale: text("cut_rationale"),
 		/** A DEFAULT, not the binding destination. The Export names that. */
