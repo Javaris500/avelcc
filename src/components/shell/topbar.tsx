@@ -23,7 +23,7 @@ function Control({
 }) {
 	return (
 		<button
-			className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[13px] py-1.5 text-[12.5px] text-text-muted transition-[color,border-color] duration-[var(--duration-micro)] hover:border-[var(--elevation-border-raised)] hover:text-text"
+			className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[13px] py-1.5 text-xs text-text-muted transition-[color,border-color] duration-[var(--duration-micro)] hover:border-[var(--elevation-border-raised)] hover:text-text"
 			data-testid={testId}
 			onClick={onClick}
 			type="button"
@@ -49,7 +49,7 @@ export function TopBar({
 		>
 			{/* Live pill. Not a control — it reports, it does not act. */}
 			<span
-				className="inline-flex items-center gap-[7px] rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[11px] py-1 text-[12px] text-text-muted"
+				className="inline-flex items-center gap-[7px] rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-[11px] py-1 text-xs text-text-muted"
 				data-testid="live-pill"
 			>
 				<span

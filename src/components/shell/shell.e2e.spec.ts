@@ -29,7 +29,8 @@ const DARK = {
 /** Reference `.light`. */
 const LIGHT = {
 	border: "rgb(229, 231, 235)", // --border    #e5e7eb
-	panel: "rgb(255, 255, 255)", // --color-app-panel AND --color-app-raised
+	panel: "rgb(255, 255, 255)", // --color-app-panel  #ffffff
+	raised: "rgb(238, 238, 238)", // --color-app-raised #eeeeee, correction 5
 	text: "rgb(26, 29, 35)", // --text      #1a1d23
 	gatePass: "rgb(21, 128, 61)", // --pass      #15803d
 };
@@ -278,27 +279,67 @@ test.describe("borders follow the theme", () => {
 		await gotoApp(page);
 		await toggleToLight(page);
 
-		// KNOWN AND UNRESOLVED, measured with the pointer parked off the sidebar:
-		// in light, --color-app-panel and --color-app-raised are BOTH #ffffff, so
-		// the switcher's fill is identical to the sidebar it sits on and carries
-		// no separation at all. The patch calls this deliberate — elevation
-		// "carried by border and shadow alone".
+		// RESOLVED, and this test now guards the resolution.
 		//
-		// So the border is the only thing left doing the work, and these three
-		// assertions pin that: identical fills, and a border that differs. If
-		// someone reverts the elevation-border fix, the third fails and the
-		// switcher becomes invisible rather than merely subtle.
+		// Light --color-app-raised was #ffffff, identical to --color-app-panel, so
+		// the switcher's fill carried no separation from the sidebar it sits on
+		// and a 1px hairline was doing all the work for a control the operator is
+		// meant to click. Correction 5 took the reference's #eeeeee.
 		//
-		// White against the reference's own #eeeeee is 1.16:1; white against this
-		// border is 1.24:1. Both are below any perceptual threshold worth relying
-		// on, which is the argument for taking the reference's value.
+		// The reference never relied on either alone: it uses a distinct fill AND
+		// a border, and the two together are what make a control read as one.
+		// These three assert both halves are present. A revert of either — the
+		// fill back to white, or the elevation-border alias back to frozen — fails
+		// here rather than shipping a control nobody can see.
 		await expectStyle(page, "sidebar", "background-color").toBe(LIGHT.panel);
 		await expectStyle(page, "workspace-switcher", "background-color").toBe(
-			LIGHT.panel,
+			LIGHT.raised,
 		);
 		await expectStyle(page, "workspace-switcher", "border-top-color").toBe(
 			LIGHT.border,
 		);
+	});
+});
+
+/**
+ * The type scale, enforced on the chrome this session owns.
+ *
+ * tokens.css defines six steps and no half-pixels. Before it existed every
+ * component picked its own pixel value with nothing to be wrong against, and
+ * matching the reference faithfully propagated its 9.5/10.5/12.5px prototype
+ * ramp. This pins the shell chrome to the scale so it cannot drift back one
+ * arbitrary value at a time.
+ *
+ * Scoped to testids this mount renders. The nav and the routes are other
+ * sessions' and are theirs to pin.
+ */
+test.describe("type scale", () => {
+	const SCALE_PX = [11, 12, 13, 14, 15, 19];
+
+	const CHROME = [
+		"wordmark",
+		"search-hint",
+		"workspace-switcher",
+		"search-trigger",
+		"account",
+		"live-pill",
+		"control-theme",
+		"control-gates",
+		"control-target",
+	];
+
+	test("renders every chrome element at an on-scale size", async ({ page }) => {
+		await gotoApp(page);
+
+		for (const id of CHROME) {
+			const px = await page.evaluate((testId) => {
+				const el = document.querySelector(`[data-testid="${testId}"]`);
+				if (!el) throw new Error(`no [data-testid="${testId}"]`);
+				return Number.parseFloat(getComputedStyle(el).fontSize);
+			}, id);
+
+			expect(SCALE_PX, `${id} renders ${px}px`).toContain(px);
+		}
 	});
 });
 

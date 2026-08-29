@@ -19,6 +19,12 @@ import type { Session } from "#/routes/-lib/session";
  * login renders outside this component with its own `.app` wrapper and the two
  * must read one stored preference.
  *
+ * `text-base` sets the scale's 14px base. Nothing in the stylesheet sets a base
+ * size, so html, body and this wrapper all inherit the browser's 16px, and any
+ * element without an explicit size renders off-scale. The reference sets it on
+ * body; this sets it on the wrapper, which is the part of the problem inside
+ * this mount. Reported for the surfaces outside it.
+ *
  * `.app` supplies tabular-nums and the text-subtle contrast fix. `.light` sits
  * HERE, on the shell wrapper, never on <html> — the patch and
  * DAY-ONE-FRONTEND both require it, because the landing shares this stylesheet
@@ -44,7 +50,7 @@ export function Shell({
 	return (
 		<div
 			className={cn(
-				"app min-h-screen bg-app-bg p-[26px] text-text",
+				"app min-h-screen bg-app-bg p-[26px] text-base text-text",
 				theme === "light" && "light",
 			)}
 			data-testid="app-shell"

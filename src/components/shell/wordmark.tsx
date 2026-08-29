@@ -16,7 +16,7 @@ export function Wordmark({ className }: { className?: string }) {
 	return (
 		<span
 			className={cn(
-				"font-display text-[15px] font-bold tracking-[var(--tracking-wordmark)] text-text",
+				"font-display text-lg font-bold tracking-[var(--tracking-wordmark)] text-text",
 				className,
 			)}
 			data-testid="wordmark"

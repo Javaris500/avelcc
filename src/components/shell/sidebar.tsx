@@ -60,7 +60,7 @@ export function Sidebar({
 					aria-hidden="true"
 					className="size-[15px] shrink-0 rounded-xs bg-accent"
 				/>
-				<span className="flex-1 truncate text-[13px] text-text">
+				<span className="flex-1 truncate text-sm text-text">
 					{session.workspace}
 				</span>
 				<ChevronDown
@@ -81,9 +81,9 @@ export function Sidebar({
 					size={13}
 					strokeWidth={2.2}
 				/>
-				<span className="flex-1 text-[13px] text-text-subtle">Find…</span>
+				<span className="flex-1 text-sm text-text-subtle">Find…</span>
 				<kbd
-					className="rounded-xs border border-[var(--elevation-border-rest)] px-[5px] py-px font-mono text-[10px] text-text-subtle"
+					className="rounded-xs border border-[var(--elevation-border-rest)] px-[5px] py-px font-mono text-micro text-text-subtle"
 					data-testid="search-hint"
 				>
 					F
@@ -115,7 +115,7 @@ export function Sidebar({
 						aria-hidden="true"
 						className="size-[22px] shrink-0 rounded-full border border-[var(--elevation-border-rest)] bg-app-float"
 					/>
-					<span className="truncate text-[12.5px] text-text-muted">
+					<span className="truncate text-xs text-text-muted">
 						{session.operator}
 					</span>
 				</button>
