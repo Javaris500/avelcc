@@ -18,6 +18,8 @@
      Every alias must be declared in BOTH :root and .light. This is a class of
      bug, not an incident — it already cost every border in light mode once.
 
+     6. The .app text-subtle override is themed. Unscoped it applies in light
+        too, where the dark-tuned value measures 3.10:1 instead of 4.59:1.
      5. light --color-app-raised is #eeeeee, not #ffffff. As written it is
         identical to --color-app-panel, so a raised control has no background
         separation from the surface behind it. Operator ruling, reference wins.
@@ -434,4 +436,15 @@ body {
    to --color-text-muted (5.65:1) rather than collapsing into it.
    ══════════════════════════════════════════════════════════════════════════ */
 
+/* CORRECTION 6 (see header). As written this override is UNTHEMED.
+   #8b939e was measured at 4.39:1 against the DARK panel #2a2e36 and is correct
+   there. But .app and .light sit on the same element, .app is declared later,
+   and both are single-class selectors — so .app won in light too, landing
+   #8b939e on white at 3.10:1. The override that raised dark contrast pushed
+   light BELOW the 4.59:1 the base token already gave.
+
+   Fixed with a compound selector so light keeps its own value. Found by
+   session 3 measuring the painted colour and noticing it came back #8b939e
+   where the light token says #6e7681. */
 .app { --color-text-subtle: #8b939e; }
+.app.light { --color-text-subtle: #6e7681; }
