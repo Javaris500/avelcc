@@ -12,7 +12,18 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppActivityRouteImport } from './routes/_app/activity'
+import { Route as AppClientsRouteImport } from './routes/_app/clients'
+import { Route as AppIntakeRouteImport } from './routes/_app/intake'
+import { Route as AppPlaybooksRouteImport } from './routes/_app/playbooks'
+import { Route as AppPresetsRouteImport } from './routes/_app/presets'
+import { Route as AppCatalogAgentsRouteImport } from './routes/_app/catalog.agents'
+import { Route as AppCatalogSkillsRouteImport } from './routes/_app/catalog.skills'
+import { Route as AppCatalogSourcesRouteImport } from './routes/_app/catalog.sources'
 import { Route as AppMissionsIndexRouteImport } from './routes/_app/missions.index'
+import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings.account'
+import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings.connections'
+import { Route as AppSettingsRepositoriesRouteImport } from './routes/_app/settings.repositories'
 import { Route as ApiAuthGithubRouteImport } from './routes/api/auth/github'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github.callback'
 import { Route as AppMissionsMissionIdExportsNewRouteImport } from './routes/_app/missions.$missionId.exports.new'
@@ -31,9 +42,64 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppActivityRoute = AppActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsRoute = AppClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIntakeRoute = AppIntakeRouteImport.update({
+  id: '/intake',
+  path: '/intake',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlaybooksRoute = AppPlaybooksRouteImport.update({
+  id: '/playbooks',
+  path: '/playbooks',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPresetsRoute = AppPresetsRouteImport.update({
+  id: '/presets',
+  path: '/presets',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogAgentsRoute = AppCatalogAgentsRouteImport.update({
+  id: '/catalog/agents',
+  path: '/catalog/agents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogSkillsRoute = AppCatalogSkillsRouteImport.update({
+  id: '/catalog/skills',
+  path: '/catalog/skills',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCatalogSourcesRoute = AppCatalogSourcesRouteImport.update({
+  id: '/catalog/sources',
+  path: '/catalog/sources',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMissionsIndexRoute = AppMissionsIndexRouteImport.update({
   id: '/missions/',
   path: '/missions/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsAccountRoute = AppSettingsAccountRouteImport.update({
+  id: '/settings/account',
+  path: '/settings/account',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsConnectionsRoute = AppSettingsConnectionsRouteImport.update({
+  id: '/settings/connections',
+  path: '/settings/connections',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRepositoriesRoute = AppSettingsRepositoriesRouteImport.update({
+  id: '/settings/repositories',
+  path: '/settings/repositories',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiAuthGithubRoute = ApiAuthGithubRouteImport.update({
@@ -56,6 +122,17 @@ const AppMissionsMissionIdExportsNewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/activity': typeof AppActivityRoute
+  '/clients': typeof AppClientsRoute
+  '/intake': typeof AppIntakeRoute
+  '/playbooks': typeof AppPlaybooksRoute
+  '/presets': typeof AppPresetsRoute
+  '/catalog/agents': typeof AppCatalogAgentsRoute
+  '/catalog/skills': typeof AppCatalogSkillsRoute
+  '/catalog/sources': typeof AppCatalogSourcesRoute
+  '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
+  '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
   '/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
@@ -64,6 +141,17 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/activity': typeof AppActivityRoute
+  '/clients': typeof AppClientsRoute
+  '/intake': typeof AppIntakeRoute
+  '/playbooks': typeof AppPlaybooksRoute
+  '/presets': typeof AppPresetsRoute
+  '/catalog/agents': typeof AppCatalogAgentsRoute
+  '/catalog/skills': typeof AppCatalogSkillsRoute
+  '/catalog/sources': typeof AppCatalogSourcesRoute
+  '/settings/account': typeof AppSettingsAccountRoute
+  '/settings/connections': typeof AppSettingsConnectionsRoute
+  '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
   '/missions': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
@@ -74,6 +162,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/activity': typeof AppActivityRoute
+  '/_app/clients': typeof AppClientsRoute
+  '/_app/intake': typeof AppIntakeRoute
+  '/_app/playbooks': typeof AppPlaybooksRoute
+  '/_app/presets': typeof AppPresetsRoute
+  '/_app/catalog/agents': typeof AppCatalogAgentsRoute
+  '/_app/catalog/skills': typeof AppCatalogSkillsRoute
+  '/_app/catalog/sources': typeof AppCatalogSourcesRoute
+  '/_app/settings/account': typeof AppSettingsAccountRoute
+  '/_app/settings/connections': typeof AppSettingsConnectionsRoute
+  '/_app/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
   '/_app/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
@@ -84,6 +183,17 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/activity'
+    | '/clients'
+    | '/intake'
+    | '/playbooks'
+    | '/presets'
+    | '/catalog/agents'
+    | '/catalog/skills'
+    | '/catalog/sources'
+    | '/settings/account'
+    | '/settings/connections'
+    | '/settings/repositories'
     | '/api/auth/github'
     | '/missions/'
     | '/api/auth/github/callback'
@@ -92,6 +202,17 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/activity'
+    | '/clients'
+    | '/intake'
+    | '/playbooks'
+    | '/presets'
+    | '/catalog/agents'
+    | '/catalog/skills'
+    | '/catalog/sources'
+    | '/settings/account'
+    | '/settings/connections'
+    | '/settings/repositories'
     | '/api/auth/github'
     | '/missions'
     | '/api/auth/github/callback'
@@ -101,6 +222,17 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/login'
+    | '/_app/activity'
+    | '/_app/clients'
+    | '/_app/intake'
+    | '/_app/playbooks'
+    | '/_app/presets'
+    | '/_app/catalog/agents'
+    | '/_app/catalog/skills'
+    | '/_app/catalog/sources'
+    | '/_app/settings/account'
+    | '/_app/settings/connections'
+    | '/_app/settings/repositories'
     | '/api/auth/github'
     | '/_app/missions/'
     | '/api/auth/github/callback'
@@ -137,11 +269,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/activity': {
+      id: '/_app/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof AppActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients': {
+      id: '/_app/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof AppClientsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/intake': {
+      id: '/_app/intake'
+      path: '/intake'
+      fullPath: '/intake'
+      preLoaderRoute: typeof AppIntakeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/playbooks': {
+      id: '/_app/playbooks'
+      path: '/playbooks'
+      fullPath: '/playbooks'
+      preLoaderRoute: typeof AppPlaybooksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/presets': {
+      id: '/_app/presets'
+      path: '/presets'
+      fullPath: '/presets'
+      preLoaderRoute: typeof AppPresetsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/agents': {
+      id: '/_app/catalog/agents'
+      path: '/catalog/agents'
+      fullPath: '/catalog/agents'
+      preLoaderRoute: typeof AppCatalogAgentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/skills': {
+      id: '/_app/catalog/skills'
+      path: '/catalog/skills'
+      fullPath: '/catalog/skills'
+      preLoaderRoute: typeof AppCatalogSkillsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/catalog/sources': {
+      id: '/_app/catalog/sources'
+      path: '/catalog/sources'
+      fullPath: '/catalog/sources'
+      preLoaderRoute: typeof AppCatalogSourcesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/missions/': {
       id: '/_app/missions/'
       path: '/missions'
       fullPath: '/missions/'
       preLoaderRoute: typeof AppMissionsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/account': {
+      id: '/_app/settings/account'
+      path: '/settings/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AppSettingsAccountRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/connections': {
+      id: '/_app/settings/connections'
+      path: '/settings/connections'
+      fullPath: '/settings/connections'
+      preLoaderRoute: typeof AppSettingsConnectionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/repositories': {
+      id: '/_app/settings/repositories'
+      path: '/settings/repositories'
+      fullPath: '/settings/repositories'
+      preLoaderRoute: typeof AppSettingsRepositoriesRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/auth/github': {
@@ -169,11 +378,33 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppActivityRoute: typeof AppActivityRoute
+  AppClientsRoute: typeof AppClientsRoute
+  AppIntakeRoute: typeof AppIntakeRoute
+  AppPlaybooksRoute: typeof AppPlaybooksRoute
+  AppPresetsRoute: typeof AppPresetsRoute
+  AppCatalogAgentsRoute: typeof AppCatalogAgentsRoute
+  AppCatalogSkillsRoute: typeof AppCatalogSkillsRoute
+  AppCatalogSourcesRoute: typeof AppCatalogSourcesRoute
+  AppSettingsAccountRoute: typeof AppSettingsAccountRoute
+  AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
+  AppSettingsRepositoriesRoute: typeof AppSettingsRepositoriesRoute
   AppMissionsIndexRoute: typeof AppMissionsIndexRoute
   AppMissionsMissionIdExportsNewRoute: typeof AppMissionsMissionIdExportsNewRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppActivityRoute: AppActivityRoute,
+  AppClientsRoute: AppClientsRoute,
+  AppIntakeRoute: AppIntakeRoute,
+  AppPlaybooksRoute: AppPlaybooksRoute,
+  AppPresetsRoute: AppPresetsRoute,
+  AppCatalogAgentsRoute: AppCatalogAgentsRoute,
+  AppCatalogSkillsRoute: AppCatalogSkillsRoute,
+  AppCatalogSourcesRoute: AppCatalogSourcesRoute,
+  AppSettingsAccountRoute: AppSettingsAccountRoute,
+  AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
+  AppSettingsRepositoriesRoute: AppSettingsRepositoriesRoute,
   AppMissionsIndexRoute: AppMissionsIndexRoute,
   AppMissionsMissionIdExportsNewRoute: AppMissionsMissionIdExportsNewRoute,
 }
