@@ -1,0 +1,91 @@
+{
+  "avel_version": "1",
+  "cut": "vertical",
+  "cut_source": "derived",
+  "files": [
+    {
+      "path": "MISSION.md",
+      "sha256": "4a3034de8cd37f2061d2d3bb855ec6c19355e0982946a2f85b08411f10cec022"
+    },
+    {
+      "path": "contract/phase1.openapi.json",
+      "sha256": "008a939528c99eee36c8b6a3e1e60111128882714041a83491b711bb9668c53e"
+    },
+    {
+      "path": "conventions/layering.md",
+      "sha256": "f2693721d4c571b24bdadf6a73b755483a7fe578259223e680ff9159738c4ad3"
+    },
+    {
+      "path": "conventions/naming.md",
+      "sha256": "e6f723c28f59f306e21c406528ba9e18f181afd644e995e8572f6d0f726ad03d"
+    },
+    {
+      "path": "conventions/testing.md",
+      "sha256": "e766bb96ac5c8d16a9957f578c8021735d4b3da873c06960135eafa080353a5c"
+    },
+    {
+      "path": "mission/brief.md",
+      "sha256": "0524163ea39e8958a6726e465e5f60e9b2eaa4dd54eca6f4d700cf1bf5821920"
+    },
+    {
+      "path": "mission/playbook.md",
+      "sha256": "f6464abb8433977909e72910fb54b53eef7123ecda98bb9e6030fc6acbfa720e"
+    },
+    {
+      "path": "process/dispatch/_TEMPLATE.md",
+      "sha256": "18423e9387551291bb2e950c06d36cd98d66db1fffabe8720d47cee1655bfa30"
+    },
+    {
+      "path": "process/findings/_TEMPLATE.md",
+      "sha256": "ab0d65c74c6c792925c9955e77a373264f952d88f03cbafaec2470a13ae30a09"
+    },
+    {
+      "path": "process/log/decision-log.md",
+      "sha256": "f6353e3f6fe5ccea195f7e413277ea4451cc5d889bc150ec559270199aec8f54"
+    },
+    {
+      "path": "process/reports/_TEMPLATE.md",
+      "sha256": "5b334f0d0626f751de6d0d06e95dd5b84359b30efb7fb573f117811ba46a4a7e"
+    },
+    {
+      "path": "roster/nemi/depth.md",
+      "sha256": "78b5a272fa1310ccf3846e841ead14cf1502a19e50ac09735c87b2709498be61"
+    },
+    {
+      "path": "roster/nemi/identity.md",
+      "sha256": "277fe43e5ea1499da20a5f6c65afc9791bc6b61c2be3c4553d33a347db8c5f70"
+    },
+    {
+      "path": "roster/nemi/skills/playwright-gate.md",
+      "sha256": "f60bcf6a8ccf63c63b2a3a35dd84ee40d9ae09a82577215f115c5c540837b0be"
+    },
+    {
+      "path": "roster/roster.json",
+      "sha256": "39a73cce872aaf5a2933e3ff152929db81655effa145f44e5dc26e034ce0917b"
+    },
+    {
+      "path": "roster/transactions/depth.md",
+      "sha256": "82ed1629b59abd7240b01b79f41dbc33e453fabfe1604079d3c33b517ffe97cc"
+    },
+    {
+      "path": "roster/transactions/identity.md",
+      "sha256": "e67c011e344fa8615ad85c57f64229176bb4d292b112a4bdbc5fc42d38b297f4"
+    },
+    {
+      "path": "roster/transactions/skills/drizzle-migrate.md",
+      "sha256": "67175fa030b2b27ca51c29422d91a2ba27131f958d064b8ed70975802f2011df"
+    },
+    {
+      "path": "roster/transactions/skills/nestjs-module.md",
+      "sha256": "948ae09a5e52b956d26773dc7b892a350d085eb7093e9cb749251009a3730962"
+    }
+  ],
+  "gate": {
+    "config_sha256": "2984d0b3aa929def6c8770003146d30425408e5cd6e79e4e1d254d3db5c3b54b",
+    "coverage_delta_min": 0,
+    "mutation_floor": 60
+  },
+  "mission_id": "01J8Z4K2QW3E5R7T9Y1U3I5O7A",
+  "package_sha256": "6156944ca9c96583590d248d9096fa105c0532f89be650b4a821af521ef5813a",
+  "sprint": 1
+}

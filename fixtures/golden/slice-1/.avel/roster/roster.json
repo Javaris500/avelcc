@@ -1,0 +1,63 @@
+{
+  "agents": [
+    {
+      "append_only": [
+        ".avel/process/log/decision-log.md",
+        ".avel/process/reports/**"
+      ],
+      "kind": "horizontal",
+      "phase": "C",
+      "readonly": [
+        "**"
+      ],
+      "slug": "nemi",
+      "writable": [
+        "apps/web/e2e/**",
+        "apps/web/src/**/*.test.tsx"
+      ]
+    },
+    {
+      "append_only": [
+        ".avel/process/log/decision-log.md",
+        ".avel/process/reports/**",
+        "apps/api/src/app.module.ts"
+      ],
+      "kind": "feature",
+      "phase": "B",
+      "readonly": [
+        ".avel/contract/**",
+        ".avel/conventions/**",
+        "packages/shared/**"
+      ],
+      "slug": "transactions",
+      "writable": [
+        "apps/api/src/modules/transactions/**",
+        "apps/web/src/app/transactions/**",
+        "apps/web/src/components/features/transactions/**"
+      ]
+    }
+  ],
+  "cut": "vertical",
+  "edges": [
+    {
+      "artifact": ".avel/contract/phase1.openapi.json",
+      "from": "operator",
+      "to": [
+        "transactions"
+      ]
+    },
+    {
+      "artifact": "apps/api/src/modules/transactions/*.dto.ts",
+      "from": "transactions",
+      "to": [
+        "nemi"
+      ]
+    }
+  ],
+  "phases": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ]
+}
