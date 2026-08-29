@@ -22,7 +22,13 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
 	testDir: "./src",
 	testMatch: "**/*.e2e.spec.ts",
-	fullyParallel: true,
+	// SERIAL, deliberately. Against this dev server parallel workers start runs
+	// mid-rebuild and produce scattered "element not visible" failures that read
+	// exactly like real defects. Confirmed twice, from two sessions: the same
+	// specs pass serially. A suite that cries wolf gets ignored, and these are
+	// the only checks that catch the defects a green build cannot see.
+	fullyParallel: false,
+	workers: 1,
 	// A committed .only silently shrinks the suite to one test while still
 	// reporting green.
 	forbidOnly: !!process.env.CI,
