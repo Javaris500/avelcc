@@ -1,60 +1,109 @@
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
+
+import { cn } from "#/components/cn";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
+import { FULL_BUILD_GATES } from "#/contract/shared/playbook";
 
 /**
- * Top bar: live pill on the left, right-aligned pill controls.
+ * Top bar: run state on the left, right-aligned pill controls.
  *
- * Reference `.topbar`: 14px/22px padding, 12px gap, bottom border, and a
- * flex spacer that pushes the controls right. It wraps rather than overflows.
+ * Everything here is about the CURRENT VIEW's data. Per-operator preferences —
+ * theme, sidebar collapse — live in the sidebar footer beside the account,
+ * because they belong to the operator rather than to what is on screen.
+ *
+ * Every control opens something. A chevron that opens nothing is the product
+ * telling the operator a menu exists when it does not.
  */
 
 /**
- * A right-aligned pill control. Reference `.ctl`: panel background, resting
- * border that strengthens on hover, full radius.
+ * Delivery targets. Closed vocabulary from DATA-CONTRACTS-V2.md:275
+ * (`target_kind 'zip' | 'github_pr' | 'github_push'`). Not invented, and not
+ * extendable here — a fourth target is a contract change.
  */
-function Control({
-	children,
-	onClick,
+const TARGETS = ["zip", "github_pr", "github_push"] as const;
+type Target = (typeof TARGETS)[number];
+
+const GATE_FILTER_ALL = "All gates";
+
+/** Shared pill chrome. Reference `.ctl`. */
+const CTL =
+	"interactive inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted hover:border-[var(--elevation-border-raised)] hover:text-text";
+
+function Chevron() {
+	return (
+		<ChevronDown
+			aria-hidden="true"
+			className="opacity-70 transition-transform duration-[var(--duration-micro)] group-data-[state=open]:rotate-180"
+			size={12}
+			strokeWidth={2.4}
+		/>
+	);
+}
+
+/** A pill that opens a real menu. aria-expanded comes from Radix. */
+function MenuControl({
+	label,
 	testId,
+	children,
 }: {
-	children: ReactNode;
-	onClick?: () => void;
+	label: string;
 	testId: string;
+	children: ReactNode;
 }) {
 	return (
-		<button
-			className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted transition-[color,border-color] duration-[var(--duration-micro)] hover:border-[var(--elevation-border-raised)] hover:text-text"
-			data-testid={testId}
-			onClick={onClick}
-			type="button"
-		>
-			{children}
-		</button>
+		<DropdownMenu>
+			<DropdownMenuTrigger className={cn(CTL, "group")} data-testid={testId}>
+				{label}
+				<Chevron />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" data-testid={`${testId}-menu`}>
+				{children}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
 export function TopBar({
-	theme,
-	onToggleTheme,
 	breadcrumb,
+	activity = "idle",
 }: {
-	theme: "dark" | "light";
-	onToggleTheme: () => void;
 	breadcrumb: string;
+	/**
+	 * Whether a run is actually in progress. Defaults to idle, because zero
+	 * missions have run. The dot only pulses when something is happening — an
+	 * animation next to "No run in progress" reads as activity where there is
+	 * none.
+	 */
+	activity?: "idle" | "running";
 }) {
+	const [gateFilter, setGateFilter] = useState<string>(GATE_FILTER_ALL);
+	const [target, setTarget] = useState<Target>("github_pr");
+	const running = activity === "running";
+
 	return (
 		<header
 			className="flex flex-wrap items-center gap-3 border-b border-[var(--elevation-border-rest)] px-6 py-3.5"
 			data-testid="topbar"
 		>
-			{/* Live pill. Not a control — it reports, it does not act. */}
+			{/* Reports state, does not act on it. A span, not a button. */}
 			<span
 				className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1 text-xs text-text-muted"
+				data-activity={activity}
 				data-testid="live-pill"
 			>
 				<span
 					aria-hidden="true"
-					className="size-1.5 animate-pulse rounded-full bg-gate-pass"
+					className={cn(
+						"size-1.5 rounded-full",
+						running ? "animate-pulse bg-gate-pass" : "bg-text-subtle",
+					)}
 					data-testid="live-dot"
 				/>
 				{breadcrumb}
@@ -62,27 +111,46 @@ export function TopBar({
 
 			<span aria-hidden="true" className="flex-1" data-testid="topbar-spacer" />
 
-			<Control testId="control-theme" onClick={onToggleTheme}>
-				{theme === "dark" ? "Light" : "Dark"}
-			</Control>
-			<Control testId="control-gates">
-				All gates
-				<ChevronDown
-					aria-hidden="true"
-					className="opacity-70"
-					size={9}
-					strokeWidth={2.4}
-				/>
-			</Control>
-			<Control testId="control-target">
-				github_pr
-				<ChevronDown
-					aria-hidden="true"
-					className="opacity-70"
-					size={9}
-					strokeWidth={2.4}
-				/>
-			</Control>
+			<MenuControl label={gateFilter} testId="control-gates">
+				<DropdownMenuLabel>Filter by gate</DropdownMenuLabel>
+				<DropdownMenuItem
+					data-testid="gate-option-all"
+					onSelect={() => setGateFilter(GATE_FILTER_ALL)}
+				>
+					{GATE_FILTER_ALL}
+				</DropdownMenuItem>
+				{/* The five real gates, from the golden fixture's playbook. */}
+				{FULL_BUILD_GATES.map((gate) => (
+					<DropdownMenuItem
+						data-testid={`gate-option-${gate.name}`}
+						key={gate.name}
+						onSelect={() => setGateFilter(gate.name)}
+					>
+						<span className="font-mono">{gate.name}</span>
+						<span className="ml-auto text-micro text-text-subtle">
+							{gate.policy}
+						</span>
+					</DropdownMenuItem>
+				))}
+			</MenuControl>
+
+			<MenuControl label={target} testId="control-target">
+				<DropdownMenuLabel>Delivery target</DropdownMenuLabel>
+				{TARGETS.map((kind) => (
+					<DropdownMenuItem
+						data-testid={`target-option-${kind}`}
+						key={kind}
+						onSelect={() => setTarget(kind)}
+					>
+						<span className="font-mono">{kind}</span>
+						{kind === target ? (
+							<span className="ml-auto text-micro text-text-subtle">
+								current
+							</span>
+						) : null}
+					</DropdownMenuItem>
+				))}
+			</MenuControl>
 		</header>
 	);
 }

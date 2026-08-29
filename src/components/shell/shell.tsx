@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { cn } from "#/components/cn";
 import { Sidebar } from "#/components/shell/sidebar";
 import { TopBar } from "#/components/shell/topbar";
+import { useCollapsed } from "#/components/shell/use-collapsed";
 import { useTheme } from "#/components/theme/use-theme";
+import { TooltipProvider } from "#/components/ui/tooltip";
 import type { NavGroup } from "#/contract/ui/nav";
 import type { Session } from "#/routes/-lib/session";
 
@@ -45,44 +47,58 @@ export function Shell({
 	navGroups?: NavGroup[];
 	children: ReactNode;
 }) {
-	const { theme, toggle } = useTheme();
+	const { theme, toggle: toggleTheme } = useTheme();
+	const { collapsed, toggle: toggleCollapsed } = useCollapsed();
 
 	return (
-		<div
-			className={cn(
-				"app min-h-screen bg-app-bg p-(--frame-mat) text-text",
-				theme === "light" && "light",
-			)}
-			data-testid="app-shell"
-			data-theme={theme}
-		>
+		<TooltipProvider delayDuration={300}>
 			<div
-				className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[var(--frame-sidebar)_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-[1000px]:h-auto max-[1000px]:grid-cols-1"
-				data-testid="app-window"
+				className={cn(
+					"app min-h-screen bg-app-bg p-(--frame-mat) text-text",
+					theme === "light" && "light",
+				)}
+				data-testid="app-shell"
+				data-theme={theme}
 			>
-				<Sidebar
-					navGroups={navGroups}
-					onSignOut={onSignOut}
-					session={session}
-				/>
-
-				<div
-					className="flex min-w-0 flex-col overflow-hidden"
-					data-testid="main-pane"
+				{/* Twelve nav items sit before the content in tab order. Visually
+			    hidden until focused, then a real, visible target. */}
+				<a
+					className="sr-only rounded-sm bg-app-float px-3 py-2 text-sm text-text focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+					data-testid="skip-to-content"
+					href="#main-content"
 				>
-					<TopBar
-						breadcrumb={breadcrumb}
-						onToggleTheme={toggle}
+					Skip to content
+				</a>
+				<div
+					className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-[1000px]:h-auto max-[1000px]:grid-cols-1"
+					data-testid="app-window"
+				>
+					<Sidebar
+						collapsed={collapsed}
+						navGroups={navGroups}
+						onSignOut={onSignOut}
+						onToggleCollapsed={toggleCollapsed}
+						onToggleTheme={toggleTheme}
+						session={session}
 						theme={theme}
 					/>
-					<main
-						className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
-						data-testid="main"
+
+					<div
+						className="flex min-w-0 flex-col overflow-hidden"
+						data-testid="main-pane"
 					>
-						{children}
-					</main>
+						<TopBar breadcrumb={breadcrumb} />
+						<main
+							className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
+							data-testid="main"
+							id="main-content"
+							tabIndex={-1}
+						>
+							{children}
+						</main>
+					</div>
 				</div>
 			</div>
-		</div>
+		</TooltipProvider>
 	);
 }

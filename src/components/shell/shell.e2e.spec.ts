@@ -77,6 +77,15 @@ function expectStyle(page: Page, testId: string, prop: string) {
 	});
 }
 
+/** A custom property as the shell wrapper resolves it. */
+function tokenOf(page: Page, name: string) {
+	return page.evaluate((prop) => {
+		const el = document.querySelector('[data-testid="app-shell"]');
+		if (!el) throw new Error("no app-shell");
+		return getComputedStyle(el).getPropertyValue(prop).trim();
+	}, name);
+}
+
 async function toggleToLight(page: Page) {
 	await page.getByTestId("control-theme").click();
 	await expect(page.getByTestId("app-shell")).toHaveAttribute(
@@ -95,10 +104,11 @@ test.describe("shell structure", () => {
 			"sidebar",
 			"brand-mark",
 			"wordmark",
-			"sidebar-collapse",
 			"workspace-switcher",
 			"search-trigger",
 			"search-hint",
+			"sidebar-collapse",
+			"sidebar-footer",
 			"nav-slot",
 			"account",
 			"main-pane",
@@ -205,7 +215,10 @@ test.describe("theme", () => {
 			DARK.switcherBg,
 		);
 		await expectStyle(page, "app-shell", "color").toBe(DARK.text);
-		await expectStyle(page, "live-dot", "background-color").toBe(DARK.gatePass);
+		// The idle dot is neutral, so gate-pass is asserted on the token itself.
+		// That is the more direct form of DAY-ONE's check anyway: it asks whether
+		// the semantic colour resolves per theme, not whether one dot uses it.
+		expect(await tokenOf(page, "--color-gate-pass")).toBe("#22c55e");
 	});
 
 	test("actually repaints in light — the patch landed", async ({ page }) => {
@@ -218,9 +231,7 @@ test.describe("theme", () => {
 		await expectStyle(page, "app-shell", "color").toBe(LIGHT.text);
 		// DAY-ONE: "if the light-mode semantics still read #22c55e, the patch did
 		// not land."
-		await expectStyle(page, "live-dot", "background-color").toBe(
-			LIGHT.gatePass,
-		);
+		expect(await tokenOf(page, "--color-gate-pass")).toBe("#15803d");
 	});
 
 	test("survives a reload", async ({ page }) => {
@@ -340,6 +351,360 @@ test.describe("type scale", () => {
 
 			expect(SCALE_PX, `${id} renders ${px}px`).toContain(px);
 		}
+	});
+});
+
+/**
+ * THE WIRING.
+ *
+ * Five controls in this shell rendered an affordance and did nothing: a
+ * chevron that opened no menu, and an "F" hint for a shortcut that did not
+ * exist. That is "looks finished but isn't" inside the product, which is the
+ * failure mode this codebase exists to prevent, so these assert behaviour
+ * rather than presence. An onClick that fires is a claim like any other.
+ */
+test.describe("wired controls", () => {
+	test("workspace switcher opens a menu with one real workspace", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		const trigger = page.getByTestId("workspace-switcher");
+
+		await expect(trigger).toHaveAttribute("aria-expanded", "false");
+		await trigger.click();
+
+		await expect(page.getByTestId("workspace-menu")).toBeVisible();
+		await expect(trigger).toHaveAttribute("aria-expanded", "true");
+		// One workspace. CLIENTS is unbuilt, so a second would be invented.
+		await expect(page.getByTestId("workspace-option-current")).toBeVisible();
+	});
+
+	test("gate filter offers the five real gates and nothing invented", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("control-gates").click();
+		await expect(page.getByTestId("control-gates-menu")).toBeVisible();
+
+		// From FULL_BUILD_GATES, transcribed from the golden fixture's playbook.
+		for (const gate of [
+			"phase1-close",
+			"alignment",
+			"qa",
+			"security",
+			"acceptance",
+		]) {
+			await expect(page.getByTestId(`gate-option-${gate}`)).toBeVisible();
+		}
+
+		await page.getByTestId("gate-option-alignment").click();
+		await expect(page.getByTestId("control-gates")).toContainText("alignment");
+	});
+
+	test("target offers the closed vocabulary and selection sticks", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("control-target").click();
+
+		for (const kind of ["zip", "github_pr", "github_push"]) {
+			await expect(page.getByTestId(`target-option-${kind}`)).toBeVisible();
+		}
+
+		await page.getByTestId("target-option-zip").click();
+		await expect(page.getByTestId("control-target")).toContainText("zip");
+	});
+
+	test("account sign-out is a named action, not a bare click", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("account").click();
+
+		await expect(page.getByTestId("account-menu")).toBeVisible();
+		await expect(page.getByTestId("account-sign-out")).toBeVisible();
+		// The only irreversible control in the shell now says what it does.
+		await expect(page.getByTestId("account-sign-out")).toContainText(
+			"Sign out",
+		);
+	});
+
+	test("the collapse control does what its icon promises", async ({ page }) => {
+		await gotoApp(page);
+		const toggle = page.getByTestId("sidebar-collapse");
+
+		// It used to render an affordance with no onClick. Now it collapses.
+		await expect(toggle).toHaveAttribute("aria-expanded", "true");
+		await toggle.click();
+		await expect(page.getByTestId("sidebar")).toHaveAttribute(
+			"data-collapsed",
+			"true",
+		);
+		await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	});
+});
+
+test.describe("search", () => {
+	test("the trigger opens a real focused input", async ({ page }) => {
+		await gotoApp(page);
+		await page.getByTestId("search-trigger").click();
+
+		await expect(page.getByTestId("search-input")).toBeFocused();
+	});
+
+	test("the advertised F shortcut actually opens it", async ({ page }) => {
+		await gotoApp(page);
+
+		// The hint is rendered, so it has to work.
+		await page.keyboard.press("f");
+		await expect(page.getByTestId("search-input")).toBeFocused();
+	});
+
+	test("F is not stolen from someone already typing", async ({ page }) => {
+		await gotoApp(page);
+		await page.getByTestId("search-trigger").click();
+		await expect(page.getByTestId("search-input")).toBeFocused();
+
+		await page.keyboard.type("off");
+
+		// If the handler swallowed it, the f characters never reach the field.
+		await expect(page.getByTestId("search-input")).toHaveValue("off");
+	});
+
+	test("Escape closes it and returns focus to the trigger", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("search-trigger").click();
+		await expect(page.getByTestId("search-input")).toBeFocused();
+
+		await page.keyboard.press("Escape");
+
+		// The trigger is conditionally rendered, so this only works if focus is
+		// restored AFTER it remounts.
+		await expect(page.getByTestId("search-trigger")).toBeFocused();
+	});
+
+	test("says there is nothing to search rather than inventing results", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("search-trigger").click();
+		await page.keyboard.type("meridian");
+
+		await expect(page.getByTestId("search-empty")).toBeVisible();
+	});
+});
+
+test.describe("keyboard and focus", () => {
+	test("Escape closes a menu and returns focus to its trigger", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("workspace-switcher").click();
+		await expect(page.getByTestId("workspace-menu")).toBeVisible();
+
+		await page.keyboard.press("Escape");
+
+		await expect(page.getByTestId("workspace-menu")).toHaveCount(0);
+		await expect(page.getByTestId("workspace-switcher")).toBeFocused();
+	});
+
+	test("the skip link is the first tab stop and moves focus to the content", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.keyboard.press("Tab");
+
+		await expect(page.getByTestId("skip-to-content")).toBeFocused();
+		// sr-only until focused, then a real visible target.
+		await expect(page.getByTestId("skip-to-content")).toBeVisible();
+
+		await page.keyboard.press("Enter");
+		await expect(page.getByTestId("main")).toBeFocused();
+	});
+
+	test("every control shows a focus ring when tabbed to", async ({ page }) => {
+		await gotoApp(page);
+
+		// Verified by tabbing, not by reading the stylesheet.
+		for (let i = 0; i < 3; i++) {
+			await page.keyboard.press("Tab");
+			const outline = await page.evaluate(() => {
+				const cs = getComputedStyle(document.activeElement as Element);
+				return { style: cs.outlineStyle, width: cs.outlineWidth };
+			});
+			expect(outline.style, `tab stop ${i + 1}`).toBe("solid");
+			expect(outline.width, `tab stop ${i + 1}`).toBe("2px");
+		}
+	});
+});
+
+test.describe("honest state", () => {
+	test("the idle dot does not animate", async ({ page }) => {
+		await gotoApp(page);
+
+		await expect(page.getByTestId("live-pill")).toHaveAttribute(
+			"data-activity",
+			"idle",
+		);
+		// A pulse beside "No run in progress" reads as activity where there is
+		// none. Zero missions have run.
+		const animation = await styleOf(page, "live-dot", "animation-name");
+		expect(animation).toBe("none");
+	});
+
+	test("the nav shows a cut edge only once it is scrolled", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		const slot = page.getByTestId("nav-slot");
+
+		await expect(slot).toHaveAttribute("data-scrolled", "false");
+		await expectStyle(page, "nav-slot", "border-top-color").toBe(
+			"rgba(0, 0, 0, 0)",
+		);
+	});
+});
+
+/**
+ * The sidebar rail, and the footer that holds the operator's own controls.
+ *
+ * Theme and collapse are preferences; gates and target are about the current
+ * view's data. They were mixed in one strip and are now separated.
+ */
+test.describe("rail and footer", () => {
+	const RAIL_PX = 64; // 16 grid units. On the 4px scale, not a literal.
+
+	test("the theme toggle lives in the footer, not the top bar", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+
+		await expect(
+			page.locator('[data-testid="topbar"] [data-testid="control-theme"]'),
+		).toHaveCount(0);
+		await expect(
+			page.locator(
+				'[data-testid="sidebar-footer"] [data-testid="control-theme"]',
+			),
+		).toHaveCount(1);
+	});
+
+	test("the moved toggle still switches the theme", async ({ page }) => {
+		await gotoApp(page);
+		const shell = page.getByTestId("app-shell");
+
+		await expect(shell).toHaveAttribute("data-theme", "dark");
+		await page.getByTestId("control-theme").click();
+		await expect(shell).toHaveAttribute("data-theme", "light");
+	});
+
+	test("there is exactly one theme control, so nothing can desync", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+
+		// Two useTheme instances drift apart the moment either is pressed.
+		await expect(page.getByTestId("control-theme")).toHaveCount(1);
+	});
+
+	test("collapsing narrows the sidebar without moving the frame", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		const windowBefore = await page.getByTestId("app-window").boundingBox();
+
+		await expect(page.getByTestId("sidebar")).toHaveCSS("width", "238px");
+		await page.getByTestId("sidebar-collapse").click();
+
+		await expect(page.getByTestId("sidebar")).toHaveCSS(
+			"width",
+			`${RAIL_PX}px`,
+		);
+		const windowAfter = await page.getByTestId("app-window").boundingBox();
+		expect(windowAfter?.width).toBe(windowBefore?.width);
+	});
+
+	test("the rail drops labels but keeps every control reachable", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("sidebar-collapse").click();
+
+		await expect(page.getByTestId("wordmark")).toHaveCount(0);
+		await expect(page.getByTestId("search-hint")).toHaveCount(0);
+
+		await expect(page.getByTestId("brand-mark")).toBeVisible();
+		await expect(page.getByTestId("workspace-switcher")).toBeVisible();
+		await expect(page.getByTestId("search-trigger")).toBeVisible();
+		await expect(page.getByTestId("control-theme")).toBeVisible();
+		await expect(page.getByTestId("account")).toBeVisible();
+	});
+
+	test("the collapsed state survives a reload", async ({ page }) => {
+		await gotoApp(page);
+		await page.getByTestId("sidebar-collapse").click();
+		await expect(page.getByTestId("sidebar")).toHaveAttribute(
+			"data-collapsed",
+			"true",
+		);
+
+		await page.reload();
+		await expect(page.getByTestId("sidebar")).toHaveAttribute(
+			"data-collapsed",
+			"true",
+		);
+	});
+
+	test("collapsed reaches NavTree through the seam", async ({ page }) => {
+		await gotoApp(page);
+		await page.getByTestId("sidebar-collapse").click();
+
+		// The frame's only job here. What NavTree does with it is session 3's.
+		await expect(page.getByTestId("nav-tree")).toHaveAttribute(
+			"data-collapsed",
+			"true",
+		);
+	});
+});
+
+/**
+ * A control whose visible label is gone must say what it is some other way.
+ * One tooltip per test, on a fresh page: Radix has a skip-delay window, and
+ * hovering several triggers in sequence makes later ones look broken when they
+ * are not.
+ */
+test.describe("rail labelling", () => {
+	for (const [control, tip, label] of [
+		["sidebar-collapse", "sidebar-collapse-tip", "Expand sidebar"],
+		["search-trigger", "search-trigger-tip", "Find"],
+		["control-theme", "control-theme-tip", "theme"],
+		["account", "account-tip", "@"],
+	] as const) {
+		test(`${control} is labelled when collapsed`, async ({ page }) => {
+			await gotoApp(page);
+			await page.getByTestId("sidebar-collapse").click();
+			await expect(page.getByTestId("sidebar")).toHaveAttribute(
+				"data-collapsed",
+				"true",
+			);
+
+			await page.getByTestId(control).hover();
+
+			await expect(page.getByTestId(tip)).toContainText(label);
+		});
+	}
+
+	test("the collapse toggle carries an aria-label in both states", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		const toggle = page.getByTestId("sidebar-collapse");
+
+		await expect(toggle).toHaveAttribute("aria-label", "Collapse sidebar");
+		await toggle.click();
+		await expect(toggle).toHaveAttribute("aria-label", "Expand sidebar");
 	});
 });
 
