@@ -213,6 +213,37 @@ export function githubPushTarget(auth: GitHubAuth): DeliveryTarget {
 
 			const { commitSha } = await commitPackage(ctx, auth);
 
+			const opts = {
+				owner,
+				repo,
+				token: auth.token,
+				fetchImpl: auth.fetchImpl,
+			};
+
+			/**
+			 * AN EMPTY REPOSITORY HAS NO BRANCH TO MOVE, so the ref must be
+			 * CREATED rather than updated.
+			 *
+			 * `commitPackage` already supports this case — a null base commit
+			 * produces a root commit against no base tree — but the write here
+			 * always PATCHed, and PATCH on a ref that does not exist is a 422 from
+			 * GitHub. So the one case the commit path was explicitly built for
+			 * could never complete: blobs, tree and commit were all written, then
+			 * the delivery failed at the last call with BRANCH_NOT_FOUND.
+			 *
+			 * `createRef` is the additive call and cannot repoint anything, which
+			 * is why it is safe to reach for here: if the branch turns out to
+			 * exist, GitHub refuses rather than overwriting it.
+			 */
+			if (ctx.baseCommitSha === null) {
+				const created = await createRef({
+					...opts,
+					ref: `refs/heads/${branch}`,
+					sha: commitSha,
+				});
+				return { kind: "github_push", commitSha, ref: created.ref };
+			}
+
 			/**
 			 * FORCE IS NOT PASSED, and that is the safety property of this target.
 			 * The gateway defaults it to false and sends it explicitly. A
@@ -221,10 +252,7 @@ export function githubPushTarget(auth: GitHubAuth): DeliveryTarget {
 			 * the answer is to re-preview, never to overwrite what arrived.
 			 */
 			const ref = await updateRef({
-				owner,
-				repo,
-				token: auth.token,
-				fetchImpl: auth.fetchImpl,
+				...opts,
 				ref: `heads/${branch}`,
 				sha: commitSha,
 			});

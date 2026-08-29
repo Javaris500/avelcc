@@ -40,6 +40,14 @@ export const Route = createFileRoute("/api/exports")({
 					target: parsed.data.target,
 					repoUrl: parsed.data.repoUrl,
 					previewExportId: parsed.data.previewExportId,
+					/**
+					 * No `ref` is passed, because `export.create`'s body has none —
+					 * only the preview body does. When a preview is linked its ref
+					 * wins, which covers the case that matters; an unlinked create
+					 * therefore targets the default branch. A create against a
+					 * non-default branch with no preview is not expressible in the
+					 * contract as written.
+					 */
 				});
 
 				return exportResponse(result, 201);

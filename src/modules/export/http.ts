@@ -14,8 +14,15 @@ export function exportResponse(
 	created: 200 | 201,
 ): Response {
 	if (result.ok) {
+		// `meta` carries the delivery identifiers — a PR's number and url — which
+		// the exports table has no columns for. The success envelope allows it,
+		// so this costs no contract change. See createExport.
 		return Response.json(
-			{ success: true, data: result.export },
+			{
+				success: true,
+				data: result.export,
+				...(result.meta ? { meta: result.meta } : {}),
+			},
 			{ status: created },
 		);
 	}

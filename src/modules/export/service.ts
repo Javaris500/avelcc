@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import type { ErrorCode } from "#/contract/shared/errors";
 import type { Db } from "#/modules/db/client";
-import { exports, missions } from "#/modules/db/schema";
+import { connections, exports, missions } from "#/modules/db/schema";
 import type { RemoteTree, Violation } from "#/modules/export/blast/types";
 import { checkDeliverable } from "#/modules/export/delivery/guards";
 import {
@@ -16,6 +16,7 @@ import type {
 	DeliveryTarget,
 	PreviewFacts,
 } from "#/modules/export/delivery/types";
+import { GatewayError } from "#/modules/export/gateway/types";
 import { packageSha256, sha256Hex } from "#/modules/export/render/manifest";
 
 /**
@@ -78,7 +79,7 @@ export type ExportFailure = {
 };
 
 export type ExportResult =
-	| { ok: true; export: ExportRow }
+	| { ok: true; export: ExportRow; meta?: Record<string, unknown> }
 	| { ok: false; failure: ExportFailure };
 
 export type ExportRow = typeof exports.$inferSelect;
@@ -111,7 +112,18 @@ async function advance(
 		.set({ ...extra, status: to })
 		.where(eq(exports.id, row.id))
 		.returning();
-	return next as ExportRow;
+	/**
+	 * An UPDATE that matched nothing means the row is gone underneath us. Casting
+	 * `undefined` through as an ExportRow defers the failure to the NEXT advance,
+	 * which dereferences `row.status` and throws a TypeError from inside
+	 * assertTransition — mid-delivery, with a message about nothing.
+	 */
+	if (!next) {
+		throw new Error(
+			`Export ${row.id} disappeared while advancing ${row.status} -> ${to}.`,
+		);
+	}
+	return next;
 }
 
 /**
@@ -204,13 +216,22 @@ async function prepare(
 	let current = await advance(db, row, "rendering");
 	const files = await deps.renderPackage(mission);
 
-	// The package hash, over paths and per-file hashes — the same preimage the
-	// manifest uses, so the number here is the number the package states.
+	/**
+	 * The package hash, over the SAME preimage manifest.json uses — which means
+	 * manifest.json is excluded from it.
+	 *
+	 * `packagePreimage` skips it (a manifest cannot hash itself), and `render()`
+	 * puts it into the returned map. Hashing every entry here therefore produced
+	 * a number that could never equal the one printed inside the artifact, so the
+	 * value persisted for querying disagreed with the package's own manifest and
+	 * was published into PR bodies as "Package sha256". The determinism gate
+	 * still worked, because it compared this value against itself — which is
+	 * exactly why the disagreement went unnoticed.
+	 */
 	const packageHash = packageSha256(
-		[...files.entries()].map(([path, bytes]) => ({
-			path,
-			sha256: sha256Hex(bytes),
-		})),
+		[...files.entries()]
+			.filter(([path]) => path !== "manifest.json")
+			.map(([path, bytes]) => ({ path, sha256: sha256Hex(bytes) })),
 	);
 
 	current = await advance(db, current, "verifying");
@@ -321,6 +342,74 @@ function resolveRepo(
 	return { ok: true, repo: parsed };
 }
 
+/**
+ * Turns a thrown gateway failure into the contract's declared 502.
+ *
+ * Every network call in this module can throw a GatewayError, and until now
+ * every one of them escaped both routes as an unhandled exception — a framework
+ * 500 with no `success:false` envelope, so the client's error map never saw the
+ * code it switches on. The contract declares `502: errorEnvelope` and nothing
+ * ever returned one.
+ *
+ * `preflight.blast-radius.ts` already got this right; this is the same mapping,
+ * moved into the service so all three export routes inherit it.
+ */
+function asGatewayFailure(error: unknown): ExportResult | null {
+	if (error instanceof GatewayError) {
+		return fail("EXTERNAL_GITHUB", 502, error.detail);
+	}
+	return null;
+}
+
+/**
+ * The connection that authorizes a GitHub delivery.
+ *
+ * Resolved SERVER-SIDE from the mission's engagement rather than taken from the
+ * request. DECISIONS-V2:103 scopes a Connection per engagement, so the mission
+ * already determines which credential applies, and letting a caller name one
+ * would let them borrow another engagement's authorization — the one-way door
+ * `client_id` exists to keep shut.
+ *
+ * This is also why the routes pass no `connectionId`: the contract bodies have
+ * no such field, and adding one would have been the wrong shape.
+ */
+async function resolveConnection(
+	db: Db,
+	engagementId: string,
+): Promise<string | null> {
+	const [row] = await db
+		.select({ id: connections.id })
+		.from(connections)
+		.where(
+			and(
+				eq(connections.engagementId, engagementId),
+				eq(connections.service, "github"),
+				eq(connections.status, "active"),
+				isNull(connections.deletedAt),
+			),
+		)
+		.limit(1);
+	return row?.id ?? null;
+}
+
+/**
+ * `findByKey` then `insert` is not atomic, so two concurrent requests with one
+ * key both pass the replay check and the loser violates
+ * `exports_idempotency_key_unique`. That insert sits outside the try block, so
+ * it escaped as an unhandled 500 rather than the 409 the contract declares.
+ * Catching the constraint and re-reading turns the race into the intended
+ * answer — the database, not the check, is what actually enforces uniqueness.
+ */
+function isUniqueViolation(error: unknown): boolean {
+	// Postgres 23505. neon-http surfaces the driver error with `code` intact.
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: unknown }).code === "23505"
+	);
+}
+
 async function loadMission(db: Db, id: string) {
 	const [m] = await db
 		.select()
@@ -360,8 +449,29 @@ export async function previewExport(
 ): Promise<ExportResult> {
 	const { db } = deps;
 
+	/**
+	 * A replayed key returns the original ONLY if it is the same request. The
+	 * key alone is not enough: reusing a create key here would hand back a real
+	 * delivery row as a `201` preview, and reusing a key across missions or
+	 * targets would silently answer with something unrelated. A key that means
+	 * something different from what was asked is a conflict, not a replay.
+	 */
 	const existing = await findByKey(db, input.idempotencyKey);
-	if (existing) return { ok: true, export: existing };
+	if (existing) {
+		const sameRequest =
+			existing.dryRun &&
+			existing.missionId === input.missionId &&
+			existing.targetKind === input.target;
+		if (!sameRequest) {
+			return fail(
+				"IDEMPOTENCY_REPLAY",
+				409,
+				`Idempotency key ${input.idempotencyKey} already belongs to a different export.`,
+				{ exportId: existing.id, dryRun: existing.dryRun },
+			);
+		}
+		return { ok: true, export: existing };
+	}
 
 	const mission = await loadMission(db, input.missionId);
 	if (!mission) {
@@ -380,31 +490,46 @@ export async function previewExport(
 		);
 	}
 
-	if (input.target !== "zip" && !input.connectionId) {
+	const connectionId =
+		input.target === "zip"
+			? null
+			: await resolveConnection(db, mission.engagementId);
+
+	if (input.target !== "zip" && !connectionId) {
 		return fail(
 			"REPO_NO_ACCESS",
 			403,
-			`A ${input.target} export must name the connection that authorizes it. None was supplied, and exports_remote_target_requires_connection refuses the row.`,
+			`No active github connection is attached to this mission's engagement, so nothing authorizes a ${input.target}. exports_remote_target_requires_connection refuses the row.`,
 		);
 	}
 
 	const resolved = resolveRepo(input.target, mission.repoUrl, input.repoUrl);
 	if (!resolved.ok) return { ok: false, failure: resolved.failure };
 
-	const [created] = await db
-		.insert(exports)
-		.values({
-			missionId: mission.id,
-			sprintN: mission.sprintN,
-			idempotencyKey: input.idempotencyKey,
-			targetKind: input.target,
-			connectionId: input.connectionId ?? null,
-			dryRun: true,
-			status: "pending",
-		})
-		.returning();
+	let created: ExportRow | undefined;
+	try {
+		[created] = await db
+			.insert(exports)
+			.values({
+				missionId: mission.id,
+				sprintN: mission.sprintN,
+				idempotencyKey: input.idempotencyKey,
+				targetKind: input.target,
+				connectionId,
+				dryRun: true,
+				status: "pending",
+			})
+			.returning();
+	} catch (error) {
+		// Lost the race with a concurrent request holding the same key.
+		if (!isUniqueViolation(error)) throw error;
+		const winner = await findByKey(db, input.idempotencyKey);
+		if (winner) return { ok: true, export: winner };
+		throw error;
+	}
+	if (!created) throw new Error("The export row was not created.");
 
-	let row = created as ExportRow;
+	let row = created;
 	try {
 		const prepared = await prepare(
 			deps,
@@ -417,6 +542,8 @@ export async function previewExport(
 		return { ok: true, export: row };
 	} catch (error) {
 		await markFailed(db, row);
+		const gateway = asGatewayFailure(error);
+		if (gateway) return gateway;
 		throw error;
 	}
 }
@@ -431,6 +558,8 @@ export type CreateInput = {
 	connectionId?: string;
 	/** Overrides the mission's repo_url for this export only. */
 	repoUrl?: string;
+	/** Ignored when a preview is linked: that preview's ref wins. See below. */
+	ref?: string;
 	message?: string;
 };
 
@@ -467,11 +596,16 @@ export async function createExport(
 		);
 	}
 
-	if (input.target !== "zip" && !input.connectionId) {
+	const connectionId =
+		input.target === "zip"
+			? null
+			: await resolveConnection(db, mission.engagementId);
+
+	if (input.target !== "zip" && !connectionId) {
 		return fail(
 			"REPO_NO_ACCESS",
 			403,
-			`A ${input.target} export must name the connection that authorizes it.`,
+			`No active github connection is attached to this mission's engagement, so nothing authorizes a ${input.target}.`,
 		);
 	}
 
@@ -480,6 +614,7 @@ export async function createExport(
 
 	// Loaded BEFORE the row is created, so a bad preview reference costs no row.
 	let preview: PreviewFacts | null = null;
+	let previewRef: string | null = null;
 	if (input.previewExportId) {
 		const p = await getExport(db, input.previewExportId);
 		if (!p) {
@@ -489,6 +624,32 @@ export async function createExport(
 				`No export with id ${input.previewExportId} to approve from.`,
 			);
 		}
+		/**
+		 * IT MUST ACTUALLY BE A PREVIEW, of this mission, for this target.
+		 *
+		 * Only the id was checked before, so any earlier row carrying a package
+		 * hash satisfied `checkPreviewRequired` — a completed github_pr delivery, a
+		 * failed row that got as far as `previewing`, or a preview of a different
+		 * mission entirely. That defeats the rule the guard exists to enforce: a
+		 * github_push could be authorized by something no operator ever reviewed
+		 * as a blast radius. checkPreviewMatchesMission catches the wrong mission
+		 * downstream; nothing caught the wrong KIND of row.
+		 */
+		if (!p.dryRun || p.status !== "previewed") {
+			return fail(
+				"PREVIEW_REQUIRED",
+				422,
+				`Export ${p.id} is not an approved preview (dryRun=${p.dryRun}, status=${p.status}). A delivery must be approved from a preview that reached 'previewed'.`,
+			);
+		}
+		if (p.targetKind !== input.target) {
+			return fail(
+				"PREVIEW_REQUIRED",
+				422,
+				`Preview ${p.id} was computed for a ${p.targetKind}, not a ${input.target}. A blast radius for one target does not authorize another.`,
+			);
+		}
+
 		/**
 		 * An export with no recorded package hash cannot be approved from.
 		 * Silently treating it as "matches" would disable the determinism gate on
@@ -510,26 +671,60 @@ export async function createExport(
 			baseCommitSha: p.baseCommitSha,
 			violations: [],
 		};
+		previewRef = p.baseRef;
 	}
 
-	const [created] = await db
-		.insert(exports)
-		.values({
-			missionId: mission.id,
-			sprintN: mission.sprintN,
-			idempotencyKey: input.idempotencyKey,
-			targetKind: input.target,
-			connectionId: input.connectionId ?? null,
-			dryRun: false,
-			previewExportId: input.previewExportId ?? null,
-			status: "pending",
-		})
-		.returning();
+	let created: ExportRow | undefined;
+	try {
+		[created] = await db
+			.insert(exports)
+			.values({
+				missionId: mission.id,
+				sprintN: mission.sprintN,
+				idempotencyKey: input.idempotencyKey,
+				targetKind: input.target,
+				connectionId,
+				dryRun: false,
+				previewExportId: input.previewExportId ?? null,
+				status: "pending",
+			})
+			.returning();
+	} catch (error) {
+		if (!isUniqueViolation(error)) throw error;
+		const winner = await findByKey(db, input.idempotencyKey);
+		if (winner) {
+			return fail(
+				"IDEMPOTENCY_REPLAY",
+				409,
+				"This idempotency key already produced an export. Nothing was delivered a second time.",
+				{ exportId: winner.id, status: winner.status },
+			);
+		}
+		throw error;
+	}
+	if (!created) throw new Error("The export row was not created.");
 
-	let row = created as ExportRow;
+	let row = created;
 
 	try {
-		const prepared = await prepare(deps, row, mission, resolved.repo, "main");
+		/**
+		 * THE REF WAS HARDCODED TO "main", AND THAT COULD WRITE TO THE WRONG
+		 * BRANCH.
+		 *
+		 * `previewExport` honours `input.ref`; this did not. Preview against
+		 * `develop` and approve, and the re-prepare read main's tree — so
+		 * `checkPreviewFresh(develop_tip, main_tip)` failed and the export could
+		 * never be delivered. In the worse case where the two tips happened to
+		 * coincide, the staleness check PASSED and `ctx.target.branch` was also
+		 * "main", so a github_push approved against develop wrote to main.
+		 *
+		 * A linked preview's ref wins outright. The whole point of approving from
+		 * a preview is that the delivery matches what was reviewed, and letting a
+		 * request re-specify the branch afterwards is exactly the drift the link
+		 * exists to prevent.
+		 */
+		const ref = previewRef ?? input.ref ?? "main";
+		const prepared = await prepare(deps, row, mission, resolved.repo, ref);
 		row = prepared.row;
 
 		const verdict = checkDeliverable({
@@ -579,9 +774,45 @@ export async function createExport(
 			prStatus: outcome.kind === "github_pr" ? "open" : null,
 		});
 
-		return { ok: true, export: row };
+		/**
+		 * THE OUTCOME TRAVELS IN `meta`, BECAUSE THE TABLE HAS NOWHERE TO PUT IT.
+		 *
+		 * A successful github_pr previously returned a row saying `pr-open` and no
+		 * way whatsoever to find the pull request — the number and url were
+		 * computed and dropped on the floor. There are no columns for them, so
+		 * persisting properly needs a migration; until then they at least reach
+		 * the caller, and the success envelope already allows a `meta` object so
+		 * this costs no contract change.
+		 *
+		 * The zip's BYTES are still lost. They cannot go in a JSON envelope and
+		 * there is nowhere to store them, which is the R2 gap rather than an
+		 * oversight. Its hash and length are returned so a caller can at least
+		 * verify an archive they rebuild.
+		 *
+		 * `verdict.warning` rides along too. guards.ts says it is "returned rather
+		 * than logged, so a caller that ignores it does so visibly" — it was being
+		 * ignored invisibly, and it marks a PR whose blast radius no operator ever
+		 * saw.
+		 */
+		return {
+			ok: true,
+			export: row,
+			meta: {
+				delivery:
+					outcome.kind === "zip"
+						? {
+								kind: outcome.kind,
+								sha256: outcome.sha256,
+								byteLength: outcome.byteLength,
+							}
+						: outcome,
+				...(verdict.warning ? { warning: verdict.warning } : {}),
+			},
+		};
 	} catch (error) {
 		await markFailed(db, row);
+		const gateway = asGatewayFailure(error);
+		if (gateway) return gateway;
 		throw error;
 	}
 }
