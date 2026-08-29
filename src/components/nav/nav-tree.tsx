@@ -29,7 +29,7 @@ function Icon({ item }: { item: NavItem }) {
 	);
 }
 
-const ROW = "flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-[13.5px]";
+const ROW = "flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-xs";
 
 function Row({ item }: { item: NavItem }) {
 	const label = (
@@ -78,7 +78,7 @@ function Row({ item }: { item: NavItem }) {
 			{label}
 			{item.badge ? (
 				<span
-					className="ml-auto font-mono text-[10px] text-text-subtle"
+					className="ml-auto font-mono text-micro text-text-subtle"
 					data-testid={`${testId(item.label)}-badge`}
 				>
 					{item.badge}
@@ -102,7 +102,7 @@ export function NavTree({ groups, collapsed = false }: NavTreeProps) {
 			{groups.map((group) => (
 				<div key={group.label}>
 					<p
-						className="px-2 pb-1.5 font-mono text-[11px] font-medium tracking-wide text-text-subtle uppercase"
+						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-subtle uppercase"
 						data-testid={`nav-group-${group.label.toLowerCase()}`}
 					>
 						{group.label}
