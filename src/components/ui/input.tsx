@@ -1,55 +1,34 @@
-import type {
-	InputHTMLAttributes,
-	ReactNode,
-	SelectHTMLAttributes,
-} from "react";
+import type * as React from "react";
 
-import { cn } from "#/components/cn";
-
-const field = [
-	"w-full rounded-xs bg-app-recessed px-2.5",
-	"border border-[var(--elevation-border-rest)]",
-	"text-sm text-text placeholder:text-text-subtle",
-	"disabled:opacity-[var(--opacity-disabled)]",
-].join(" ");
-
-export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
-	"data-testid": string;
-};
-
-export function Input({ className, ...props }: InputProps) {
-	return <input className={cn(field, "h-9", className)} {...props} />;
-}
-
-export type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
-	"data-testid": string;
-};
-
-export function Select({ className, ...props }: SelectProps) {
-	return <select className={cn(field, "h-9", className)} {...props} />;
-}
+import { cn } from "#/components/cn.ts";
 
 /**
- * Density is set on the container, never the row — the patch defines
- * --row-pad there so a table can switch between reading and scanning without
- * every row deciding for itself.
+ * shadcn's input, modified once at generation.
+ *   - every `dark:` utility removed; this app has no `dark` class
+ *   - data-testid required, same reasoning as Button
+ *   - :user-invalid, not :invalid. A required empty field is invalid from the
+ *     moment it renders, and colouring it red before the operator has typed
+ *     punishes them for not having started.
  */
-export function Density({
-	mode,
-	className,
-	children,
-}: {
-	mode: "comfortable" | "compact";
-	className?: string;
-	children: ReactNode;
-}) {
+export type InputProps = React.ComponentProps<"input"> & {
+	"data-testid": string;
+};
+
+export function Input({ className, type, ...props }: InputProps) {
 	return (
-		<div
-			className={cn(`density-${mode}`, className)}
-			data-density={mode}
-			data-testid={`density-${mode}`}
-		>
-			{children}
-		</div>
+		<input
+			className={cn(
+				"flex h-9 w-full min-w-0 rounded-xs border border-input bg-muted px-2.5 py-1 text-sm",
+				"placeholder:text-muted-foreground transition-[color,box-shadow] outline-none",
+				"file:inline-flex file:border-0 file:bg-transparent file:text-sm file:font-medium",
+				"focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+				"user-invalid:border-destructive user-invalid:ring-destructive/20",
+				"disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]",
+				className,
+			)}
+			data-slot="input"
+			type={type}
+			{...props}
+		/>
 	);
 }

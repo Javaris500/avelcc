@@ -95,6 +95,53 @@
   --text-lg--line-height:     1.35;
   --text-title:               19px;   /* page title, one per screen           */
   --text-title--line-height:  1.2;
+
+  /* ── ICON SCALE ─────────────────────────────────────────────────────────
+     Three sizes, so nobody writes size={15} because it looked better once.
+
+     The nav row deviates from the supplied convention and this is the record
+     of why. That convention says 16 for nav; our nav row is 12px text, which
+     is denser than it assumes. At 16 the icon is 1.33x the text it labels and
+     becomes the heavier element in the pair. A nav row icon sits INLINE with
+     its label, so it takes the inline size. 14/12 = 1.17, which reads as a
+     label with a marker rather than a marker with a caption. */
+  --icon-inline:  14px;   /* beside text: nav rows, list rows, inline status  */
+  --icon-control: 16px;   /* buttons, toolbar controls, standalone affordance */
+  --icon-header:  20px;   /* section and page headers                        */
+
+  /* ── shadcn ALIAS LAYER ─────────────────────────────────────────────────
+     Tokens flow ONE DIRECTION. Brand is the source; these are aliases that
+     point at it. Never the reverse, and never a literal value here.
+
+     THE COLLISION, and why accent is not the accent:
+     shadcn's `accent` means "subtle hover surface", NOT "brand accent". Mapped
+     naively to --color-accent, every ghost button hover would turn cyan. It
+     points at --color-accent-surface instead, which is our app-raised step —
+     the patch labels that "hover, active row", so the semantics line up
+     exactly. DO NOT "simplify" this back to --color-accent.
+
+     These are declared TWICE, here and in .light, and that is not redundancy.
+     CSS substitutes var() inside a custom property at computed-value time on
+     the declaring element, so an alias declared only here would freeze against
+     the dark palette and never follow the theme. That is correction 4 in
+     patch.css, which cost us every border in light mode. */
+  --color-accent-surface:       var(--color-app-raised);
+
+  --color-background:           var(--color-app-panel);
+  --color-foreground:           var(--color-text);
+  --color-primary:              var(--color-accent);
+  --color-primary-foreground:   var(--color-bg);
+  --color-secondary:            var(--color-app-raised);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted:                var(--color-app-recessed);
+  --color-muted-foreground:     var(--color-text-muted);
+  --color-accent-foreground:    var(--color-text);
+  --color-destructive:          var(--color-danger);
+  --color-input:                var(--color-border);
+  --color-ring:                 var(--color-focus-ring);
+  --color-popover:              var(--color-app-float);
+  --color-popover-foreground:   var(--color-text);
+
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -115,4 +162,22 @@
 
   --color-border:        #e5e7eb;   /* [ref] avel-cc-shell.html .light        */
   --color-border-strong: #d1d5db;   /* [ref] avel-cc-shell.html .light        */
+
+  /* shadcn aliases, re-resolved against the light palette. See the note
+     above: a var() alias declared only on :root freezes at dark. */
+  --color-accent-surface:       var(--color-app-raised);
+  --color-background:           var(--color-app-panel);
+  --color-foreground:           var(--color-text);
+  --color-primary:              var(--color-accent);
+  --color-primary-foreground:   var(--color-bg);
+  --color-secondary:            var(--color-app-raised);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted:                var(--color-app-recessed);
+  --color-muted-foreground:     var(--color-text-muted);
+  --color-accent-foreground:    var(--color-text);
+  --color-destructive:          var(--color-danger);
+  --color-input:                var(--color-border);
+  --color-ring:                 var(--color-focus-ring);
+  --color-popover:              var(--color-app-float);
+  --color-popover-foreground:   var(--color-text);
 }
