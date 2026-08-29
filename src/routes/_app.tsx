@@ -36,7 +36,7 @@ function AppLayout() {
 
 	return (
 		<Shell
-			breadcrumb={session.workspace}
+			breadcrumb="No run in progress"
 			onSignOut={onSignOut}
 			session={session}
 		>
