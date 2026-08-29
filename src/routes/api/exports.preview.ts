@@ -42,6 +42,7 @@ export const Route = createFileRoute("/api/exports/preview")({
 					missionId: parsed.data.missionId,
 					idempotencyKey: parsed.data.idempotencyKey,
 					target: parsed.data.target,
+					repoUrl: parsed.data.repoUrl,
 					ref: parsed.data.ref,
 				});
 

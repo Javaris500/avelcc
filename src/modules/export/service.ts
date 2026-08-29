@@ -194,8 +194,9 @@ async function prepare(
 		type: string;
 		sprintN: number;
 		brief: Record<string, unknown>;
-		repoUrl: string | null;
 	},
+	/** Already resolved and parsed by the caller. null only for a zip. */
+	repo: { owner: string; repo: string } | null,
 	ref: string,
 ): Promise<Prepared> {
 	const { db } = deps;
@@ -224,15 +225,17 @@ async function prepare(
 	 * walked — the lifecycle is shared — but there is nothing remote to diff, so
 	 * an empty radius here is the honest value rather than a skipped step.
 	 */
-	if (row.targetKind !== "zip" && deps.readRemote && deps.computeRadius) {
-		const parsed = mission.repoUrl ? parseRepoUrl(mission.repoUrl) : null;
-		if (parsed) {
-			const remote = await deps.readRemote({ ...parsed, ref });
-			baseCommitSha = remote.commitSha || null;
-			const computed = deps.computeRadius(files, remote);
-			violations = computed.violations;
-			radius = computed.radius;
-		}
+	if (
+		row.targetKind !== "zip" &&
+		repo &&
+		deps.readRemote &&
+		deps.computeRadius
+	) {
+		const remote = await deps.readRemote({ ...repo, ref });
+		baseCommitSha = remote.commitSha || null;
+		const computed = deps.computeRadius(files, remote);
+		violations = computed.violations;
+		radius = computed.radius;
 	}
 
 	/**
@@ -265,6 +268,59 @@ async function prepare(
 	};
 }
 
+/**
+ * Which repository this export targets, and a refusal if a GitHub target has
+ * none.
+ *
+ * The contract lets the caller override the mission's `repo_url` per export —
+ * `repoUrl` is on both the preview and the create body — and that override was
+ * being ignored entirely, so a caller supplying one silently got the mission's.
+ *
+ * The refusal matters more. Without it a GitHub export with no resolvable repo
+ * ran the whole pipeline, passed every guard vacuously (no remote read means no
+ * violations and a null tip), reached `delivering`, and only then threw from
+ * inside the target — a 500, after a row had already claimed to be delivering.
+ * A missing repository is knowable before any of that.
+ *
+ * REPO_NOT_FOUND is the contract's only declared 404 here and the noun is
+ * right for once: there is no repository to deliver to.
+ */
+type RepoResolution =
+	| { ok: true; repo: { owner: string; repo: string } | null }
+	| { ok: false; failure: ExportFailure };
+
+function resolveRepo(
+	target: ExportTargetKind,
+	missionRepoUrl: string | null,
+	override: string | undefined,
+): RepoResolution {
+	if (target === "zip") return { ok: true, repo: null };
+
+	const url = override ?? missionRepoUrl;
+	if (!url) {
+		return {
+			ok: false,
+			failure: {
+				code: "REPO_NOT_FOUND",
+				status: 404,
+				detail: `A ${target} export needs a repository. The mission has no repo_url and the request supplied none.`,
+			},
+		};
+	}
+	const parsed = parseRepoUrl(url);
+	if (!parsed) {
+		return {
+			ok: false,
+			failure: {
+				code: "REPO_NOT_FOUND",
+				status: 404,
+				detail: `Could not read an owner and repository out of ${url}. Expected https://github.com/owner/repo.`,
+			},
+		};
+	}
+	return { ok: true, repo: parsed };
+}
+
 async function loadMission(db: Db, id: string) {
 	const [m] = await db
 		.select()
@@ -282,6 +338,8 @@ export type PreviewInput = {
 	target: ExportTargetKind;
 	/** Required by the schema CHECK for any non-zip target. */
 	connectionId?: string;
+	/** Overrides the mission's repo_url for this export only. */
+	repoUrl?: string;
 	ref?: string;
 };
 
@@ -330,6 +388,9 @@ export async function previewExport(
 		);
 	}
 
+	const resolved = resolveRepo(input.target, mission.repoUrl, input.repoUrl);
+	if (!resolved.ok) return { ok: false, failure: resolved.failure };
+
 	const [created] = await db
 		.insert(exports)
 		.values({
@@ -345,7 +406,13 @@ export async function previewExport(
 
 	let row = created as ExportRow;
 	try {
-		const prepared = await prepare(deps, row, mission, input.ref ?? "main");
+		const prepared = await prepare(
+			deps,
+			row,
+			mission,
+			resolved.repo,
+			input.ref ?? "main",
+		);
 		row = await advance(db, prepared.row, "previewed");
 		return { ok: true, export: row };
 	} catch (error) {
@@ -362,6 +429,8 @@ export type CreateInput = {
 	target: ExportTargetKind;
 	previewExportId?: string;
 	connectionId?: string;
+	/** Overrides the mission's repo_url for this export only. */
+	repoUrl?: string;
 	message?: string;
 };
 
@@ -405,6 +474,9 @@ export async function createExport(
 			`A ${input.target} export must name the connection that authorizes it.`,
 		);
 	}
+
+	const resolved = resolveRepo(input.target, mission.repoUrl, input.repoUrl);
+	if (!resolved.ok) return { ok: false, failure: resolved.failure };
 
 	// Loaded BEFORE the row is created, so a bad preview reference costs no row.
 	let preview: PreviewFacts | null = null;
@@ -457,7 +529,7 @@ export async function createExport(
 	let row = created as ExportRow;
 
 	try {
-		const prepared = await prepare(deps, row, mission, "main");
+		const prepared = await prepare(deps, row, mission, resolved.repo, "main");
 		row = prepared.row;
 
 		const verdict = checkDeliverable({
@@ -478,16 +550,14 @@ export async function createExport(
 		row = await advance(db, row, "delivering");
 
 		const target = deps.targetFor(input.target);
-		const parsed = mission.repoUrl ? parseRepoUrl(mission.repoUrl) : null;
 		const ctx: DeliveryContext = {
 			files: prepared.files,
 			snapshotSha256: prepared.packageHash,
 			missionId: mission.id,
 			sprintN: mission.sprintN,
-			target:
-				input.target === "zip" || !parsed
-					? null
-					: { ...parsed, branch: row.baseRef ?? "main" },
+			target: resolved.repo
+				? { ...resolved.repo, branch: row.baseRef ?? "main" }
+				: null,
 			baseCommitSha: prepared.baseCommitSha,
 			message:
 				input.message ?? `AVEL ${mission.type} sprint ${mission.sprintN}`,
