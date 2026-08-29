@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { z } from "zod";
 
+import { missionListRow } from "#/contract/mission";
+import { successList } from "#/contract/shared/envelope";
+import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
 import { EmptyState, ErrorState } from "#/ui/states";
@@ -12,17 +16,113 @@ export const Route = createFileRoute("/_app/missions/")({
 });
 
 /**
- * The smallest real loop, minus the data.
+ * The smallest real loop, closed.
  *
- * This screen exists today to prove the four-state machinery renders inside the
- * shell. It deliberately resolves to an empty list: there is no contract yet,
- * so there is no Mission shape, so nothing here hand-writes one. The row
- * renderer arrives with mission.list, not before it.
+ * This is the first screen in the app that reads the database. The shape is
+ * INFERRED from the contract and never hand-written: missionListRow is the one
+ * definition this screen and /api/missions both import, so they cannot disagree
+ * about a field without one of them failing to compile.
+ *
+ * The response is parsed with the same successList envelope the route answers
+ * with. envelope.ts: a body that does not match the contract "fails validation
+ * at the boundary instead of reaching a screen that has no case for it". So
+ * drift surfaces here as an error state, not as a column rendering undefined.
  */
+const missionListResponse = successList(missionListRow);
+type MissionListResponse = z.infer<typeof missionListResponse>;
+type MissionRow = z.infer<typeof missionListRow>;
+
+async function fetchMissions(): Promise<MissionListResponse> {
+	const res = await fetch("/api/missions");
+	const body = await res.json().catch(() => null);
+
+	// Codes are the contract; messages change freely. Nothing here parses one.
+	if (body?.success === false) throw new Error(body.error.code);
+
+	// These two are NOT contract codes and are labelled so. No envelope arrived
+	// to carry a code, and borrowing one that means something else would be
+	// worse than reporting exactly what is known.
+	if (!res.ok || body === null) throw new Error(`HTTP_${res.status}`);
+	const parsed = missionListResponse.safeParse(body);
+	if (!parsed.success) throw new Error("SHAPE_MISMATCH");
+
+	return parsed.data;
+}
+
+/**
+ * mission.list declares 200 and 403 only, so FORBIDDEN is the single code an
+ * envelope can carry to this screen. contract/errors holds an export-scoped map
+ * and an auth-scoped map and no CRUD-scoped one, so this names the case it can
+ * actually receive rather than inventing a table for a vocabulary it does not
+ * own.
+ */
+function describeFailure(code: string): string {
+	switch (code) {
+		case "FORBIDDEN":
+			return "This session is not permitted to read missions. Nothing was loaded.";
+		case "SHAPE_MISMATCH":
+			return "The endpoint answered, but the body did not match mission.list. The screen and the route have drifted apart, and rendering it anyway would be a guess.";
+		default:
+			return "The request to /api/missions did not complete, so nothing was loaded. This screen only reads, so nothing was written either.";
+	}
+}
+
+/**
+ * The row ROUTES.md specifies: client, type, sprint, status, last activity,
+ * last export result.
+ *
+ * status is a mono tag rather than a coloured StatusBadge on purpose. The
+ * column is TEXT with no vocabulary declared anywhere, so there is no state to
+ * map a tone onto, and a green "draft" would be this screen inventing the
+ * lifecycle the contract deliberately refuses to declare.
+ */
+function MissionRowView({ mission }: { mission: MissionRow }) {
+	return (
+		<li
+			className="flex flex-col gap-1 border-b border-[var(--elevation-border-rest)] py-3"
+			data-testid="mission-row"
+		>
+			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+				<span
+					className="font-display text-sm font-semibold text-text"
+					data-testid="mission-client"
+				>
+					{mission.clientName}
+				</span>
+				<span className="text-sm text-text-muted" data-testid="mission-type">
+					{mission.type}
+				</span>
+				<Tag data-testid="mission-sprint">sprint {mission.sprintN}</Tag>
+				{/* Right-aligned as a column on desktop. On a phone the row wraps, and
+				    an auto margin there strands the status alone on its own line, so it
+				    flows inline with the rest instead. */}
+				<Tag className="sm:ml-auto" data-testid="mission-status">
+					{mission.status}
+				</Tag>
+			</div>
+			{/* Both are NULL for every row today and are rendered as empty rather
+			    than filled from somewhere else. ROUTES.md: ship the column when the
+			    aggregate join exists, and never substitute updatedAt, which is
+			    row-edit time and not audited activity. */}
+			<div className="flex flex-wrap gap-x-4 text-micro text-text-subtle">
+				<span data-testid="mission-activity">
+					last activity {mission.lastActivity ?? "—"}
+				</span>
+				<span data-testid="mission-export">
+					last export {mission.lastExportResult ?? "—"}
+				</span>
+			</div>
+		</li>
+	);
+}
+
 function Missions() {
-	const query = useQuery<never[]>({
+	const query = useQuery<MissionListResponse>({
 		queryKey: ["missions"],
-		queryFn: async () => [],
+		queryFn: fetchMissions,
+		// Fail visibly and immediately. The error state carries its own retry, so
+		// three silent backoffs only delay telling the operator what happened.
+		retry: false,
 	});
 
 	return (
@@ -62,16 +162,38 @@ function Missions() {
 				}
 				error={({ error, retry }) => (
 					<ErrorState
-						body={error.message}
-						code="UNKNOWN"
+						body={describeFailure(error.message)}
+						code={error.message}
 						retry={retry}
 						title="The mission list could not be read."
 					/>
 				)}
+				// The query resolves the ENVELOPE, not the array, so the default
+				// heuristic cannot see the rows. Emptiness is the page being empty.
+				isEmpty={(page) => page.data.length === 0}
 				loading={<SkeletonRows count={6} />}
 				query={query}
 			>
-				{(missions) => <div data-testid="mission-rows">{missions.length}</div>}
+				{(page) => (
+					<div data-testid="mission-rows">
+						<ul>
+							{page.data.map((mission) => (
+								<MissionRowView key={mission.id} mission={mission} />
+							))}
+						</ul>
+						<p
+							className="pt-3 text-micro text-text-subtle"
+							data-testid="mission-list-note"
+						>
+							{page.data.length} of {page.meta.total} shown.
+							{page.meta.nextCursor
+								? " More rows exist; the next page is not built."
+								: ""}{" "}
+							Last activity and last export are empty on every row because
+							ActivityLog and Export have no tables yet.
+						</p>
+					</div>
+				)}
 			</Surface>
 		</div>
 	);
