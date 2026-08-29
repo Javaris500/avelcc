@@ -134,7 +134,19 @@
 
   --frame-mat:     26px;   /* the desktop inset around the app window        */
   --frame-sidebar: 238px;  /* sidebar column                                 */
-  --frame-max:    1440px;  /* app window cap                                 */
+  /* The window fills the desktop. Was 1440px, which left 480px unused at
+     1920 and 1120px — 44% of the screen — at 2560.
+
+     The cap's usual justification is reading measure, and it does not apply
+     here: screens already cap their own CONTENT (pre-flight 68ch, home 64ch),
+     so prose is protected one level down. The frame cap was only constraining
+     the things that actually want width — file lists, blast-radius tables, the
+     loadout's three panes.
+
+     The mat stays. It is the reference's identity and it is what makes this
+     read as an instrument rather than a web page. A screen that needs a
+     measure sets its own; the frame should not decide that for it. */
+  --frame-max:     100%;   /* app window fills the desktop, inside the mat   */
 
   /* ── shadcn ALIAS LAYER ─────────────────────────────────────────────────
      Tokens flow ONE DIRECTION. Brand is the source; these are aliases that
