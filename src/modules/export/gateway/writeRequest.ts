@@ -8,6 +8,20 @@ import {
 const API = "https://api.github.com";
 
 /**
+ * A STABLE MARKER, owned by this module, for the one 422 that is a state rather
+ * than a fault: the ref a caller asked to create is already there.
+ *
+ * It exists because the caller genuinely needs to tell that case apart — a
+ * retried delivery finds its own branch from the first attempt — and the only
+ * signal GitHub gives is a message. Sniffing that message once, here, and
+ * handing downstream a marker this project controls is the difference between
+ * one place parsing GitHub's wording and every call site doing it. The code
+ * stays EXTERNAL_GITHUB because ERROR_CODES has nothing for "already exists";
+ * see isRefAlreadyExists in write.ts for the predicate callers should use.
+ */
+export const REF_ALREADY_EXISTS = "ref already exists";
+
+/**
  * The write side's single IO edge, mirroring readTree's.
  *
  * Every mutating call in this module goes through here, so the credential
@@ -161,6 +175,17 @@ function classifyUnprocessable(said: string, where: string): GatewayError {
 		return new GatewayError(
 			"PREVIEW_STALE",
 			`${where} moved since the base commit was read, so the update was refused — re-run the preview against the current tip`,
+		);
+	}
+
+	if (text.includes("reference already exists")) {
+		// A THIRD meaning of 422 on the ref endpoints, distinct from the two above.
+		// It must not reach either of them: it is the opposite of BRANCH_NOT_FOUND,
+		// and reading it as PREVIEW_STALE would send the operator to re-run a
+		// preview over a repository that has not moved.
+		return new GatewayError(
+			"EXTERNAL_GITHUB",
+			`${REF_ALREADY_EXISTS}: the ref this request tried to create is already present in ${where}`,
 		);
 	}
 

@@ -5,14 +5,19 @@ import type {
 	CreatedBlob,
 	CreatedCommit,
 	CreatedPullRequest,
+	CreatedRef,
 	CreatedTree,
 	CreatePullRequestOptions,
+	CreateRefOptions,
 	CreateTreeOptions,
 	UpdatedRef,
 	UpdateRefOptions,
 } from "#/modules/export/gateway/types";
 import { GatewayError } from "#/modules/export/gateway/types";
-import { githubWrite } from "#/modules/export/gateway/writeRequest";
+import {
+	githubWrite,
+	REF_ALREADY_EXISTS,
+} from "#/modules/export/gateway/writeRequest";
 import { gitBlobSha } from "#/modules/export/git/gitBlobSha";
 
 /**
@@ -138,12 +143,56 @@ export async function createCommit(
  * once here rather than at four call sites. Segments are encoded individually
  * so a branch name's slashes stay structural.
  */
+function qualifiedRef(ref: string): string {
+	return ref.startsWith("refs/") ? ref : `refs/${ref}`;
+}
+
 function refPath(ref: string): string {
 	return ref
 		.replace(/^refs\//, "")
 		.split("/")
 		.map(encodeURIComponent)
 		.join("/");
+}
+
+/**
+ * Create a branch, which is what a pull request needs before it can point at
+ * one. `github_pr` cannot exist without this call.
+ *
+ * Additive and reversible, unlike everything else in this file: it brings a ref
+ * into existence and touches nothing that was already there. Creating a ref
+ * that already exists is refused by GitHub rather than silently repointing it,
+ * which is the behaviour we want — repointing is updateRef's job and it is the
+ * dangerous one.
+ */
+export async function createRef(opts: CreateRefOptions): Promise<CreatedRef> {
+	const created = await githubWrite<{ ref: string; object: { sha: string } }>(
+		opts,
+		{
+			method: "POST",
+			path: "/git/refs",
+			// FULLY QUALIFIED here. The sibling call strips exactly this prefix;
+			// see the comment on CreateRefOptions.ref for why they differ.
+			body: { ref: qualifiedRef(opts.ref), sha: opts.sha },
+		},
+	);
+	return { ref: created.ref, sha: created.object.sha };
+}
+
+/**
+ * True when a failure is "that ref is already there".
+ *
+ * The one condition in this module a caller is expected to branch on, because a
+ * retried delivery legitimately finds the branch its first attempt created. It
+ * is a predicate rather than an error code because ERROR_CODES is closed and
+ * holds nothing for it, and a predicate rather than a documented message
+ * because the caller must never parse GitHub's wording — that happens once, in
+ * classifyUnprocessable, and produces the marker this reads.
+ */
+export function isRefAlreadyExists(error: unknown): boolean {
+	return (
+		error instanceof GatewayError && error.detail.startsWith(REF_ALREADY_EXISTS)
+	);
 }
 
 /**

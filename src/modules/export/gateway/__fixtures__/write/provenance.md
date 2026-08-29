@@ -30,6 +30,10 @@ git rather than from this project:
 | CRLF, `line one\r\nline two\r\n` | 20 | `cf9b2a85b62bc2fd67c5ed43a1d0009df848ac8a` |
 | UTF-8, `héllo — 世界 🚀\n` | 23 | `86a7b568d11a87bab070e35ccda8ee4eb12a2a43` |
 
+`ref-created.json` is the create-a-reference response; note it is the same
+shape as `ref-updated.json`, which is why `CreatedRef` is an alias rather than a
+second type.
+
 The error bodies are the message strings GitHub documents for each condition.
 The 422 mapping reads them, which is the one place in the module that parses a
 message; `classifyUnprocessable` says why and what happens when none matches.

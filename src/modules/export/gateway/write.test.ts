@@ -11,7 +11,9 @@ import {
 	createBlob,
 	createCommit,
 	createPullRequest,
+	createRef,
 	createTree,
+	isRefAlreadyExists,
 	toBase64,
 	updateRef,
 } from "#/modules/export/gateway/write";
@@ -273,6 +275,85 @@ describe("createCommit", () => {
 			message: "avel: mission 4 sprint 2",
 			tree: "cd8274d15fa3ae2ab983129fb037999f264ba9a7",
 			parents: ["a3f9c2107f0f4b1b3a1f0e6a1c2d3e4f5a6b7c8d"],
+		});
+	});
+});
+
+/* ── createRef ─────────────────────────────────────────────── */
+
+describe("createRef", () => {
+	const make = {
+		...base,
+		ref: "heads/avel/mission-4-sprint-2",
+		sha: "7638417db6d59f3c431d3e1f261cc637155684cd",
+	};
+
+	it("sends the FULLY QUALIFIED ref, which is the opposite of updateRef", async () => {
+		// The asymmetry worth absorbing: POST /git/refs rejects the short form in
+		// its body, PATCH /git/refs/{ref} 404s on the long one in its path. A
+		// caller passes whichever spelling they have and each call sends what its
+		// own endpoint wants.
+		const { fetchImpl, calls } = replay(fixture("ref-created"), 201);
+		await createRef({ ...make, fetchImpl });
+
+		expect(calls[0]?.url).toBe("https://api.github.com/repos/o/r/git/refs");
+		expect(calls[0]?.init?.method).toBe("POST");
+		expect(sentBody(calls)).toEqual({
+			ref: "refs/heads/avel/mission-4-sprint-2",
+			sha: "7638417db6d59f3c431d3e1f261cc637155684cd",
+		});
+	});
+
+	it("leaves an already-qualified ref alone rather than doubling the prefix", async () => {
+		const { fetchImpl, calls } = replay(fixture("ref-created"), 201);
+		await createRef({ ...make, ref: "refs/heads/main", fetchImpl });
+		expect(sentBody(calls).ref).toBe("refs/heads/main");
+	});
+
+	it("returns the ref and the commit it points at", async () => {
+		const { fetchImpl } = replay(fixture("ref-created"), 201);
+		const out = await createRef({ ...make, fetchImpl });
+		expect(out).toEqual({
+			ref: "refs/heads/avel/mission-4-sprint-2",
+			sha: "7638417db6d59f3c431d3e1f261cc637155684cd",
+		});
+	});
+
+	it("does NOT read an existing ref as PREVIEW_STALE or BRANCH_NOT_FOUND", async () => {
+		// A third meaning of 422 on these endpoints. PREVIEW_STALE would send the
+		// operator to re-preview a repository that has not moved, and
+		// BRANCH_NOT_FOUND is the exact opposite of what happened.
+		const { fetchImpl } = replay(fixture("error-ref-exists"), 422);
+		const err = await createRef({ ...make, fetchImpl }).catch((e) => e);
+		expect(err.code).not.toBe("PREVIEW_STALE");
+		expect(err.code).not.toBe("BRANCH_NOT_FOUND");
+		expect(err.detail).toContain("already present");
+	});
+
+	it("is recognisable by predicate, so no caller parses GitHub's wording", async () => {
+		// A retried delivery finds the branch its own first attempt created. That
+		// is a state the orchestration has to branch on, and the only signal
+		// GitHub gives is a message — so the message is read once, in the
+		// classifier, and callers read this instead.
+		const { fetchImpl } = replay(fixture("error-ref-exists"), 422);
+		const err = await createRef({ ...make, fetchImpl }).catch((e) => e);
+		expect(isRefAlreadyExists(err)).toBe(true);
+	});
+
+	it("does not claim every failure is an existing ref", async () => {
+		const { fetchImpl } = replay(fixture("error-unmapped"), 422);
+		const err = await createRef({ ...make, fetchImpl }).catch((e) => e);
+		expect(isRefAlreadyExists(err)).toBe(false);
+		expect(isRefAlreadyExists(new Error("Reference already exists"))).toBe(
+			false,
+		);
+		expect(isRefAlreadyExists(undefined)).toBe(false);
+	});
+
+	it("still maps the ordinary failures like every other call", async () => {
+		const { fetchImpl } = replay({}, 404);
+		await expect(createRef({ ...make, fetchImpl })).rejects.toMatchObject({
+			code: "REPO_NOT_FOUND",
 		});
 	});
 });

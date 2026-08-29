@@ -193,3 +193,22 @@ export type CreatePullRequestOptions = WriteOptions & {
 };
 
 export type CreatedPullRequest = { number: number; url: string };
+
+export type CreateRefOptions = WriteOptions & {
+	/**
+	 * `refs/heads/main`, or `heads/main` — the leading `refs/` is normalized ON.
+	 *
+	 * THE OPPOSITE OF UpdateRefOptions.ref, and not a mistake in either place.
+	 * GitHub's two ref endpoints disagree: POST /git/refs takes the fully
+	 * qualified name in its body and rejects the short form, while PATCH
+	 * /git/refs/{ref} takes the short form in its path and 404s on the long one.
+	 * Both calls accept either spelling here and each sends what its own endpoint
+	 * wants, so the asymmetry is absorbed once rather than at every call site.
+	 */
+	ref: string;
+	/** The commit the new ref points at. */
+	sha: string;
+};
+
+/** Identical to UpdatedRef; named for the call that produced it. */
+export type CreatedRef = UpdatedRef;
