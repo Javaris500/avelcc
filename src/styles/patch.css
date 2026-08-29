@@ -11,6 +11,13 @@
         variables that no utility references, which silently deleted every
         gate, diff, radius, z-index and motion token from the dark theme while
         leaving the .light block intact.
+     GENERAL RULE, learned from correction 4 and worth reading before adding
+     any semantic alias: a custom property whose value is var(--something)
+     resolves AT THE DECLARING ELEMENT. Declared once on :root it freezes
+     against the root theme and no .light override will ever re-resolve it.
+     Every alias must be declared in BOTH :root and .light. This is a class of
+     bug, not an incident — it already cost every border in light mode once.
+
      5. light --color-app-raised is #eeeeee, not #ffffff. As written it is
         identical to --color-app-panel, so a raised control has no background
         separation from the surface behind it. Operator ruling, reference wins.

@@ -28,7 +28,7 @@ function Missions() {
 	return (
 		<div className="px-6 py-5">
 			<h1
-				className="font-display text-[15px] font-semibold"
+				className="font-display text-lg font-semibold"
 				data-testid="page-title"
 			>
 				Missions

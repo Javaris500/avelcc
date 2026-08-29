@@ -30,4 +30,12 @@ html, body, #app { min-height: 100%; }
 body {
   margin: 0;
   font-family: var(--font-sans);
+  /* Without this the browser default stands and every element with no explicit
+     size renders at 16px — a seventh value belonging to no step of the scale.
+     Invisible to tsc, biome and the build; only a rendered measurement sees it.
+     It also hides behind explicit sizes, so it surfaces only when something
+     asks about CONTAINERS rather than about text. Found by session 2's chrome
+     guard. The reference sets body{font-size:14px} at line 41; we set none. */
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
 }
