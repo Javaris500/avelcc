@@ -1,5 +1,5 @@
-import { ChevronDown } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ChevronDown, PanelLeft } from "lucide-react";
+import { type ReactNode, type RefObject, useState } from "react";
 
 import { cn } from "#/components/cn";
 import {
@@ -34,7 +34,7 @@ const GATE_FILTER_ALL = "All gates";
 
 /** Shared pill chrome. Reference `.ctl`. */
 const CTL =
-	"interactive inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted hover:border-[var(--elevation-border-raised)] hover:text-text";
+	"interactive inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted hover:border-[var(--elevation-border-raised)] hover:text-text max-md:min-h-11";
 
 function Chevron() {
 	return (
@@ -73,8 +73,18 @@ function MenuControl({
 export function TopBar({
 	breadcrumb,
 	activity = "idle",
+	onOpenNav,
+	navTriggerRef,
 }: {
 	breadcrumb: string;
+	/**
+	 * Supplied only below the compact breakpoint, where the sidebar is a
+	 * drawer. Distinct from sidebar-collapse, which is a desktop control for
+	 * the rail and means a different thing.
+	 */
+	onOpenNav?: () => void;
+	/** Held by the shell so the drawer can hand focus back on close. */
+	navTriggerRef?: RefObject<HTMLButtonElement | null>;
 	/**
 	 * Whether a run is actually in progress. Defaults to idle, because zero
 	 * missions have run. The dot only pulses when something is happening — an
@@ -92,6 +102,19 @@ export function TopBar({
 			className="flex flex-wrap items-center gap-3 border-b border-[var(--elevation-border-rest)] px-6 py-3.5"
 			data-testid="topbar"
 		>
+			{onOpenNav ? (
+				<button
+					aria-label="Open navigation"
+					className="interactive -ml-2 flex size-11 shrink-0 items-center justify-center rounded-sm text-text-muted md:hidden"
+					data-testid="nav-drawer-trigger"
+					onClick={onOpenNav}
+					ref={navTriggerRef}
+					type="button"
+				>
+					<PanelLeft aria-hidden="true" size={18} strokeWidth={1.8} />
+				</button>
+			) : null}
+
 			{/* Reports state, does not act on it. A span, not a button. */}
 			<span
 				className="inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1 text-xs text-text-muted"

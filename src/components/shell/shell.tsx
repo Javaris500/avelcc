@@ -1,9 +1,14 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cn } from "#/components/cn";
+import { NavDrawer } from "#/components/shell/nav-drawer";
 import { Sidebar } from "#/components/shell/sidebar";
 import { TopBar } from "#/components/shell/topbar";
 import { useCollapsed } from "#/components/shell/use-collapsed";
+import {
+	COMPACT_QUERY,
+	useMediaQuery,
+} from "#/components/shell/use-media-query";
 import { useTheme } from "#/components/theme/use-theme";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import type { NavGroup } from "#/contract/ui/nav";
@@ -49,12 +54,34 @@ export function Shell({
 }) {
 	const { theme, toggle: toggleTheme } = useTheme();
 	const { collapsed, toggle: toggleCollapsed } = useCollapsed();
+	const compact = useMediaQuery(COMPACT_QUERY);
+	const [drawerOpen, setDrawerOpen] = useState(false);
+	const navTriggerRef = useRef<HTMLButtonElement>(null);
+
+	// Leaving compact must not strand an open drawer over a desktop layout.
+	useEffect(() => {
+		if (!compact) setDrawerOpen(false);
+	}, [compact]);
+
+	// Rendered in exactly ONE place: the grid column, or the drawer. Two copies
+	// would duplicate every data-testid in the shell.
+	const sidebar = (
+		<Sidebar
+			collapsed={compact ? false : collapsed}
+			navGroups={navGroups}
+			onSignOut={onSignOut}
+			onToggleCollapsed={toggleCollapsed}
+			onToggleTheme={toggleTheme}
+			session={session}
+			theme={theme}
+		/>
+	);
 
 	return (
 		<TooltipProvider delayDuration={300}>
 			<div
 				className={cn(
-					"app min-h-screen bg-app-bg p-(--frame-mat) text-text",
+					"app min-h-screen bg-app-bg p-(--frame-mat) text-text max-md:p-3",
 					theme === "light" && "light",
 				)}
 				data-testid="app-shell"
@@ -69,25 +96,25 @@ export function Shell({
 				>
 					Skip to content
 				</a>
+				{/* One column below the breakpoint comes for free: the sidebar is not
+				    rendered there, so the grid has a single child. An explicit
+				    max-md:grid-cols-1 was here and a mutation proved it changed
+				    nothing, so it is gone rather than reading as though it works. */}
 				<div
-					className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-[1000px]:h-auto max-[1000px]:grid-cols-1"
+					className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
 					data-testid="app-window"
 				>
-					<Sidebar
-						collapsed={collapsed}
-						navGroups={navGroups}
-						onSignOut={onSignOut}
-						onToggleCollapsed={toggleCollapsed}
-						onToggleTheme={toggleTheme}
-						session={session}
-						theme={theme}
-					/>
+					{compact ? null : sidebar}
 
 					<div
 						className="flex min-w-0 flex-col overflow-hidden"
 						data-testid="main-pane"
 					>
-						<TopBar breadcrumb={breadcrumb} />
+						<TopBar
+							breadcrumb={breadcrumb}
+							navTriggerRef={navTriggerRef}
+							onOpenNav={compact ? () => setDrawerOpen(true) : undefined}
+						/>
 						<main
 							className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
 							data-testid="main"
@@ -98,6 +125,16 @@ export function Shell({
 						</main>
 					</div>
 				</div>
+
+				{compact ? (
+					<NavDrawer
+						onOpenChange={setDrawerOpen}
+						open={drawerOpen}
+						returnFocusTo={navTriggerRef}
+					>
+						{sidebar}
+					</NavDrawer>
+				) : null}
 			</div>
 		</TooltipProvider>
 	);

@@ -133,7 +133,11 @@ test.describe("shell structure", () => {
 		// .app — 238px + 1fr, capped, radius-lg, clipping its corners.
 		const side = await page.getByTestId("sidebar").boundingBox();
 		expect(side?.width).toBe(238);
-		await expectStyle(page, "app-window", "max-width").toBe("1440px");
+		// DELIBERATE DIVERGENCE from the reference, at the operator's request.
+		// avel-cc-shell.html caps at 1440 because it is a prototype shown at one
+		// size; a tool discarding 44% of a 2560px screen is a different problem.
+		// --frame-max is now 100%.
+		await expectStyle(page, "app-window", "max-width").toBe("100%");
 		await expectStyle(page, "app-window", "border-top-left-radius").toBe(
 			"14px",
 		);
@@ -705,6 +709,112 @@ test.describe("rail labelling", () => {
 		await expect(toggle).toHaveAttribute("aria-label", "Collapse sidebar");
 		await toggle.click();
 		await expect(toggle).toHaveAttribute("aria-label", "Expand sidebar");
+	});
+});
+
+/**
+ * COMPACT WIDTHS.
+ *
+ * At 390 the 238px sidebar column left under 100px of usable main and pushed
+ * the content 788px down the page. Nothing flagged it: there was no horizontal
+ * overflow, and "no horizontal overflow" passes just as happily on a broken
+ * layout as on a working one. These assert the POSITIVE path — hidden by
+ * default, visible after the trigger, main at full width — because the absence
+ * check is what let it through.
+ *
+ * Five routes are `device: capture`, which ROUTES.md defines as "works on a
+ * phone". That is a promise, and this is the width it is made at.
+ */
+test.describe("compact width", () => {
+	const PHONE = { width: 390, height: 844 };
+	const MAT_PX = 12;
+
+	test.use({ viewport: PHONE });
+
+	test("the sidebar is not a column at 390", async ({ page }) => {
+		await gotoApp(page);
+
+		// Not merely hidden: not in the layout at all.
+		await expect(page.getByTestId("sidebar")).toHaveCount(0);
+		await expect(page.getByTestId("nav-drawer")).toHaveCount(0);
+	});
+
+	test("main takes the full width inside the mat", async ({ page }) => {
+		await gotoApp(page);
+		const main = await page.getByTestId("main").boundingBox();
+		if (!main) throw new Error("main not laid out");
+
+		// The 1px window border on each side is the only other subtraction.
+		expect(Math.round(main.width)).toBe(PHONE.width - MAT_PX * 2 - 2);
+		expect(Math.round(main.x)).toBe(MAT_PX + 1);
+	});
+
+	test("the mat shrinks on a phone", async ({ page }) => {
+		await gotoApp(page);
+
+		// 26px of 390 is 13% of the screen spent on margins.
+		await expectStyle(page, "app-shell", "padding").toBe(`${MAT_PX}px`);
+	});
+
+	test("a trigger opens the drawer, and it holds the real sidebar", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await expect(page.getByTestId("nav-drawer-trigger")).toBeVisible();
+
+		await page.getByTestId("nav-drawer-trigger").click();
+
+		await expect(page.getByTestId("nav-drawer")).toBeVisible();
+		await expect(page.getByTestId("sidebar")).toBeVisible();
+		// One sidebar, not a mobile copy: two would duplicate every testid.
+		await expect(page.getByTestId("sidebar")).toHaveCount(1);
+	});
+
+	test("the open drawer holds focus and Escape gives it back", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("nav-drawer-trigger").click();
+		await expect(page.getByTestId("nav-drawer")).toBeVisible();
+
+		const trapped = await page.evaluate(() =>
+			document
+				.querySelector('[data-testid="nav-drawer"]')
+				?.contains(document.activeElement),
+		);
+		expect(trapped, "focus moved into the drawer").toBe(true);
+
+		await page.keyboard.press("Escape");
+
+		await expect(page.getByTestId("nav-drawer")).toHaveCount(0);
+		// Radix restores to what it captured, and the trigger is outside this
+		// Root, so the shell hands it back explicitly.
+		await expect(page.getByTestId("nav-drawer-trigger")).toBeFocused();
+	});
+
+	test("interactive controls clear a 44px touch target", async ({ page }) => {
+		await gotoApp(page);
+
+		for (const id of [
+			"nav-drawer-trigger",
+			"control-gates",
+			"control-target",
+		]) {
+			const box = await page.getByTestId(id).boundingBox();
+			expect(box?.height ?? 0, `${id} height`).toBeGreaterThanOrEqual(44);
+		}
+	});
+
+	test("does not overflow horizontally", async ({ page }) => {
+		await gotoApp(page);
+
+		const { scrollW, clientW } = await page.evaluate(() => ({
+			scrollW: document.documentElement.scrollWidth,
+			clientW: document.documentElement.clientWidth,
+		}));
+		// True today AND while the layout was broken. Kept as a floor, never as
+		// the proof.
+		expect(scrollW).toBeLessThanOrEqual(clientW);
 	});
 });
 
