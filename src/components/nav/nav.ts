@@ -4,6 +4,7 @@ import {
 	Bookmark,
 	Building2,
 	GitBranch,
+	House,
 	Inbox,
 	Layers,
 	Library,
@@ -38,6 +39,13 @@ export const NAV: NavGroup[] = [
 	{
 		label: "Work",
 		items: [
+			{
+				label: "Home",
+				to: "/",
+				icon: House,
+				device: "capture",
+				built: true,
+			},
 			{
 				label: "Missions",
 				to: "/missions",

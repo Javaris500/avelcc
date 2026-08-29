@@ -8,7 +8,9 @@ import { expect, test } from "@playwright/test";
  * component as a user meets it, not a harness approximation.
  */
 
-const BUILT = ["Missions"];
+/** Built items and the href each must carry. */
+const BUILT: Record<string, string> = { Home: "/", Missions: "/missions" };
+const BUILT_LABELS = Object.keys(BUILT);
 const UNBUILT = [
 	"Clients",
 	"Intake",
@@ -42,7 +44,7 @@ test.beforeEach(async ({ context, page }) => {
 test("every item and group transcribed from ROUTES.md renders", async ({
 	page,
 }) => {
-	for (const label of [...BUILT, ...UNBUILT]) {
+	for (const label of [...BUILT_LABELS, ...UNBUILT]) {
 		await expect(page.getByTestId(id(label))).toBeVisible();
 	}
 	for (const group of ["work", "library", "system"]) {
@@ -50,10 +52,14 @@ test("every item and group transcribed from ROUTES.md renders", async ({
 	}
 });
 
-test("a built item is a real link and carries its href", async ({ page }) => {
-	const missions = page.getByTestId("nav-missions");
-	await expect(missions).toHaveAttribute("data-built", "true");
-	await expect(missions).toHaveAttribute("href", "/missions");
+test("every built item is a real link and carries its href", async ({
+	page,
+}) => {
+	for (const [label, href] of Object.entries(BUILT)) {
+		const item = page.getByTestId(id(label));
+		await expect(item).toHaveAttribute("data-built", "true");
+		await expect(item).toHaveAttribute("href", href);
+	}
 });
 
 test("an unbuilt item has no href and is marked disabled", async ({ page }) => {
@@ -90,7 +96,7 @@ test("tabbing the real page reaches every built item and skips every unbuilt one
 		);
 		if (testid) seen.add(testid);
 	}
-	for (const label of BUILT) {
+	for (const label of BUILT_LABELS) {
 		expect([...seen], `${label} must be keyboard reachable`).toContain(
 			id(label),
 		);
@@ -121,7 +127,7 @@ test("icons render at the inline icon size, from lucide", async ({ page }) => {
 	await expect(svg).toHaveAttribute("stroke-width", "1.8");
 	await expect(svg).toHaveAttribute("aria-hidden", "true");
 	expect(await page.getByTestId("nav-tree").locator("svg").count()).toBe(
-		BUILT.length + UNBUILT.length,
+		BUILT_LABELS.length + UNBUILT.length,
 	);
 });
 
@@ -167,10 +173,41 @@ test("the label is never dimmed and the icon always carries the cue", async ({
 			"0.35",
 		);
 	}
-	const built = await page.getByTestId("nav-missions").evaluate((el) => ({
-		label: getComputedStyle(el).opacity,
-		icon: getComputedStyle(el.querySelector("svg") as Element).opacity,
-	}));
-	expect(built.label).toBe("1");
-	expect(built.icon, "a built icon must not read as unavailable").toBe("0.9");
+	for (const label of BUILT_LABELS) {
+		const built = await page.getByTestId(id(label)).evaluate((el) => ({
+			label: getComputedStyle(el).opacity,
+			icon: getComputedStyle(el.querySelector("svg") as Element).opacity,
+		}));
+		expect(built.label).toBe("1");
+		expect(built.icon, `${label} icon must not read as unavailable`).toBe(
+			"0.9",
+		);
+	}
 });
+
+/**
+ * `to="/"` matches every path if the matching is loose, so Home would render
+ * aria-current="page" on every route — a nav that renders correctly and lies
+ * about where you are. Asserted per route, and asserted as EXACTLY ONE item,
+ * so a second highlighted row fails rather than passing because the one we
+ * looked for happened to be present.
+ *
+ * The deep route also pins the other half: Missions must STAY current on a
+ * child route, so nobody "fixes" this by making every link exact.
+ */
+for (const [route, expected] of [
+	["/", "nav-home"],
+	["/missions", "nav-missions"],
+	["/missions/abc123/exports/new", "nav-missions"],
+] as const) {
+	test(`only ${expected} is current on ${route}`, async ({ page }) => {
+		await page.goto(route);
+		await expect(page.getByTestId("nav-tree")).toBeVisible();
+		const current = await page.evaluate(() =>
+			[...document.querySelectorAll("[data-testid^=nav-]")]
+				.filter((el) => el.getAttribute("aria-current") === "page")
+				.map((el) => el.getAttribute("data-testid")),
+		);
+		expect(current).toEqual([expected]);
+	});
+}
