@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import { byCodepoint } from "#/modules/export/render/bytes";
 import { fixtureMission } from "#/modules/export/render/fixture-mission";
+import { localeProbeMission } from "#/modules/export/render/locale-probe";
 import { packagePreimage, sha256Hex } from "#/modules/export/render/manifest";
 import { render } from "#/modules/export/render/render";
 
@@ -164,9 +165,29 @@ describe("determinism", () => {
 	/**
 	 * The check above cannot fail on the slice-1 fixture: none of its 20 paths
 	 * contains a character pair Turkish and root collation disagree about.
-	 * Proven by mutation — swapping byCodepoint for localeCompare left every
-	 * test green. This renders a mission that DOES contain such a pair, so a
-	 * comparator regression moves the hash instead of hiding.
+	 * This renders a mission that DOES contain such a pair, so a comparator
+	 * regression moves the hash instead of hiding.
+	 *
+	 * The claim that once stood here — "proven by mutation, swapping byCodepoint
+	 * for localeCompare left every test green" — is true of ONE call site, not
+	 * all of them, and it is worth knowing which. Swapping the AGENT sort is
+	 * invisible in both fixtures on any machine: their slugs are the same three
+	 * (`operator`, `transactions`, `nemi`) and no locale orders those
+	 * differently from codepoint, so nothing here probes that sort at all.
+	 * Swapping the MANIFEST's path sort is caught, by slice-1's own
+	 * `manifest.json renders byte-for-byte` and by the pinned digest below.
+	 *
+	 * ON WINDOWS THIS TEST IS VACUOUS, and the one below is what actually bites.
+	 * LANG and LC_ALL do not reach node's collator here: both children resolve
+	 * `Intl.Collator().resolvedOptions().locale` to en-US no matter what this
+	 * env says, and `"I".toLowerCase()` is `i`, not the dotless ı the comment
+	 * above assumes. Measured through this exact execFileSync path. TZ is
+	 * unaffected — the same child reports getHours(0) as 9 under Asia/Tokyo
+	 * against 18 without it — so the timestamp half of this pattern is real
+	 * everywhere and only the locale half is platform-dependent.
+	 *
+	 * It is kept because it DOES bite on a Linux runner, and deleting it would
+	 * drop that coverage silently.
 	 */
 	test("under tr_TR, on paths where collation and codepoint order disagree", () => {
 		expect(
@@ -178,6 +199,35 @@ describe("determinism", () => {
 			}),
 		).toBe(renderInFreshProcess({ RENDER_CASE: "locale-probe" }));
 	}, 60_000);
+
+	/**
+	 * The locale-probe package, PINNED — the platform-independent half.
+	 *
+	 * Every determinism test above compares two runs against EACH OTHER, so a
+	 * regression that moves both sides equally is invisible to all of them. On a
+	 * machine where LC_ALL does not reach the collator there is no second locale
+	 * to disagree with the first, so both sides always move together and the
+	 * whole pattern degrades to "the renderer agrees with itself".
+	 *
+	 * A frozen digest has no such blind spot, because it is ONE side. Anything
+	 * that reorders or changes the package moves it, with no second process and
+	 * no environment involved.
+	 *
+	 * Verified rather than assumed, on the manifest's path sort: recomputing
+	 * package_sha256 over this fixture with localeCompare instead of byCodepoint
+	 * gives 5a267e58… against the real 890e400f…, under a plain en-US default
+	 * and no env at all. These 22 paths already disagree between en-US collation
+	 * and codepoint order — en-US puts `contract/…` first, codepoint puts
+	 * `MISSION.md` first — which is what makes that true here.
+	 *
+	 * If this number moves, something reordered the render. Find out what before
+	 * updating it; that is the entire point of writing it down.
+	 */
+	test("locale-probe package hashes to a frozen value", () => {
+		expect(packageDigest(render(localeProbeMission))).toBe(
+			"245f7af0856048dafeaef0fbc000e6262ea0e42c9491827e766a8b1e92c4801a",
+		);
+	});
 
 	/**
 	 * The comparator itself. The hazard is not that any one locale is wrong,
