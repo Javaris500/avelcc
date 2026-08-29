@@ -1,7 +1,7 @@
 /**
  * Types for the blast radius computation.
  *
- * Shapes come from docs/docs/BLAST-RADIUS.md. Where this file departs from the
+ * Shapes come from docs/BLAST-RADIUS.md. Where this file departs from the
  * type sketch in that document, the departure is marked and the reason given.
  */
 
