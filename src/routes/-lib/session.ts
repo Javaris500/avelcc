@@ -43,10 +43,29 @@ function readCookie(name: string): string | null {
 	return null;
 }
 
+/**
+ * DEV-ONLY AUTH BYPASS.
+ *
+ * `import.meta.env.DEV` is a compile-time constant. In a production build it is
+ * literally `false`, so this branch is dead-code-eliminated and the bypass
+ * cannot exist in shipped output — it is not a runtime flag someone can turn
+ * on, and there is no env var that enables it in prod.
+ *
+ * Opt out with VITE_AUTH_BYPASS=0 when you need to exercise the gate itself.
+ *
+ * The operator name is deliberately "dev" rather than a plausible one. A
+ * bypass that looks like a real session is a bypass someone forgets is on.
+ */
+function devSession(): Session | null {
+	if (!import.meta.env.DEV) return null;
+	if (import.meta.env.VITE_AUTH_BYPASS === "0") return null;
+	return { operator: "dev", workspace: "Meridian Law" };
+}
+
 export function readSession(): Session | null {
 	const raw = readCookie(COOKIE);
-	if (!raw) return null;
-	return { operator: raw, workspace: "Meridian Law" };
+	if (raw) return { operator: raw, workspace: "Meridian Law" };
+	return devSession();
 }
 
 export function signIn(operator: string): void {
