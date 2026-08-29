@@ -32,6 +32,19 @@ const missionListResponse = successList(missionListRow);
 type MissionListResponse = z.infer<typeof missionListResponse>;
 type MissionRow = z.infer<typeof missionListRow>;
 
+/**
+ * CLIENT-ONLY FAILURE LABELS. Deliberately NOT a fifth error vocabulary.
+ *
+ * Neither of these crosses the wire, neither is declared in contract/shared,
+ * and nothing switches on them but this file. They exist because the two
+ * failures below arrive with no envelope to carry a code: nothing answered, or
+ * what answered did not match the contract. Named here rather than written as
+ * literals at the throw site, so a string that reads like a contract code
+ * cannot quietly become one.
+ */
+const SHAPE_MISMATCH = "SHAPE_MISMATCH";
+const httpFailure = (status: number) => `HTTP_${status}`;
+
 async function fetchMissions(): Promise<MissionListResponse> {
 	const res = await fetch("/api/missions");
 	const body = await res.json().catch(() => null);
@@ -39,12 +52,9 @@ async function fetchMissions(): Promise<MissionListResponse> {
 	// Codes are the contract; messages change freely. Nothing here parses one.
 	if (body?.success === false) throw new Error(body.error.code);
 
-	// These two are NOT contract codes and are labelled so. No envelope arrived
-	// to carry a code, and borrowing one that means something else would be
-	// worse than reporting exactly what is known.
-	if (!res.ok || body === null) throw new Error(`HTTP_${res.status}`);
+	if (!res.ok || body === null) throw new Error(httpFailure(res.status));
 	const parsed = missionListResponse.safeParse(body);
-	if (!parsed.success) throw new Error("SHAPE_MISMATCH");
+	if (!parsed.success) throw new Error(SHAPE_MISMATCH);
 
 	return parsed.data;
 }
@@ -60,7 +70,7 @@ function describeFailure(code: string): string {
 	switch (code) {
 		case "FORBIDDEN":
 			return "This session is not permitted to read missions. Nothing was loaded.";
-		case "SHAPE_MISMATCH":
+		case SHAPE_MISMATCH:
 			return "The endpoint answered, but the body did not match mission.list. The screen and the route have drifted apart, and rendering it anyway would be a guess.";
 		default:
 			return "The request to /api/missions did not complete, so nothing was loaded. This screen only reads, so nothing was written either.";
