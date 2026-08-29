@@ -40,9 +40,20 @@ const gitAvailable = (() => {
 	}
 })();
 
-/** Ground truth from git itself, never from our own implementation. */
-const gitHashObject = (path: string): string =>
-	execFileSync("git", ["hash-object", "--", path], { encoding: "utf8" }).trim();
+/**
+ * Ground truth from git itself, never from our own implementation.
+ *
+ * Takes a bare fixture NAME and resolves it via `cwd`. Handing git a joined
+ * absolute path breaks this on Windows: the separators are backslashes, git
+ * cannot match them against `__fixtures__/.gitattributes`, the `* -text` guard
+ * lapses, and `core.autocrlf` rewrites crlf.txt before hashing — which shows up
+ * here as a phantom OVERWRITE on a file that never changed.
+ */
+const gitHashObject = (name: string): string =>
+	execFileSync("git", ["hash-object", "--", name], {
+		cwd: FIXTURES,
+		encoding: "utf8",
+	}).trim();
 
 const POLICY: BlastRadiusPolicy = {
 	allowedPathPrefixes: DEFAULT_ALLOWED_PATH_PREFIXES,
@@ -74,7 +85,7 @@ describe.skipIf(!gitAvailable)("gitBlobSha feeding computeBlastRadius", () => {
 
 		for (const name of names.slice(0, 5)) {
 			entries.set(`.avel/${name}`, {
-				sha: gitHashObject(join(FIXTURES, name)),
+				sha: gitHashObject(name),
 				mode: MODE.blob,
 			});
 		}
@@ -134,10 +145,7 @@ describe.skipIf(!gitAvailable)("gitBlobSha feeding computeBlastRadius", () => {
 			{
 				commitSha: "0".repeat(40),
 				entries: new Map([
-					[
-						`.avel/${name}`,
-						{ sha: gitHashObject(join(FIXTURES, name)), mode: MODE.blob },
-					],
+					[`.avel/${name}`, { sha: gitHashObject(name), mode: MODE.blob }],
 				]),
 			},
 			POLICY,
@@ -151,7 +159,7 @@ describe.skipIf(!gitAvailable)("gitBlobSha feeding computeBlastRadius", () => {
 		const entries = new Map(
 			names.map((name) => [
 				`.avel/${name}`,
-				{ sha: gitHashObject(join(FIXTURES, name)), mode: MODE.blob },
+				{ sha: gitHashObject(name), mode: MODE.blob },
 			]),
 		);
 

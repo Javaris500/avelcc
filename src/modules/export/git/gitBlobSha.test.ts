@@ -163,13 +163,16 @@ const gitAvailable = (() => {
 describe.skipIf(!gitAvailable)("gitBlobSha vs `git hash-object`", () => {
 	for (const { file } of CASES) {
 		it(`agrees on ${file}`, () => {
-			const actual = execFileSync(
-				"git",
-				["hash-object", "--", join(FIXTURES, file)],
-				{
-					encoding: "utf8",
-				},
-			).trim();
+			// The bare filename, resolved by `cwd` — never `join(FIXTURES, file)`.
+			// On Windows that produces a backslash path, git fails to match it
+			// against `__fixtures__/.gitattributes`, and the `* -text` guard stops
+			// applying: `core.autocrlf` then normalizes crlf.txt before hashing and
+			// git reports a SHA that is not the one in its own index. The guard the
+			// header above describes is only in force when git can find it.
+			const actual = execFileSync("git", ["hash-object", "--", file], {
+				cwd: FIXTURES,
+				encoding: "utf8",
+			}).trim();
 
 			expect(actual).toMatch(/^[0-9a-f]{40}$/);
 			expect(gitBlobSha(read(file))).toBe(actual);

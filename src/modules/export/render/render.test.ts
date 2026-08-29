@@ -120,10 +120,17 @@ for (const key of [...files.keys()].sort()) {
 process.stdout.write(h.digest("hex"));
 `;
 
+/**
+ * Spawns node itself and registers tsx as a loader, rather than executing
+ * `node_modules/.bin/tsx`. That path is a POSIX shell script; on Windows the
+ * runnable shim is `tsx.CMD`, so `execFileSync` on the extensionless name
+ * fails with ENOENT and takes the three determinism checks with it. Going
+ * through `process.execPath` is the same child process on every platform.
+ */
 function renderInFreshProcess(env: NodeJS.ProcessEnv): string {
 	return execFileSync(
-		path.resolve("node_modules/.bin/tsx"),
-		["--eval", CHILD],
+		process.execPath,
+		["--import", "tsx", "--input-type=module", "--eval", CHILD],
 		{ encoding: "utf8", env: { ...process.env, ...env } },
 	).trim();
 }
