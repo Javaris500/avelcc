@@ -14,21 +14,32 @@ export type ViolationCode =
 	| "PROTECTED_PATH"
 	| "OWNERSHIP_VIOLATION";
 
+/**
+ * A file as REPORTED. `size` is a byte count.
+ *
+ * Deliberately NOT the same shape as RenderedFile. The two carry different
+ * things and previously shared the field name `bytes`, which is where the
+ * ambiguity came from.
+ */
 export type FileEntry = {
 	path: string;
-	/** Byte length. Not the content. */
-	bytes: number;
+	/** Byte count, derived from the rendered content. Never a caller-supplied number. */
+	size: number;
 	blobSha: string;
 };
 
 /**
- * A file in the rendered package.
+ * A file in the rendered package. `bytes` is the CONTENT.
  *
- * Structurally identical to FileEntry: `bytes` is the byte LENGTH, not the
- * content. The blob SHA is already computed by the caller, so this function
- * compares hashes and never hashes anything itself. That is what keeps it pure.
+ * The blob SHA is computed by the caller, so classification stays a SHA
+ * comparison and this function hashes nothing. Content is present on the input;
+ * that does not make the function impure and does not make it recompute.
  */
-export type RenderedFile = FileEntry;
+export type RenderedFile = {
+	path: string;
+	bytes: Uint8Array;
+	blobSha: string;
+};
 
 export type OverwriteEntry = FileEntry & {
 	remoteBlobSha: string;

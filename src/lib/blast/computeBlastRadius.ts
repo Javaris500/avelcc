@@ -25,6 +25,11 @@ import {
  *
  * Pure. No network, no database, no clock. It compares blob SHAs the caller
  * has already computed against the SHAs in a tree the caller has already read.
+ * Content is present on the input but is never hashed here.
+ *
+ * The reported `size` is derived from `bytes.byteLength`, never copied from a
+ * caller-supplied count. The function computes the number it reports, so a
+ * wrong length has one fewer place to survive.
  *
  * Every rendered file is classified CREATE, OVERWRITE or UNCHANGED, and
  * everything remote that the package does not touch is summarised as PRESERVE.
@@ -155,7 +160,7 @@ export function computeBlastRadius(
 		const entry = remote.entries.get(path);
 
 		if (entry === undefined) {
-			create.push({ path, bytes: file.bytes, blobSha: file.blobSha });
+			create.push({ path, size: file.bytes.byteLength, blobSha: file.blobSha });
 			continue;
 		}
 
@@ -175,11 +180,15 @@ export function computeBlastRadius(
 		// detected here. See the test that documents this gap.
 
 		if (entry.sha === file.blobSha) {
-			unchanged.push({ path, bytes: file.bytes, blobSha: file.blobSha });
+			unchanged.push({
+				path,
+				size: file.bytes.byteLength,
+				blobSha: file.blobSha,
+			});
 		} else {
 			overwrite.push({
 				path,
-				bytes: file.bytes,
+				size: file.bytes.byteLength,
 				blobSha: file.blobSha,
 				remoteBlobSha: entry.sha,
 			});

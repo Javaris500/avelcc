@@ -15,9 +15,15 @@ const SHA_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SHA_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SHA_C = "cccccccccccccccccccccccccccccccccccccccc";
 
-const file = (path: string, blobSha = SHA_A, bytes = 100): RenderedFile => ({
+// RenderedFile carries CONTENT. The reported `size` is derived from it, so
+// fixtures supply real bytes rather than a count.
+const file = (
+	path: string,
+	blobSha = SHA_A,
+	content: string | Uint8Array = "x".repeat(100),
+): RenderedFile => ({
 	path,
-	bytes,
+	bytes: typeof content === "string" ? Buffer.from(content, "utf8") : content,
 	blobSha,
 });
 
@@ -64,7 +70,7 @@ describe("computeBlastRadius classification", () => {
 		);
 
 		expect(result.create).toEqual([
-			{ path: ".avel/new.md", bytes: 100, blobSha: SHA_A },
+			{ path: ".avel/new.md", size: 100, blobSha: SHA_A },
 		]);
 		expect(result.overwrite).toEqual([]);
 		expect(result.unchanged).toEqual([]);
@@ -81,7 +87,7 @@ describe("computeBlastRadius classification", () => {
 		expect(result.overwrite).toEqual([
 			{
 				path: ".avel/x.md",
-				bytes: 100,
+				size: 100,
 				blobSha: SHA_A,
 				remoteBlobSha: SHA_B,
 			},
@@ -98,7 +104,7 @@ describe("computeBlastRadius classification", () => {
 		);
 
 		expect(result.unchanged).toEqual([
-			{ path: ".avel/x.md", bytes: 100, blobSha: SHA_A },
+			{ path: ".avel/x.md", size: 100, blobSha: SHA_A },
 		]);
 		expect(result.overwrite).toEqual([]);
 	});
@@ -154,6 +160,68 @@ describe("computeBlastRadius classification", () => {
 			unchanged: 1,
 			violations: 0,
 		});
+	});
+
+	it("derives size from the content byteLength, not from a caller-supplied count", () => {
+		// The whole point of RenderedFile carrying content: the function computes
+		// the number it reports. There is no count on the input to be wrong.
+		const result = computeBlastRadius(
+			[file(".avel/a.md", SHA_A, "hello")],
+			tree({}),
+			POLICY,
+		);
+
+		expect(result.create[0]?.size).toBe(5);
+	});
+
+	it("reports byte length, not character length, for multibyte content", () => {
+		// Same failure mode gitBlobSha exists to prevent, one layer up: 14
+		// characters, 23 bytes.
+		const text = "héllo — 世界 🚀\n";
+		const result = computeBlastRadius(
+			[file(".avel/a.md", SHA_A, text)],
+			tree({}),
+			POLICY,
+		);
+
+		expect(text.length).toBe(14);
+		expect(result.create[0]?.size).toBe(23);
+	});
+
+	it("reports the view length for a subarray, not the backing buffer length", () => {
+		const backing = Buffer.from("XXXXXhelloYYYYY", "utf8");
+		const result = computeBlastRadius(
+			[file(".avel/a.md", SHA_A, backing.subarray(5, 10))],
+			tree({}),
+			POLICY,
+		);
+
+		expect(result.create[0]?.size).toBe(5);
+	});
+
+	it("reports size on overwrite and unchanged entries too", () => {
+		const result = computeBlastRadius(
+			[file(".avel/o.md", SHA_A, "abc"), file(".avel/u.md", SHA_C, "abcd")],
+			tree({ ".avel/o.md": SHA_B, ".avel/u.md": SHA_C }),
+			POLICY,
+		);
+
+		expect(result.overwrite[0]?.size).toBe(3);
+		expect(result.unchanged[0]?.size).toBe(4);
+	});
+
+	it("classifies by blobSha alone and never rehashes the content", () => {
+		// A blobSha that deliberately disagrees with the content. Classification
+		// must follow the SHA, which proves the content is not being hashed here.
+		const result = computeBlastRadius(
+			[file(".avel/x.md", SHA_A, "content that does not hash to SHA_A")],
+			tree({ ".avel/x.md": SHA_A }),
+			POLICY,
+		);
+
+		expect(result.totals.unchanged).toBe(1);
+		expect(result.totals.overwrite).toBe(0);
+		expect(result.unchanged[0]?.size).toBe(35);
 	});
 
 	it("sorts every output array by codepoint, so a re-render is byte-stable", () => {
@@ -716,15 +784,33 @@ describe("purity", () => {
 		const remote = tree({ ".avel/x.md": SHA_C, "src/a.ts": SHA_A });
 		const policy = policyWith({});
 
-		const renderedBefore = structuredClone(rendered);
+		// Snapshot explicitly rather than via structuredClone: the content is a
+		// Buffer, and a clone would come back a plain Uint8Array.
+		const snapshot = (files: RenderedFile[]) =>
+			files.map((f) => ({
+				path: f.path,
+				bytes: [...f.bytes],
+				blobSha: f.blobSha,
+			}));
+
+		const renderedBefore = snapshot(rendered);
 		const entriesBefore = new Map(remote.entries);
 		const policyBefore = structuredClone(policy);
 
 		computeBlastRadius(rendered, remote, policy);
 
-		expect(rendered).toEqual(renderedBefore);
+		expect(snapshot(rendered)).toEqual(renderedBefore);
 		expect(remote.entries).toEqual(entriesBefore);
 		expect(policy).toEqual(policyBefore);
+	});
+
+	it("does not mutate the rendered content buffers", () => {
+		const content = Buffer.from("payload bytes", "utf8");
+		const rendered = [file(".avel/x.md", SHA_A, content)];
+
+		computeBlastRadius(rendered, tree({}), POLICY);
+
+		expect(content.toString("utf8")).toBe("payload bytes");
 	});
 
 	it("returns an identical result on repeated calls with the same inputs", () => {
