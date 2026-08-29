@@ -20,7 +20,19 @@ export class SessionRequiredError extends Error {
 	}
 }
 
-const COOKIE = "avel_session";
+/**
+ * The DISPLAY cookie, readable by script.
+ *
+ * The OAuth callback also sets an httpOnly `avel_session` that a server would
+ * trust. This one exists only so the client can render a name and gate the UI.
+ * It is never authority: the client renders the decision, the server makes it.
+ * A client that lies about its session still cannot ship anything.
+ *
+ * These MUST differ. Reading the httpOnly cookie from script is impossible, so
+ * pointing this at `avel_session` would leave the gate permanently locked out
+ * after a successful OAuth sign-in.
+ */
+const COOKIE = "avel_operator";
 
 function readCookie(name: string): string | null {
 	if (typeof document === "undefined") return null;
