@@ -2,7 +2,7 @@
 
 *This document owns **shapes**: the contract layer structure and the entity definitions. It does not carry rationale — for why any of this changed, see `DECISIONS-V2.md`. For tools and versions, `TECH-STACK.md`. For build status, `STATE.md`.*
 
-*Supersedes the v1 data model. Stale markers: 13 entities · tRPC · Capability as an entity · `bytea` snapshots · `skippable` gates.*
+*Supersedes the v1 data model. Stale markers: 13 entities · tRPC · Capability as an entity · `bytea` snapshots · `skippable` gates.* <!--allow-stale-->
 
 ---
 

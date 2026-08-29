@@ -121,7 +121,7 @@ Things that are settled and should not be reopened:
 - The core is deterministic. No inference in the render, freeze, gate, or delivery path.
 - The block decision is a function, not an agent.
 - The cut is derived from the repository's directory structure, not chosen.
-- Gates are `mandatory` or `warn`. There is no skippable.
+- Gates are `mandatory` or `warn`. There is no skippable. <!--allow-stale-->
 - The mutation floor is global and versioned, never per-mission.
 - `RepoPolicy` defaults false. Safe by absence.
 

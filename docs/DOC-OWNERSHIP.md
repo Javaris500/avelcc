@@ -57,7 +57,7 @@ These strings must not appear in `docs/` outside a "stale markers" line or this 
 tRPC                        → ts-rest
 Supabase                    → Neon
 bytea                       → R2 / snapshot_key
-skippable                   → mandatory | warn + gate_override
+skippable                   → mandatory | warn + gate_override <!--allow-stale-->
 Capability (as an entity)    → Skill.type = 'capability'
 ADR-013 (for export targets) → the decision is in DECISIONS-V2
 13 entities / thirteen      → twelve

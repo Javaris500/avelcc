@@ -11,3 +11,6 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Windows alternate-data-stream junk from zip extracts
+*:Zone.Identifier
