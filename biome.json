@@ -17,7 +17,7 @@
 			"!**/src/styles.css",
 			"!**/src/lib/git/__fixtures__",
 			"!**/fixtures/golden",
-			"!**/src/styles/**"
+			"!**/src/styles"
 		]
 	},
 	"formatter": {
