@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+	type AnyPgColumn,
 	boolean,
 	check,
 	index,
@@ -10,6 +11,7 @@ import {
 	pgTable,
 	primaryKey,
 	text,
+	timestamp,
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
@@ -509,6 +511,309 @@ export const repoPolicies = pgTable(
 	],
 );
 
+/**
+ * DATA-CONTRACTS-V2:349 writes it as a quoted closed vocabulary — `service
+ * ('github')` — the same form as every other enum in that document.
+ *
+ * pgEnum by the doc's own test at :403. Nothing looks a service UP: there is no
+ * service catalogue table and no row to join to, which is what sent
+ * `missions.type` and `playbooks.mission_type` to text. What a service selects
+ * is a gateway implementation, and selecting an implementation is a branch by
+ * definition. One value today; a second is `ALTER TYPE ... ADD VALUE`.
+ */
+export const connectionService = pgEnum("connection_service", ["github"]);
+
+/**
+ * Branches: an `owner` scope authorizes every repository under that owner, a
+ * `repo` scope authorizes exactly one. Prefix match against exact match — two
+ * different comparisons, selected by this value.
+ */
+export const connectionScopeType = pgEnum("connection_scope_type", [
+	"owner",
+	"repo",
+]);
+
+/**
+ * Branches, and the branch is already written down: BLAST-RADIUS.md:272 gates
+ * `CONNECTION_REVOKED` on `Connection.status !== 'active'`.
+ */
+export const connectionStatus = pgEnum("connection_status", [
+	"active",
+	"expired",
+	"revoked",
+]);
+
+/**
+ * The export lifecycle. A state machine, and every consumer branches on it, so
+ * pgEnum rather than text.
+ *
+ * NINE STATES, FROM THE CONTRACT, NOT SIX FROM THE FIELD BLOCK. Two vocabularies
+ * exist: DATA-CONTRACTS-V2:277 prints `pending → rendering → verifying → pr-open
+ * → done | failed`, and src/contract/export.ts:18 carries those plus
+ * `previewing`, `previewed` and `delivering` from BLAST-RADIUS.md. The contract
+ * file wins because it is code three consumers already import, and because a dry
+ * run is a REAL Export row that is terminal at `previewed` — under the six-state
+ * list a preview has no state to end in. Reported as doc drift, not silently
+ * reconciled: the canonical field block is the side that is stale.
+ */
+export const exportStatus = pgEnum("export_status", [
+	"pending",
+	"rendering",
+	"verifying",
+	"previewing",
+	"previewed",
+	"delivering",
+	"pr-open",
+	"done",
+	"failed",
+]);
+
+/**
+ * What authorizes a delivery. DATA-CONTRACTS-V2:347.
+ *
+ * THE TOKEN IS NEVER IN THIS TABLE. `credential_ref` names an env var or a
+ * secret ref and the gateway resolves it. DECISIONS-V2:105 calls an unscoped,
+ * unrevocable PAT with push rights into client repositories "the largest real
+ * risk in the system"; this table is the scoping, and a column holding the
+ * secret would put that risk straight back.
+ *
+ * An export resolves BOTH this (*what authorizes this?*) and a RepoPolicy
+ * (*what am I allowed to do?*). Separate questions, separate tables.
+ */
+export const connections = pgTable(
+	"connections",
+	{
+		...identity,
+		service: connectionService("service").notNull().default("github"),
+		label: text("label").notNull(),
+		/**
+		 * NOT IN THE CANONICAL FIELD LIST, added on an operator ruling.
+		 * DECISIONS-V2:103 is titled "Connection scoped per engagement" and
+		 * DATA-CONTRACTS-V2:128 makes revocation a step of engagement close — and
+		 * without this column that step has nothing to select on. The field block
+		 * and the decision that produced it disagree; the decision is the side
+		 * with the mechanism.
+		 *
+		 * NULLABLE because V1 reads a single account-wide token from env and there
+		 * is no engagement to attach it to. Null means "not scoped to one
+		 * engagement", which is a real state rather than missing data.
+		 */
+		engagementId: uuid("engagement_id").references(() => engagements.id),
+		scopeType: connectionScopeType("scope_type").notNull(),
+		/** "meridian-co" for an owner scope, "meridian-co/app" for a repo scope. */
+		scopeValue: text("scope_value").notNull(),
+		/**
+		 * An env var name or a secret ref. NEVER the token itself.
+		 * DATA-CONTRACTS-V2:358.
+		 */
+		credentialRef: text("credential_ref").notNull(),
+		/**
+		 * Defaults to `active`, following clients.status and engagements.status —
+		 * doc-silent on a default in exactly the same way, and defaulted to
+		 * `active` here. A NOT NULL status with no default is the defect 0008 just
+		 * finished unpicking on missions.status; not reopening it one table over.
+		 */
+		status: connectionStatus("status").notNull().default("active"),
+		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		lastRotatedAt: timestamp("last_rotated_at", { withTimezone: true }),
+		/** Set by engagement close. DATA-CONTRACTS-V2:128. */
+		revokedAt: timestamp("revoked_at", { withTimezone: true }),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		// How an export finds its authorization: the service plus the scope it is
+		// reaching. NOT unique, deliberately — rotation overlaps two live rows on
+		// one scope, and no source declares a uniqueness rule here.
+		index("connections_scope_idx").on(t.service, t.scopeType, t.scopeValue),
+		index("connections_engagement_idx").on(t.engagementId),
+		index("connections_status_idx").on(t.status),
+		// `revoked` and `revoked_at` are two records of one fact and must not
+		// disagree. One-directional, like missions_override_requires_rationale: a
+		// revoked row carries its timestamp, while a timestamp on a row later
+		// marked `expired` is history rather than a contradiction.
+		check(
+			"connections_revoked_requires_timestamp",
+			sql`${t.status} <> 'revoked' or ${t.revokedAt} is not null`,
+		),
+		// An empty scope_value is a credential scoped to nothing, and the
+		// comparison it feeds would match nothing or everything depending on which
+		// side builds the pattern. Refused by the database.
+		check(
+			"connections_scope_value_present",
+			sql`length(btrim(${t.scopeValue})) > 0`,
+		),
+	],
+);
+
+/**
+ * One delivery run. DATA-CONTRACTS-V2:270.
+ *
+ * NO SOFT DELETE, for the reason roster_entries has none: the doc's field list
+ * ends at `timestamps`. It is also the right shape — "immutable after freeze"
+ * and a soft-deletable audit record are opposite ideas, and the cross-cutting
+ * invariant at :399 governs what an Export can REACH, not the Export itself.
+ *
+ * IMMUTABILITY IS NOT ENFORCED HERE, and that is an [attestation] rather than a
+ * mechanism. "Immutable after freeze; only `status` and `pr_status` advance" is
+ * a sentence; no column, constraint or trigger stops an UPDATE of
+ * snapshot_sha256 on a `done` row. A freeze trigger would enforce it and no
+ * source specifies one, so this is reported rather than invented.
+ *
+ * `scope` IS ABSENT DELIBERATELY. DATA-CONTRACTS-V2:332 describes it in prose —
+ * incremental run against full-project run — but the Export field block never
+ * lists it, and `verification.mutation` already carries a `scope` of its own.
+ * Whether a third meaning exists as a column is a contract question, and a
+ * guessed column is the thing the enum-vocabulary rule forbids.
+ */
+export const exports = pgTable(
+	"exports",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id),
+		sprintN: integer("sprint_n").notNull().default(1),
+		/** Unique. Not partial: this table has no soft delete to exclude. */
+		idempotencyKey: uuid("idempotency_key").notNull(),
+		targetKind: exportTarget("target_kind").notNull(),
+		/**
+		 * NULLABLE, with a CHECK, on an operator ruling. A zip authorizes nothing
+		 * against anyone else's repository and so has no Connection to resolve; a
+		 * github_pr or github_push without one has no answer to "what authorizes
+		 * this". The doc lists the field unqualified, which read literally makes
+		 * every zip export uninsertable. Same shape and same fix as
+		 * agent_templates_feature_requires_engagement.
+		 */
+		connectionId: uuid("connection_id").references(() => connections.id),
+		status: exportStatus("status").notNull().default("pending"),
+		/**
+		 * TEXT, because NO VOCABULARY EXISTS. DATA-CONTRACTS-V2:279 gives this
+		 * field a name and nothing else — no values appear anywhere in the doc
+		 * set. An enum here would be a vocabulary I invented. Nullable, so unlike
+		 * missions.status it blocks no write. Promote to a pgEnum once the values
+		 * are ruled.
+		 */
+		prStatus: text("pr_status"),
+		/**
+		 * NULLABLE, all three, because a row is INSERTed at `pending` and the
+		 * snapshot does not exist until the render finishes. The doc lists them
+		 * unqualified; obeyed literally that makes the first write of every export
+		 * impossible, which is the defect class 0008 just closed.
+		 *
+		 * The CHECK below carries the real rule instead — all three or none. A key
+		 * with no hash is an unverifiable blob, and a hash with no key points at
+		 * nothing.
+		 */
+		snapshotKey: text("snapshot_key"),
+		snapshotSha256: text("snapshot_sha256"),
+		snapshotBytes: integer("snapshot_bytes"),
+		/**
+		 * IN POSTGRES, QUERYABLE, NEVER SEALED INSIDE THE BLOB. DECISIONS-V2:99 —
+		 * you cannot correlate outcomes to loadouts if the manifest ships inside
+		 * the artifact. Nullable until freeze, like the snapshot columns.
+		 */
+		versionManifest: jsonb("version_manifest").$type<Record<string, unknown>>(),
+		/** AVEL's own frozen contract artifact hash. DECISIONS-V2:101. */
+		contractSha256: text("contract_sha256"),
+		/**
+		 * The gate result. jsonb because the shape is nested, read whole, and
+		 * DATA-CONTRACTS-V2:296 marks `conformance` an explicit placeholder whose
+		 * inner shape is unspecified — columns cannot be generated from a shape
+		 * that is still open.
+		 */
+		verification: jsonb("verification").$type<Record<string, unknown>>(),
+		/**
+		 * SHAPE CONTESTED, REPORTED NOT RESOLVED. DATA-CONTRACTS-V2:281 gives
+		 * `{ gate, justification, overridden_by, overridden_at }`;
+		 * src/contract/export.ts:77 gives `{ gate, rationale, overriddenBy }`.
+		 * Typed against the contract file because it is code that ships today,
+		 * keeping the doc's `overridden_at` as optional. jsonb, so reconciling the
+		 * two costs no migration.
+		 */
+		gateOverride: jsonb("gate_override").$type<{
+			gate: string;
+			rationale: string;
+			overriddenBy: string;
+			overriddenAt?: string;
+		}>(),
+		/**
+		 * This export re-ran a past mission's frozen inputs against a different
+		 * model. DECISIONS-V2:331 — the replay harness "requires no new schema
+		 * beyond a `replay_of` self-reference."
+		 */
+		replayOf: uuid("replay_of").references((): AnyPgColumn => exports.id),
+
+		/* ── from the contract, not the canonical field block ──────────────── */
+		//
+		// The five below ship in src/contract/export.ts and are specified in
+		// BLAST-RADIUS.md; the canonical Export block lists none of them. Added on
+		// an operator ruling, because `exportSchema` returns all five today and
+		// /exports/preview cannot be written without them. Added ALONGSIDE the
+		// canonical fields — nothing in that block is changed or dropped.
+
+		/**
+		 * A dry run is a REAL Export row, terminal at `previewed`, never promoted.
+		 * Without this column nothing distinguishes a preview from a delivery.
+		 */
+		dryRun: boolean("dry_run").notNull().default(false),
+		/**
+		 * Which preview this export was approved from. The device boundary is
+		 * enforced here rather than by hiding a button: a github_push with no
+		 * linked preview is refused.
+		 */
+		previewExportId: uuid("preview_export_id").references(
+			(): AnyPgColumn => exports.id,
+		),
+		baseRef: text("base_ref"),
+		/** NULLABLE: an empty repository has no tip, and that is a state. */
+		baseCommitSha: text("base_commit_sha"),
+		/**
+		 * A SEPARATE COLUMN from `verification`, and BLAST-RADIUS.md is explicit
+		 * about why: "verification asks is the work good, blast radius asks what
+		 * does delivery do." Merged, the pre-flight screen cannot tell "tests
+		 * failed" from "this would clobber a file", and those need different
+		 * buttons.
+		 */
+		blastRadius: jsonb("blast_radius").$type<Record<string, unknown>>(),
+		...timestamps,
+	},
+	(t) => [
+		uniqueIndex("exports_idempotency_key_unique").on(t.idempotencyKey),
+		index("exports_mission_idx").on(t.missionId),
+		index("exports_connection_idx").on(t.connectionId),
+		index("exports_replay_of_idx").on(t.replayOf),
+		index("exports_preview_export_idx").on(t.previewExportId),
+		index("exports_status_idx").on(t.status),
+		// A delivery into someone else's repository states what authorized it. A
+		// zip does not, because it authorizes nothing. In the database rather than
+		// in the export service, for the reason every other check here is: a
+		// service can be bypassed, and this one guards other people's code.
+		check(
+			"exports_remote_target_requires_connection",
+			sql`${t.targetKind} = 'zip' or ${t.connectionId} is not null`,
+		),
+		// The integrity check is the three columns together or not at all.
+		check(
+			"exports_snapshot_all_or_none",
+			sql`num_nonnulls(${t.snapshotKey}, ${t.snapshotSha256}, ${t.snapshotBytes}) in (0, 3)`,
+		),
+		check(
+			"exports_snapshot_bytes_nonnegative",
+			sql`${t.snapshotBytes} is null or ${t.snapshotBytes} >= 0`,
+		),
+		// Mirrors missions_sprint_n_positive. A sprint is 1-based.
+		check("exports_sprint_n_positive", sql`${t.sprintN} >= 1`),
+		// A row cannot be its own replay source or its own preview. Both compare
+		// to NULL and pass when the column is unset, which is the common case.
+		check("exports_replay_of_not_self", sql`${t.replayOf} <> ${t.id}`),
+		check(
+			"exports_preview_export_not_self",
+			sql`${t.previewExportId} <> ${t.id}`,
+		),
+	],
+);
+
 /* ── relations ──────────────────────────────────────────────────────────── */
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -603,3 +908,34 @@ export const rosterEntrySkillsRelations = relations(
 		}),
 	}),
 );
+
+export const connectionsRelations = relations(connections, ({ one, many }) => ({
+	engagement: one(engagements, {
+		fields: [connections.engagementId],
+		references: [engagements.id],
+	}),
+	exports: many(exports),
+}));
+
+export const exportsRelations = relations(exports, ({ one }) => ({
+	mission: one(missions, {
+		fields: [exports.missionId],
+		references: [missions.id],
+	}),
+	connection: one(connections, {
+		fields: [exports.connectionId],
+		references: [connections.id],
+	}),
+	// Both self-references are named, because two unnamed relations to the same
+	// table are ambiguous to drizzle's relational query builder.
+	replaySource: one(exports, {
+		fields: [exports.replayOf],
+		references: [exports.id],
+		relationName: "export_replay",
+	}),
+	previewExport: one(exports, {
+		fields: [exports.previewExportId],
+		references: [exports.id],
+		relationName: "export_preview",
+	}),
+}));

@@ -64,6 +64,20 @@
       "when": 1788030883476,
       "tag": "0008_mission_status_default_nullable_cut",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788031347478,
+      "tag": "0009_connection_and_export",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788031357153,
+      "tag": "0010_updated_at_trigger_connection_export",
+      "breakpoints": true
     }
   ]
 }

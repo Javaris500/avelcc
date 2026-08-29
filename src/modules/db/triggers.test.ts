@@ -1,5 +1,9 @@
 import { neon } from "@neondatabase/serverless";
+import { is } from "drizzle-orm";
+import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
+
+import * as schema from "#/modules/db/schema";
 
 /**
  * EVERY TABLE WITH updated_at HAS THE TRIGGER THAT MAINTAINS IT.
@@ -19,6 +23,14 @@ import { describe, expect, it } from "vitest";
  *
  * Matched on the FUNCTION the trigger calls, not on its name, so renaming a
  * trigger cannot make a missing one look present.
+ *
+ * BOTH SETS ARE READ FROM THE DATABASE, which leaves one hole the assertions
+ * below cannot see: a table that was never migrated is absent from the live
+ * side AND from the trigger side, so it passes by not existing. Generate 0009
+ * and forget to push it and every assertion here stays green while the table
+ * does not exist. `declaredTablesWithUpdatedAt` closes that by reading the
+ * schema module — the thing drizzle-kit generates from — and requiring the
+ * database to actually carry every table the code declares.
  */
 
 // Self-sufficient locally; in CI the variable comes from the environment.
@@ -88,10 +100,51 @@ describe.skipIf(!URL)("updated_at triggers", () => {
 		return rows.map((r) => String(r.table_name));
 	}
 
+	/**
+	 * The same question asked of the SCHEMA rather than the database: which
+	 * tables does the code declare with an updated_at column. Derived, never a
+	 * hardcoded list — a hardcoded one would need editing for every new table,
+	 * which is the exact maintenance burden that let 0003's array go stale.
+	 */
+	function declaredTablesWithUpdatedAt(): string[] {
+		const names: string[] = [];
+		// A loop rather than filter().map(): the module's exports are a union of
+		// tables, enums and relations, and a `v is PgTable` predicate is not
+		// assignable to that union. `is` narrows in place without one.
+		for (const value of Object.values(schema)) {
+			if (!is(value, PgTable)) continue;
+			const config = getTableConfig(value);
+			if (config.columns.some((col) => col.name === "updated_at")) {
+				names.push(config.name);
+			}
+		}
+		return names.sort();
+	}
+
 	it("finds tables to check, so a green result is not an empty set", async () => {
 		// Without this, dropping every table would pass the assertion below.
 		const tables = await tablesWithUpdatedAt();
 		expect(tables.length).toBeGreaterThan(0);
+	});
+
+	it("carries every table the schema declares, so an unapplied migration fails", async () => {
+		// Without this, generating a migration and never pushing it leaves the
+		// whole file green: the new table is missing from both sets and is
+		// therefore never compared. The trigger assertion below then guards a
+		// table that does not exist.
+		const [declared, live] = await Promise.all([
+			Promise.resolve(declaredTablesWithUpdatedAt()),
+			tablesWithUpdatedAt(),
+		]);
+
+		const unapplied = declared.filter((t) => !live.includes(t));
+
+		expect(
+			unapplied,
+			"These tables are declared in schema.ts with an updated_at column and do " +
+				"NOT exist in the database, so their migration was generated but never " +
+				"pushed. Every other assertion in this file passes for them by omission.",
+		).toEqual([]);
 	});
 
 	it("gives every table with updated_at a set_updated_at trigger", async () => {
