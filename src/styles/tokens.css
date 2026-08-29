@@ -135,7 +135,6 @@
   --frame-mat:     26px;   /* the desktop inset around the app window        */
   --frame-sidebar: 238px;  /* sidebar column                                 */
   --frame-max:    1440px;  /* app window cap                                 */
-  --frame-topbar:   52px;  /* top bar height                                 */
 
   /* ── shadcn ALIAS LAYER ─────────────────────────────────────────────────
      Tokens flow ONE DIRECTION. Brand is the source; these are aliases that

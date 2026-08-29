@@ -46,9 +46,14 @@ for (const root of ROOTS) {
 			const isComment = inBlockComment || line.trim().startsWith("//") || line.trim().startsWith("*");
 			if (line.includes("*/")) inBlockComment = false;
 			if (isComment) return;
+			// EVERY match on the line, not the first. The first-match version
+			// reported 9 spacing violations when there were 12: three were hidden
+			// behind a same-line sibling. A tool that stops at the first finding
+			// per line makes "0 literals" a weaker claim than it reads, and both
+			// I and session 2 would have reported that migration complete with
+			// three still in the file.
 			for (const [re, why] of RULES) {
-				const m = line.match(re);
-				if (m) {
+				for (const m of line.matchAll(new RegExp(re.source, "g"))) {
 					console.error(`${file}:${i + 1}  ${m[0]}  — ${why}`);
 					failures++;
 				}
