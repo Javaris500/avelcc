@@ -55,8 +55,8 @@ function DesktopRequired() {
 
   return (
     <div className="flex flex-col items-start gap-3 px-6 py-14" data-testid="desktop-required">
-      <span className="font-mono text-[12px] text-gate-stale">DESKTOP REQUIRED</span>
-      <p className="font-display text-[15px] font-semibold text-text">
+      <span className="font-mono text-xs text-gate-stale">DESKTOP REQUIRED</span>
+      <p className="font-display text-lg font-semibold text-text">
         This screen builds something. It needs a desktop.
       </p>
       <p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
@@ -84,7 +84,7 @@ function DesktopRequired() {
           Email it to myself
         </Button>
       </div>
-      <p className="pt-1 font-mono text-[11px] break-all text-text-subtle" data-testid="desktop-required-url">
+      <p className="pt-1 font-mono text-micro break-all text-text-subtle" data-testid="desktop-required-url">
         {href}
       </p>
     </div>

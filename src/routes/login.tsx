@@ -54,7 +54,7 @@ function Login() {
 			<main className="flex w-full max-w-[352px] flex-col gap-5 pt-[12vh] pb-16">
 				<div className="flex flex-col gap-2">
 					<Wordmark />
-					<h1 className="font-display text-[19px] font-semibold tracking-[-0.01em]">
+					<h1 className="font-display text-title font-semibold tracking-[-0.01em]">
 						Sign in to the Command Center
 					</h1>
 				</div>
@@ -72,13 +72,13 @@ function Login() {
 					{presented ? (
 						<>
 							<span
-								className="font-mono text-[11px] text-gate-block"
+								className="font-mono text-micro text-gate-block"
 								data-testid="login-error-code"
 							>
 								{error}
 							</span>
-							<p className="text-[13px] font-medium text-text">{presented.title}</p>
-							<p className="text-[13px] leading-relaxed text-text-muted">
+							<p className="text-sm font-medium text-text">{presented.title}</p>
+							<p className="text-sm leading-relaxed text-text-muted">
 								{presented.body}
 							</p>
 						</>
@@ -105,7 +105,7 @@ function Login() {
 					pending={pending}
 				/>
 
-				<div className="flex items-center justify-between text-[12px]">
+				<div className="flex items-center justify-between text-xs">
 					<a
 						className="text-accent-text hover:text-accent-hover"
 						data-testid="login-forgot"
@@ -116,7 +116,7 @@ function Login() {
 					<span className="font-mono text-text-subtle">avelco.dev</span>
 				</div>
 
-				<p className="border-t border-[var(--elevation-border-rest)] pt-4 text-[12px] leading-relaxed text-text-subtle">
+				<p className="border-t border-[var(--elevation-border-rest)] pt-4 text-xs leading-relaxed text-text-subtle">
 					No auth provider is wired yet. The session gate is real and rejects
 					hard; the identity source behind it is a stub. GitHub sign-in needs
 					GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in{" "}

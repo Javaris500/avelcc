@@ -12,7 +12,7 @@ import { cn } from "#/components/cn";
  * pending and stale are neutral by design, not by omission.
  */
 const badge = cva(
-	"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[12px] font-medium leading-none",
+	"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium leading-none",
 	{
 		variants: {
 			tone: {
@@ -83,7 +83,7 @@ export function Pill({
 		<span
 			className={cn(
 				"inline-flex items-center gap-1.5 rounded-full bg-app-raised px-2.5 py-0.5",
-				"text-[12px] leading-none text-text-muted",
+				"text-xs leading-none text-text-muted",
 				className,
 			)}
 			{...props}
@@ -107,7 +107,7 @@ export function Tag({
 		<span
 			className={cn(
 				"inline-flex items-center rounded-xs bg-app-recessed px-1.5 py-0.5",
-				"font-mono text-[12px] leading-none text-text-muted",
+				"font-mono text-xs leading-none text-text-muted",
 				className,
 			)}
 			{...props}

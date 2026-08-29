@@ -63,12 +63,12 @@ function SessionRejected({ error }: { error: Error }) {
 		>
 			<div className="max-w-[52ch] px-6">
 				<span
-					className="font-mono text-[12px] text-gate-block"
+					className="font-mono text-xs text-gate-block"
 					data-testid="error-code"
 				>
 					{isSession ? "SESSION_REQUIRED" : "SHELL_ERROR"}
 				</span>
-				<p className="pt-2 font-display text-[15px] font-semibold">
+				<p className="pt-2 font-display text-lg font-semibold">
 					{isSession
 						? "This request was refused."
 						: "The shell failed to load."}

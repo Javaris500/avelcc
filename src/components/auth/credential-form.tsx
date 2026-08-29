@@ -41,7 +41,7 @@ export function CredentialForm({
       }}
     >
       <div className="flex flex-col gap-1.5">
-        <label className="text-[13px] text-text-muted" htmlFor={emailId}>
+        <label className="text-sm text-text-muted" htmlFor={emailId}>
           Email
         </label>
         <input
@@ -59,11 +59,11 @@ export function CredentialForm({
         <div className="flex items-baseline justify-between gap-2">
           {/* The id is fixed at "current-password" deliberately; browsers key
               password-manager heuristics on it. useId would randomise it. */}
-          <label className="text-[13px] text-text-muted" htmlFor="current-password">
+          <label className="text-sm text-text-muted" htmlFor="current-password">
             Password
           </label>
           <button
-            className="interactive rounded-xs px-1 text-[12px] text-text-subtle hover:text-text-muted"
+            className="interactive rounded-xs px-1 text-xs text-text-subtle hover:text-text-muted"
             data-testid="login-reveal"
             onClick={() => setReveal((v) => !v)}
             type="button"

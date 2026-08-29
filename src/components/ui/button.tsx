@@ -25,7 +25,7 @@ const button = cva(
 				danger: "bg-danger text-bg hover:brightness-110",
 			},
 			size: {
-				sm: "h-7 px-2.5 text-[13px]",
+				sm: "h-7 px-2.5 text-sm",
 				md: "h-9 px-3.5 text-sm",
 			},
 		},

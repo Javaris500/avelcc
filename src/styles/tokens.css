@@ -62,6 +62,39 @@
   --font-emphasis: "Fraunces", ui-serif, Georgia, serif;
 
   --tracking-wordmark: -0.02em;   /* [brief] Space Grotesk 700, -0.02em       */
+
+  /* ── TYPE SCALE ─────────────────────────────────────────────────────────
+     [INVENTED — the only invented block left in this file, and deliberate]
+
+     globals-patch.css defines radius, elevation, state, z-index, motion, gate
+     colour and density. It defines NO type scale, so every component was
+     picking its own pixel value and nothing could be wrong against anything.
+     Nine distinct sizes rendered on one screen, including the half-pixel steps
+     12.5 and 13.5.
+
+     avel-cc-shell.html cannot supply this either: its own ramp is eight sizes
+     including 9.5, 10.5 and 12.5px. That is a prototype, not a system, and
+     copying it faithfully propagates it.
+
+     Six steps, no half-pixels, tuned for a dense internal tool where most text
+     is scanned rather than read. Overriding Tailwind's --text-xs/sm/base is
+     intentional: a project scale that does not own the default utility names
+     gets bypassed the first time somebody types text-sm.
+
+     Line heights are tight at the small end because these sizes label things,
+     and looser at the large end because those sizes are read. */
+  --text-micro:               11px;   /* kbd, error codes, badge counts       */
+  --text-micro--line-height:  1.35;
+  --text-xs:                  12px;   /* nav rows, meta, captions             */
+  --text-xs--line-height:     1.4;
+  --text-sm:                  13px;   /* form labels, secondary prose         */
+  --text-sm--line-height:     1.5;
+  --text-base:                14px;   /* default body                         */
+  --text-base--line-height:   1.6;
+  --text-lg:                  15px;   /* panel and section headings           */
+  --text-lg--line-height:     1.35;
+  --text-title:               19px;   /* page title, one per screen           */
+  --text-title--line-height:  1.2;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

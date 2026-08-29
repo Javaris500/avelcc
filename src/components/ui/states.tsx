@@ -23,7 +23,7 @@ export function EmptyState({
 			className={cn("flex flex-col items-start gap-2 px-6 py-14", className)}
 			data-testid="empty-state"
 		>
-			<p className="font-display text-[15px] font-semibold text-text">
+			<p className="font-display text-lg font-semibold text-text">
 				{title}
 			</p>
 			<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
@@ -58,12 +58,12 @@ export function ErrorState({
 			data-testid="error-state"
 		>
 			<span
-				className="font-mono text-[12px] text-gate-block"
+				className="font-mono text-xs text-gate-block"
 				data-testid="error-code"
 			>
 				{code}
 			</span>
-			<p className="font-display text-[15px] font-semibold text-text">
+			<p className="font-display text-lg font-semibold text-text">
 				{title}
 			</p>
 			<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
