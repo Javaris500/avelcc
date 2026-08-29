@@ -22,8 +22,7 @@ function Icon({ item }: { item: NavItem }) {
 	return (
 		<Glyph
 			aria-hidden="true"
-			className="shrink-0 opacity-90"
-			size={15}
+			className="size-(--icon-inline) shrink-0 opacity-90"
 			strokeWidth={1.8}
 		/>
 	);
@@ -39,19 +38,25 @@ function Row({ item }: { item: NavItem }) {
 	);
 
 	/**
-	 * Unbuilt: dimmed, no href, and removed from the tab order. The dimming is
-	 * a claim about focusability, and an item that looks unfocusable while
-	 * still taking tab focus is that claim being false. Enforced by rendering
-	 * a span with no tabindex rather than by styling a disabled link.
+	 * Unbuilt: muted, no href, and removed from the tab order. Enforced by
+	 * rendering a span with no tabindex rather than by styling a disabled link
+	 * — an item that looks unfocusable while still taking tab focus is that
+	 * claim being false.
+	 *
+	 * NOT --opacity-disabled. The patch's "disabled is opacity, not a colour"
+	 * rule is about controls, where a disabled danger button must stay
+	 * recognisably danger. An unbuilt item is not a disabled control, it is an
+	 * unavailable destination, and eleven of twelve items are in this state:
+	 * at 35% it measured 1.71:1 dark and 1.56:1 light, so a reader could not
+	 * resolve the information architecture at all. Full opacity in text-subtle
+	 * carries the distinction by tone, and the href and tabindex carry the
+	 * rest.
 	 */
 	if (!item.built || !item.to) {
 		return (
 			<span
 				aria-disabled="true"
-				className={cn(
-					ROW,
-					"text-text-subtle opacity-[var(--opacity-disabled)]",
-				)}
+				className={cn(ROW, "text-text-subtle")}
 				data-built="false"
 				data-testid={testId(item.label)}
 				title="Not built yet"
@@ -102,7 +107,7 @@ export function NavTree({ groups, collapsed = false }: NavTreeProps) {
 			{groups.map((group) => (
 				<div key={group.label}>
 					<p
-						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-subtle uppercase"
+						className="px-2 pb-1.5 font-mono text-micro font-medium tracking-wide text-text-muted uppercase"
 						data-testid={`nav-group-${group.label.toLowerCase()}`}
 					>
 						{group.label}

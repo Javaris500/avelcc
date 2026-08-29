@@ -111,10 +111,13 @@ test("the active item is marked aria-current=page", async ({ page }) => {
 	);
 });
 
-test("icons render at the reference weight, from lucide", async ({ page }) => {
+test("icons render at the inline icon size, from lucide", async ({ page }) => {
 	const svg = page.getByTestId("nav-missions").locator("svg");
-	await expect(svg).toHaveAttribute("width", "15");
-	await expect(svg).toHaveAttribute("height", "15");
+	// Asserted as a computed size, not an attribute: the size comes from
+	// --icon-inline, so this also proves the token resolves rather than
+	// falling back to lucide's 24px default.
+	await expect(svg).toHaveCSS("width", "14px");
+	await expect(svg).toHaveCSS("height", "14px");
 	await expect(svg).toHaveAttribute("stroke-width", "1.8");
 	await expect(svg).toHaveAttribute("aria-hidden", "true");
 	expect(await page.getByTestId("nav-tree").locator("svg").count()).toBe(
@@ -143,4 +146,21 @@ test("every interactive element in the sidebar carries a data-testid", async ({
 				.map((el) => el.tagName),
 		);
 	expect(missing).toEqual([]);
+});
+
+/**
+ * Ruling: an unbuilt item is an unavailable destination, not a disabled
+ * control, so it does not take --opacity-disabled. At 35% it measured 1.71:1
+ * dark and 1.56:1 light, and eleven of twelve items are in this state, so a
+ * reader could not resolve the information architecture at all.
+ */
+test("unbuilt items are muted by tone, never by reduced opacity", async ({
+	page,
+}) => {
+	for (const label of UNBUILT) {
+		const opacity = await page
+			.getByTestId(id(label))
+			.evaluate((el) => getComputedStyle(el).opacity);
+		expect(opacity, `${label} must not be dimmed by opacity`).toBe("1");
+	}
 });
