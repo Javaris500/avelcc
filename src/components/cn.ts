@@ -1,5 +1,5 @@
-import { type ClassValue, clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 /**
  * Conventionally this lives at src/lib/utils.ts. It is here because src/lib/
@@ -7,5 +7,5 @@ import { twMerge } from 'tailwind-merge'
  * to session 2. Documented workaround, not a silent relocation.
  */
 export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs))
+	return twMerge(clsx(inputs));
 }

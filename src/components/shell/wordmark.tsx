@@ -1,4 +1,4 @@
-import { cn } from '#/components/cn'
+import { cn } from "#/components/cn";
 
 /**
  * `avel.` — lowercase, Space Grotesk 700, -0.02em. LOGO-BRIEF: "We already
@@ -8,18 +8,18 @@ import { cn } from '#/components/cn'
  * "Use once per page, never adjacent to another animated element."
  */
 export function Wordmark({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        'font-display text-[17px] font-bold tracking-[var(--tracking-wordmark)] text-text',
-        className,
-      )}
-      data-testid="wordmark"
-    >
-      avel
-      <span aria-hidden="true" className="animate-period text-accent">
-        .
-      </span>
-    </span>
-  )
+	return (
+		<span
+			className={cn(
+				"font-display text-[17px] font-bold tracking-[var(--tracking-wordmark)] text-text",
+				className,
+			)}
+			data-testid="wordmark"
+		>
+			avel
+			<span aria-hidden="true" className="animate-period text-accent">
+				.
+			</span>
+		</span>
+	);
 }

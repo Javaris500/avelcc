@@ -9,40 +9,40 @@
  */
 
 export type Session = {
-  operator: string
-  workspace: string
-}
+	operator: string;
+	workspace: string;
+};
 
 export class SessionRequiredError extends Error {
-  constructor() {
-    super('SESSION_REQUIRED')
-    this.name = 'SessionRequiredError'
-  }
+	constructor() {
+		super("SESSION_REQUIRED");
+		this.name = "SessionRequiredError";
+	}
 }
 
-const COOKIE = 'avel_session'
+const COOKIE = "avel_session";
 
 function readCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null
-  for (const part of document.cookie.split('; ')) {
-    const [k, ...rest] = part.split('=')
-    if (k === name) return decodeURIComponent(rest.join('='))
-  }
-  return null
+	if (typeof document === "undefined") return null;
+	for (const part of document.cookie.split("; ")) {
+		const [k, ...rest] = part.split("=");
+		if (k === name) return decodeURIComponent(rest.join("="));
+	}
+	return null;
 }
 
 export function readSession(): Session | null {
-  const raw = readCookie(COOKIE)
-  if (!raw) return null
-  return { operator: raw, workspace: 'Meridian Law' }
+	const raw = readCookie(COOKIE);
+	if (!raw) return null;
+	return { operator: raw, workspace: "Meridian Law" };
 }
 
 export function signIn(operator: string): void {
-  document.cookie = `${COOKIE}=${encodeURIComponent(operator)}; path=/; SameSite=Lax`
+	document.cookie = `${COOKIE}=${encodeURIComponent(operator)}; path=/; SameSite=Lax`;
 }
 
 export function signOut(): void {
-  document.cookie = `${COOKIE}=; path=/; Max-Age=0; SameSite=Lax`
+	document.cookie = `${COOKIE}=; path=/; Max-Age=0; SameSite=Lax`;
 }
 
 /**
@@ -51,7 +51,7 @@ export function signOut(): void {
  * they were simply logged out.
  */
 export function requireSession(): Session {
-  const session = readSession()
-  if (!session) throw new SessionRequiredError()
-  return session
+	const session = readSession();
+	if (!session) throw new SessionRequiredError();
+	return session;
 }
