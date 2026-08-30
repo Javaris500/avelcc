@@ -269,7 +269,18 @@
      scroller. */
   --color-background:           var(--color-app-panel);
   --color-foreground:           var(--color-text);
-  --color-primary:              var(--color-accent);
+  /* A DEEPER BLUE IN LIGHT, AND ONLY FOR THE SOLID BUTTON.
+     --color-primary-foreground is var(--color-bg) in both themes, which is
+     only correct when the page ground is dark: dark text on #0092ca measures
+     4.79:1 and passes, while LIGHT text on the same #0092ca measures 3.03:1
+     and fails AA outright. The mapping is symmetric and the accent is not.
+     Measured on the Clients page primary button, both themes.
+     #0078ab, the existing light accent-hover, only reaches 4.23 and still
+     fails. #006a97 clears it at 5.16 while keeping white-on-blue, which is
+     what a primary button is expected to look like. --color-accent itself is
+     untouched at #0092ca: it carries the seam, the glows and the link text,
+     none of which sit under solid white type. */
+  --color-primary:              #006a97;
   --color-primary-foreground:   var(--color-bg);
   --color-secondary:            var(--color-app-raised);
   --color-secondary-foreground: var(--color-text);

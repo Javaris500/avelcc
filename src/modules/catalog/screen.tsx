@@ -54,11 +54,27 @@ export function CatalogSurface<TData extends { data: unknown[] }>({
 					const shown = presentCatalogError(error, noun);
 					return (
 						<div
-							className="px-4 py-3"
+							/*
+							 * QUIET, BUT NOT UNSTYLED. The copy and the tone were right
+							 * and are unchanged; what was missing is that it had no
+							 * surface at all, so it rendered as prose floating in an
+							 * empty pane and read as a page that failed to load rather
+							 * than a state somebody designed. metric-stat.tsx names the
+							 * same trap: being correct is not the same as looking
+							 * deliberate.
+							 *
+							 * A DASHED border is the whole idea. Every solid border in
+							 * this app bounds something real; dashed is the convention
+							 * for a placeholder, so the container says "this is where it
+							 * will be" without adding a word or raising the volume. The
+							 * fill recesses toward the desktop tone by half, which is
+							 * gentle in both themes and needs no per-theme value.
+							 */
+							className="rounded-md border border-[var(--elevation-border-rest)] border-dashed bg-[color-mix(in_oklab,var(--color-app-bg)_50%,transparent)] px-5 py-6"
 							data-built="false"
 							data-testid={`${testId}-not-built`}
 						>
-							<p className="text-sm text-text-subtle">
+							<p className="max-w-[68ch] text-sm leading-relaxed text-text-subtle">
 								Not built. {shown.body}
 							</p>
 						</div>

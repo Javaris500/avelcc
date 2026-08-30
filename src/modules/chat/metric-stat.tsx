@@ -56,13 +56,24 @@ const UNKNOWN = "—";
  * apart from a screen that is broken. It is the same problem a designed
  * "not built" state has: being correct is not the same as looking deliberate.
  *
- * `app-recessed` is the well surface in both themes, and it is the only step
- * that separates downward from `app-bg` in light, where everything above the
- * panel is white. So the slot reads as a place a value goes, empty on purpose,
- * rather than as text that did not arrive.
+ * IT STAYS A WELL — the slot must read as a place a value goes, empty on
+ * purpose, rather than as text that did not arrive, and downward is what says
+ * that. What changed is HOW FAR DOWN.
+ *
+ * It was `app-recessed`, which is tuned for inputs and code blocks: whole
+ * surfaces, several lines tall. On a chip a few characters wide it was 8.4 L*
+ * below its own panel in dark — measured rgb(22,24,29) at L* 8.2 against a
+ * panel at 16.6 — and three of them across the status strip read as holes
+ * punched in the row rather than as slots.
+ *
+ * Mixing `app-bg` at 60% recesses PROPORTIONALLY instead: it composites toward
+ * the desktop tone rather than jumping to the well tone, landing about 3 L*
+ * below the panel in dark and about 3 below white in light. Same direction in
+ * both themes, which is what the original reasoning was protecting, at a depth
+ * a chip can carry.
  */
 const UNKNOWN_SLOT =
-	"rounded-xs bg-app-recessed px-1.5 text-text-subtle tabular-nums";
+	"rounded-xs bg-[color-mix(in_oklab,var(--color-app-bg)_60%,transparent)] px-1.5 text-text-subtle tabular-nums";
 
 export function MetricStat({
 	metric,
