@@ -1,5 +1,4 @@
 import type { CrudCode, ErrorCode } from "#/contract/shared/errors";
-import { isTerminal } from "#/modules/export/delivery/lifecycle";
 import type { ExportRow, RenderPackage } from "#/modules/export/service";
 import { packageHashOf } from "#/modules/export/service";
 import { writeZip } from "#/modules/export/zip/writeZip";
@@ -137,12 +136,21 @@ export async function buildArchive(
 	}
 
 	/**
-	 * TERMINAL, not merely "not failed". `previewed` is terminal too and must be
-	 * refused — a dry run is never promoted and delivered nothing — so the state
-	 * is checked against the lifecycle machine and then narrowed to `done`, which
-	 * is the only terminal state a zip delivery reaches.
+	 * `done` AND NOTHING ELSE, including the other terminal states.
+	 *
+	 * This read `!isTerminal(row.status) || row.status !== "done"`, and the first
+	 * clause could never change the answer: every status that is not `done` is
+	 * refused by the second, and `done` is terminal so the first is false for it.
+	 * It was there to say "terminal is not the test" and said it in dead code,
+	 * where the next reader has to evaluate a boolean to discover it does
+	 * nothing. The sentence does that job better.
+	 *
+	 * What it was guarding against is real: `previewed` IS terminal, so a check
+	 * for terminality alone would have served a dry run's archive as though it
+	 * had been delivered. A dry run is never promoted and delivered nothing.
+	 * `done` is the only terminal state a zip delivery reaches.
 	 */
-	if (!isTerminal(row.status) || row.status !== "done") {
+	if (row.status !== "done") {
 		return fail(
 			"PRECONDITION_FAILED",
 			422,

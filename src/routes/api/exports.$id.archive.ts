@@ -5,7 +5,7 @@ import { buildArchive } from "#/modules/export/archive";
 import { renderFixturePackage } from "#/modules/export/deps";
 import { errorResponse } from "#/modules/export/http";
 import { getExport } from "#/modules/export/service";
-import { withMethodGuard } from "#/modules/http/shielded";
+import { shielded, withMethodGuard } from "#/modules/http/shielded";
 import { getMission } from "#/modules/mission/service";
 
 /**
@@ -31,67 +31,78 @@ function exportIdFrom(url: string): string {
 export const Route = createFileRoute("/api/exports/$id/archive")({
 	server: {
 		handlers: withMethodGuard({
-			GET: async ({ request }) => {
-				const id = exportIdFrom(request.url);
+			/**
+			 * SHIELDED, and it was the last route in the codebase that was not.
+			 *
+			 * It reads the database twice and re-renders a package, so a throw from
+			 * any of the three escaped as a framework 500 carrying `unhandled: true`
+			 * and no envelope — the exact defect INTERNAL_ERROR and shielded() were
+			 * introduced to remove, surviving in the one file written before either
+			 * existed. Nobody was careless; the wrapper arrived after this route did
+			 * and the earliest file was never revisited.
+			 */
+			GET: ({ request }) =>
+				shielded("export archive", async () => {
+					const id = exportIdFrom(request.url);
 
-				// Refused before the query: a non-uuid cannot match a row, and handing
-				// one to a uuid column raises at the database rather than returning
-				// cleanly. Same guard and same wrong-noun 404 as exports.$id.ts.
-				if (!uuid.safeParse(id).success) {
-					return errorResponse(
-						404,
-						"REPO_NOT_FOUND",
-						`No export with id ${id}.`,
+					// Refused before the query: a non-uuid cannot match a row, and handing
+					// one to a uuid column raises at the database rather than returning
+					// cleanly. Same guard and same wrong-noun 404 as exports.$id.ts.
+					if (!uuid.safeParse(id).success) {
+						return errorResponse(
+							404,
+							"REPO_NOT_FOUND",
+							`No export with id ${id}.`,
+						);
+					}
+
+					const result = await buildArchive(
+						{
+							loadExport: (exportId) => getExport(db, exportId),
+							loadMission: (missionId) => getMission(db, missionId),
+							renderPackage: renderFixturePackage,
+						},
+						id,
 					);
-				}
 
-				const result = await buildArchive(
-					{
-						loadExport: (exportId) => getExport(db, exportId),
-						loadMission: (missionId) => getMission(db, missionId),
-						renderPackage: renderFixturePackage,
-					},
-					id,
-				);
+					if (!result.ok) {
+						const { status, code, detail, details } = result.failure;
+						return errorResponse(status, code, detail, details);
+					}
 
-				if (!result.ok) {
-					const { status, code, detail, details } = result.failure;
-					return errorResponse(status, code, detail, details);
-				}
+					/**
+					 * `BodyInit` accepts a view over an ArrayBuffer, not over the wider
+					 * ArrayBufferLike that Uint8Array is typed with — a SharedArrayBuffer
+					 * cannot be a response body. writeZip's bytes always sit on a plain
+					 * ArrayBuffer, so this narrows with a real check rather than a cast,
+					 * and re-views the same memory rather than copying the archive.
+					 */
+					const { buffer, byteOffset, byteLength } = result.bytes;
+					if (!(buffer instanceof ArrayBuffer)) {
+						return errorResponse(
+							422,
+							"DETERMINISM_VIOLATION",
+							`Export ${id} rebuilt onto a buffer that cannot be served, so nothing was returned.`,
+						);
+					}
+					const body = new Uint8Array(buffer, byteOffset, byteLength);
 
-				/**
-				 * `BodyInit` accepts a view over an ArrayBuffer, not over the wider
-				 * ArrayBufferLike that Uint8Array is typed with — a SharedArrayBuffer
-				 * cannot be a response body. writeZip's bytes always sit on a plain
-				 * ArrayBuffer, so this narrows with a real check rather than a cast,
-				 * and re-views the same memory rather than copying the archive.
-				 */
-				const { buffer, byteOffset, byteLength } = result.bytes;
-				if (!(buffer instanceof ArrayBuffer)) {
-					return errorResponse(
-						422,
-						"DETERMINISM_VIOLATION",
-						`Export ${id} rebuilt onto a buffer that cannot be served, so nothing was returned.`,
-					);
-				}
-				const body = new Uint8Array(buffer, byteOffset, byteLength);
-
-				return new Response(body, {
-					status: 200,
-					headers: {
-						"Content-Type": "application/zip",
-						"Content-Disposition": `attachment; filename="${result.filename}"`,
-						"Content-Length": String(result.byteLength),
-						/**
-						 * The archive's own hash, so a caller can verify the bytes it
-						 * received without re-deriving anything. Strong rather than weak:
-						 * the zip writer is byte-deterministic, which is what makes an
-						 * exact-match validator meaningful here at all.
-						 */
-						ETag: `"${result.sha256}"`,
-					},
-				});
-			},
+					return new Response(body, {
+						status: 200,
+						headers: {
+							"Content-Type": "application/zip",
+							"Content-Disposition": `attachment; filename="${result.filename}"`,
+							"Content-Length": String(result.byteLength),
+							/**
+							 * The archive's own hash, so a caller can verify the bytes it
+							 * received without re-deriving anything. Strong rather than weak:
+							 * the zip writer is byte-deterministic, which is what makes an
+							 * exact-match validator meaningful here at all.
+							 */
+							ETag: `"${result.sha256}"`,
+						},
+					});
+				}),
 		}),
 	},
 });
