@@ -482,7 +482,18 @@ function ClientDetail() {
 							 * the panel prints no title of its own, so the section headings
 							 * are already the first level beneath it.
 							 */}
-							<div className="flex min-w-0 flex-col gap-4">
+							{/*
+							 * A MEASURE, now that the rail is gone and this column is the
+							 * full width of the window. `DefinitionListShell` is a
+							 * two-column grid with no max of its own, so at 1052px it put
+							 * "Primary contact" and "Status" 538px apart — a pair that has
+							 * to be read as a pair, separated by half the screen.
+							 *
+							 * Constrained here rather than inside the shell component,
+							 * because this is a property of THIS page's column and not of
+							 * every definition list in the product.
+							 */}
+							<div className="flex min-w-0 max-w-4xl flex-col gap-4">
 								<Sections client={c} detail={detail} />
 							</div>
 						</>

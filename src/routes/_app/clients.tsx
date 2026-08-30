@@ -5,6 +5,7 @@ import {
 	Outlet,
 	useParams,
 } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { z } from "zod";
 
@@ -13,6 +14,13 @@ import { successList } from "#/contract/shared/envelope";
 import { CLIENT_STATUS_TONE } from "#/modules/client/ui/status";
 import { StatusBadge } from "#/ui/badge";
 import { Button } from "#/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "#/ui/dropdown-menu";
 import { SkeletonRows } from "#/ui/skeleton";
 import { EmptyState, ErrorState } from "#/ui/states";
 import { Surface } from "#/ui/surface";
@@ -246,6 +254,84 @@ function HeaderCell({
 	);
 }
 
+/**
+ * THE CLIENT SWITCHER, which replaces the table on a detail page.
+ *
+ * Changing which client you are looking at is a control, not a region. As a
+ * column the table spent 288x723 to show one row, and the space it held was
+ * taken from the pane that had ten sections to render.
+ *
+ * It carries the blocked count on every entry, because that is the one signal
+ * UI-PLAN requires to survive into any list of clients — and only where it is
+ * non-zero, so "not blocked" and "not counted" stay different pixels.
+ *
+ * Disabled with a reason when there is nothing to switch to. One client is not
+ * a choice, and a menu that opens onto a single item you are already looking at
+ * is the kind of control this project keeps deleting.
+ */
+function ClientSwitcher({
+	rows,
+	selectedId,
+}: {
+	rows: ClientListResponse["data"];
+	selectedId: string;
+}) {
+	const current = rows.find((r) => r.id === selectedId);
+	const others = rows.filter((r) => r.id !== selectedId);
+
+	if (others.length === 0) {
+		return (
+			<span
+				className="inline-flex items-center gap-2 rounded-sm bg-app-raised px-2.5 py-2 text-sm text-text"
+				data-testid="client-switcher-only"
+				title="This is the only client. There is nothing to switch to."
+			>
+				{current?.name ?? "Client"}
+			</span>
+		);
+	}
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				className="interactive group inline-flex items-center gap-2 rounded-sm bg-app-raised px-2.5 py-2 text-left text-sm text-text"
+				data-testid="client-switcher"
+			>
+				{current?.name ?? "Client"}
+				<ChevronDown
+					aria-hidden="true"
+					className="shrink-0 text-text-subtle transition-transform duration-[var(--duration-micro)] group-data-[state=open]:rotate-180"
+					size={12}
+					strokeWidth={2}
+				/>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start" data-testid="client-switcher-menu">
+				<DropdownMenuLabel>Switch client</DropdownMenuLabel>
+				{others.map((r) => (
+					<DropdownMenuItem asChild key={r.id}>
+						<Link
+							data-testid={`client-switcher-option-${r.id}`}
+							params={{ clientId: r.id }}
+							to="/clients/$clientId"
+						>
+							{r.name}
+							{r.openBlockers > 0 ? (
+								<StatusBadge
+									className="ml-auto"
+									data-testid="client-switcher-blocked"
+									tone="warn"
+								>
+									{r.openBlockers}
+								</StatusBadge>
+							) : null}
+						</Link>
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
 function ClientsLayout() {
 	const query = useQuery<ClientListResponse>({
 		queryKey: ["clients"],
@@ -313,7 +399,14 @@ function ClientsLayout() {
 		 * gap between the two panes is this row's job; the margin around them is
 		 * the shell's.
 		 */
-		<div className="flex h-full flex-col gap-4 lg:flex-row">
+		<div
+			className={cn(
+				"flex h-full flex-col gap-4",
+				// A ROW ONLY WHERE THERE ARE TWO PANES. On the id page the switcher
+				// is one line above the detail, not a column beside it.
+				selectedId === undefined && "lg:flex-row",
+			)}
+		>
 			<section
 				aria-label="Clients"
 				/*
@@ -332,10 +425,24 @@ function ClientsLayout() {
 				 * wrapped its prose at roughly 55 characters. The width was being
 				 * spent on the pane that had least to say.
 				 */
+				/*
+				 * A BAR, NOT A COLUMN, once a client is selected.
+				 *
+				 * As a column it was 288px wide and 723px tall holding about 135px of
+				 * content — a ~590px void between the sidebar and everything the
+				 * operator was actually reading, and it pushed the sections 43% of
+				 * the way across a 1440px screen. The list has one row today; the
+				 * detail has ten sections. The column was sized for the wrong one.
+				 *
+				 * The table does not shrink into the bar, it is REPLACED by a
+				 * switcher: on a detail page, changing which client you are looking
+				 * at is a control, not a spatial region. The full table lives at
+				 * /clients, where it has the width to be a table.
+				 */
 				className={
 					selectedId === undefined
 						? "flex min-w-0 flex-1 flex-col gap-3"
-						: "flex shrink-0 flex-col gap-3 max-lg:hidden lg:w-72"
+						: "flex shrink-0 flex-wrap items-center gap-2 max-lg:hidden"
 				}
 				data-testid="clients-pane"
 			>
@@ -346,6 +453,22 @@ function ClientsLayout() {
 				 * testids, which is a selector that silently matches the wrong one.
 				 * The pane is named by its `aria-label`, so nothing is lost.
 				 */}
+				{/*
+				 * THE SWITCHER LEADS THE BAR. It names what you are looking at, and
+				 * identity comes before the things you can do to it — reading
+				 * "New client · Import · CounselOS" puts the answer after the verbs.
+				 *
+				 * ONE OR THE OTHER, never both: on the id page the bar carries this
+				 * and the table is not rendered at all. Shrinking a table into a bar
+				 * would keep the component and lose the point.
+				 */}
+				{selectedId === undefined ? null : (
+					<ClientSwitcher
+						rows={query.data?.data ?? []}
+						selectedId={selectedId}
+					/>
+				)}
+
 				<div className="flex flex-wrap items-center gap-2">
 					{/*
 					 * MODULE ACTIONS, which sit left of the shell's core actions. Both
@@ -381,245 +504,253 @@ function ClientsLayout() {
 					</div>
 				</div>
 
-				<Surface
-					empty={
-						<EmptyState
-							action={
-								<div className="flex flex-wrap items-center gap-3">
-									<Button
-										data-testid="clients-empty-new"
-										disabled
-										variant="primary"
-									>
-										New client
-									</Button>
-									<span className="text-sm text-text-subtle">
-										Disabled: the create form is not built.
-									</span>
-								</div>
-							}
-							body="A client is the company the work is for. Adding one is the first step: engagements, requests and missions all hang off a client, and nothing can be delivered until one exists."
-							className="px-0"
-							title="No clients yet"
-						/>
-					}
-					error={({ error, retry }) => {
-						const shown = describeFailure(error.message);
-						return (
-							<ErrorState
-								body={shown.body}
-								className="px-0"
-								code={error.message}
-								retry={shown.canRetry ? retry : undefined}
-								title={shown.title}
-							/>
-						);
-					}}
-					isEmpty={(d) => d.data.length === 0}
-					loading={<SkeletonRows count={6} />}
-					query={query}
-				>
-					{(data) => (
-						<div className="flex flex-col gap-2">
-							{/*
-							 * A real `<fieldset>` rather than `role="group"`. The native
-							 * element carries the grouping without an ARIA attribute
-							 * standing in for it, and the legend names the group before the
-							 * options are read.
-							 */}
-							<fieldset
-								className="flex flex-wrap items-center gap-1 border-0 p-0"
-								data-testid="clients-status-filter"
-							>
-								<legend className="sr-only">Filter by status</legend>
-								{STATUS_FILTERS.map((option) => (
-									<button
-										aria-pressed={status === option}
-										className={
-											status === option
-												? "interactive rounded-full bg-app-raised px-2.5 py-0.5 text-micro text-text"
-												: "interactive rounded-full px-2.5 py-0.5 text-micro text-text-subtle"
-										}
-										data-testid={`clients-filter-${option}`}
-										key={option}
-										onClick={() => setStatus(option)}
-										type="button"
-									>
-										{option}
-									</button>
-								))}
-							</fieldset>
-
-							{visible.length === 0 ? (
-								<EmptyState
-									action={
+				{selectedId !== undefined ? null : (
+					<Surface
+						empty={
+							<EmptyState
+								action={
+									<div className="flex flex-wrap items-center gap-3">
 										<Button
-											data-testid="clients-filter-clear"
-											onClick={() => setStatus("all")}
-											variant="secondary"
+											data-testid="clients-empty-new"
+											disabled
+											variant="primary"
 										>
-											Show all clients
+											New client
 										</Button>
-									}
-									body={`No client has the status "${status}". The filter is hiding ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}.`}
+										<span className="text-sm text-text-subtle">
+											Disabled: the create form is not built.
+										</span>
+									</div>
+								}
+								body="A client is the company the work is for. Adding one is the first step: engagements, requests and missions all hang off a client, and nothing can be delivered until one exists."
+								className="px-0"
+								title="No clients yet"
+							/>
+						}
+						error={({ error, retry }) => {
+							const shown = describeFailure(error.message);
+							return (
+								<ErrorState
+									body={shown.body}
 									className="px-0"
-									title="Nothing matches this filter"
+									code={error.message}
+									retry={shown.canRetry ? retry : undefined}
+									title={shown.title}
 								/>
-							) : (
-								<table
-									className="w-full border-collapse"
-									data-testid="clients-table"
+							);
+						}}
+						isEmpty={(d) => d.data.length === 0}
+						loading={<SkeletonRows count={6} />}
+						query={query}
+					>
+						{(data) => (
+							<div className="flex flex-col gap-2">
+								{/*
+								 * A real `<fieldset>` rather than `role="group"`. The native
+								 * element carries the grouping without an ARIA attribute
+								 * standing in for it, and the legend names the group before the
+								 * options are read.
+								 */}
+								<fieldset
+									className="flex flex-wrap items-center gap-1 border-0 p-0"
+									data-testid="clients-status-filter"
 								>
-									<thead>
-										<tr>
-											{(selectedId === undefined
-												? COLUMNS
-												: COMPACT_COLUMNS
-											).map((col) => (
-												<HeaderCell
-													active={sortKey === col.key}
-													dir={sortDir}
-													key={col.key}
-													label={col.label}
-													onClick={() => toggleSort(col.key)}
-												/>
-											))}
-										</tr>
-									</thead>
-									<tbody data-testid="clients-rows">
-										{visible.map((client) => {
-											const selected = client.id === selectedId;
-											return (
-												<tr
-													// The selected row is marked by SURFACE, not by a
-													// line, and `aria-current` carries the same fact to
-													// anyone who cannot see the surface.
-													aria-current={selected ? "true" : undefined}
-													className={cn("group", selected && "bg-app-raised")}
-													data-selected={selected}
-													data-testid="client-row"
-													key={client.id}
-												>
-													<td className={CELL}>
+									<legend className="sr-only">Filter by status</legend>
+									{STATUS_FILTERS.map((option) => (
+										<button
+											aria-pressed={status === option}
+											className={
+												status === option
+													? "interactive rounded-full bg-app-raised px-2.5 py-0.5 text-micro text-text"
+													: "interactive rounded-full px-2.5 py-0.5 text-micro text-text-subtle"
+											}
+											data-testid={`clients-filter-${option}`}
+											key={option}
+											onClick={() => setStatus(option)}
+											type="button"
+										>
+											{option}
+										</button>
+									))}
+								</fieldset>
+
+								{visible.length === 0 ? (
+									<EmptyState
+										action={
+											<Button
+												data-testid="clients-filter-clear"
+												onClick={() => setStatus("all")}
+												variant="secondary"
+											>
+												Show all clients
+											</Button>
+										}
+										body={`No client has the status "${status}". The filter is hiding ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}.`}
+										className="px-0"
+										title="Nothing matches this filter"
+									/>
+								) : (
+									<table
+										className="w-full border-collapse"
+										data-testid="clients-table"
+									>
+										<thead>
+											<tr>
+												{(selectedId === undefined
+													? COLUMNS
+													: COMPACT_COLUMNS
+												).map((col) => (
+													<HeaderCell
+														active={sortKey === col.key}
+														dir={sortDir}
+														key={col.key}
+														label={col.label}
+														onClick={() => toggleSort(col.key)}
+													/>
+												))}
+											</tr>
+										</thead>
+										<tbody data-testid="clients-rows">
+											{visible.map((client) => {
+												const selected = client.id === selectedId;
+												return (
+													<tr
+														// The selected row is marked by SURFACE, not by a
+														// line, and `aria-current` carries the same fact to
+														// anyone who cannot see the surface.
+														aria-current={selected ? "true" : undefined}
+														className={cn("group", selected && "bg-app-raised")}
+														data-selected={selected}
+														data-testid="client-row"
+														key={client.id}
+													>
+														<td className={CELL}>
+															{/*
+															 * The link is the cell, stretched to the row, so
+															 * the whole row is the target. The mission list
+															 * settled this: "a link the width of a word is a
+															 * link you miss with a thumb".
+															 */}
+															<Link
+																className="block rounded-sm text-sm text-text"
+																data-testid="client-row-link"
+																params={{ clientId: client.id }}
+																to="/clients/$clientId"
+															>
+																{client.name}
+															</Link>
+														</td>
 														{/*
-														 * The link is the cell, stretched to the row, so
-														 * the whole row is the target. The mission list
-														 * settled this: "a link the width of a word is a
-														 * link you miss with a thumb".
+														 * THE FIVE BROWSING CELLS, hidden together with their
+														 * headers when the pane is a switcher. A `<td>` left
+														 * behind here would shift every remaining cell one
+														 * column left of its heading, which is a table that
+														 * reads as data rather than as broken.
 														 */}
-														<Link
-															className="block rounded-sm text-sm text-text"
-															data-testid="client-row-link"
-															params={{ clientId: client.id }}
-															to="/clients/$clientId"
+														{selectedId !== undefined ? null : (
+															<>
+																<td
+																	className={cn(
+																		CELL,
+																		"text-micro text-text-subtle",
+																	)}
+																>
+																	{/*
+																	 * An em dash, not blank. Blank reads as a
+																	 * rendering fault; the dash says the field is
+																	 * empty on purpose.
+																	 */}
+																	{client.primaryContact ?? "—"}
+																</td>
+																<td className={CELL}>
+																	<StatusBadge
+																		data-testid="client-status"
+																		tone={CLIENT_STATUS_TONE[client.status]}
+																	>
+																		{client.status}
+																	</StatusBadge>
+																</td>
+																<td
+																	className={cn(
+																		CELL,
+																		"text-micro tabular-nums",
+																	)}
+																	data-testid="client-requests"
+																>
+																	<Count n={client.openRequests} />
+																</td>
+																<td
+																	className={cn(
+																		CELL,
+																		"text-micro tabular-nums",
+																	)}
+																	data-testid="client-missions"
+																>
+																	<Count n={client.activeMissions} />
+																</td>
+															</>
+														)}
+														{/*
+														 * THE COLUMN THE RULING ASKED FOR. A client with
+														 * blocked work has to look different before it is
+														 * clicked, so this is the one number that carries a
+														 * tone rather than sitting muted with the others.
+														 */}
+														<td
+															className={cn(CELL, "text-micro tabular-nums")}
+															data-testid="client-blocked"
 														>
-															{client.name}
-														</Link>
-													</td>
-													{/*
-													 * THE FIVE BROWSING CELLS, hidden together with their
-													 * headers when the pane is a switcher. A `<td>` left
-													 * behind here would shift every remaining cell one
-													 * column left of its heading, which is a table that
-													 * reads as data rather than as broken.
-													 */}
-													{selectedId !== undefined ? null : (
-														<>
+															{client.openBlockers > 0 ? (
+																<StatusBadge
+																	data-testid="client-blocked-badge"
+																	tone="warn"
+																>
+																	{client.openBlockers}
+																</StatusBadge>
+															) : (
+																<Count n={0} />
+															)}
+														</td>
+														{selectedId !== undefined ? null : (
 															<td
 																className={cn(
 																	CELL,
 																	"text-micro text-text-subtle",
 																)}
+																data-testid="client-last-activity"
 															>
-																{/*
-																 * An em dash, not blank. Blank reads as a
-																 * rendering fault; the dash says the field is
-																 * empty on purpose.
-																 */}
-																{client.primaryContact ?? "—"}
+																{client.lastActivityAt
+																	? new Date(
+																			client.lastActivityAt,
+																		).toLocaleDateString()
+																	: "—"}
 															</td>
-															<td className={CELL}>
-																<StatusBadge
-																	data-testid="client-status"
-																	tone={CLIENT_STATUS_TONE[client.status]}
-																>
-																	{client.status}
-																</StatusBadge>
-															</td>
-															<td
-																className={cn(CELL, "text-micro tabular-nums")}
-																data-testid="client-requests"
-															>
-																<Count n={client.openRequests} />
-															</td>
-															<td
-																className={cn(CELL, "text-micro tabular-nums")}
-																data-testid="client-missions"
-															>
-																<Count n={client.activeMissions} />
-															</td>
-														</>
-													)}
-													{/*
-													 * THE COLUMN THE RULING ASKED FOR. A client with
-													 * blocked work has to look different before it is
-													 * clicked, so this is the one number that carries a
-													 * tone rather than sitting muted with the others.
-													 */}
-													<td
-														className={cn(CELL, "text-micro tabular-nums")}
-														data-testid="client-blocked"
-													>
-														{client.openBlockers > 0 ? (
-															<StatusBadge
-																data-testid="client-blocked-badge"
-																tone="warn"
-															>
-																{client.openBlockers}
-															</StatusBadge>
-														) : (
-															<Count n={0} />
 														)}
-													</td>
-													{selectedId !== undefined ? null : (
-														<td
-															className={cn(
-																CELL,
-																"text-micro text-text-subtle",
-															)}
-															data-testid="client-last-activity"
-														>
-															{client.lastActivityAt
-																? new Date(
-																		client.lastActivityAt,
-																	).toLocaleDateString()
-																: "—"}
-														</td>
-													)}
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							)}
+													</tr>
+												);
+											})}
+										</tbody>
+									</table>
+								)}
 
-							{/*
-							 * The footer aggregate the reference carries. It counts what is
-							 * SHOWN and says so when a filter is narrowing it — a total that
-							 * silently means "of the ones you can see" is a number that
-							 * disagrees with the nav badge later.
-							 */}
-							<p
-								className="text-micro text-text-subtle"
-								data-testid="clients-total"
-							>
-								{status === "all"
-									? `Total: ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}`
-									: `Showing ${visible.length} of ${data.data.length} clients`}
-							</p>
-						</div>
-					)}
-				</Surface>
+								{/*
+								 * The footer aggregate the reference carries. It counts what is
+								 * SHOWN and says so when a filter is narrowing it — a total that
+								 * silently means "of the ones you can see" is a number that
+								 * disagrees with the nav badge later.
+								 */}
+								<p
+									className="text-micro text-text-subtle"
+									data-testid="clients-total"
+								>
+									{status === "all"
+										? `Total: ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}`
+										: `Showing ${visible.length} of ${data.data.length} clients`}
+								</p>
+							</div>
+						)}
+					</Surface>
+				)}
 			</section>
 
 			{/*
