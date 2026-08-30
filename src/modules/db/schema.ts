@@ -942,6 +942,118 @@ export const exports = pgTable(
 	],
 );
 
+/* ── step 4 · intake ────────────────────────────────────────────────────── */
+
+/**
+ * DOCUMENTED CLOSED SET, and the one enum in recent memory that needed no
+ * argument: DATA-CONTRACTS-V2:133 declares all four values, and code branches
+ * on every one of them — `approved` materialises a Mission and the other three
+ * do not. That is the doc's own enum test satisfied twice over.
+ *
+ * Unlike `missions.status`, which has no vocabulary anywhere and is therefore
+ * still text, and unlike `severity`, whose declared set its own corpus
+ * contradicts. The difference is evidence, not preference.
+ */
+export const intakeStatus = pgEnum("intake_status", [
+	"draft",
+	"proposed",
+	"approved",
+	"rejected",
+]);
+
+/**
+ * Canon's proposal. Never a Mission until an operator approves it.
+ * DATA-CONTRACTS-V2:130 — the field block is canonical and built here as
+ * printed, with nothing added.
+ *
+ * MUTABLE WITH SOFT DELETE, NOT APPEND-ONLY, and that is the doc's ruling
+ * rather than mine. The field block ends `deleted_at · timestamps`, and
+ * `approved_by` / `approved_at` / `mission_id` are columns ON this row that
+ * approval sets — an UPDATE by design. So `refuse_mutation()` must NOT be
+ * attached, `updated_at` is correct and needs its trigger, and this table is in
+ * scope for the soft-delete scanner rather than exempt from it.
+ *
+ * The contrast with the telemetry tables is worth keeping straight: those
+ * record what was observed and never change, so closure is a new row. An intake
+ * is a live proposal being worked on — draft to proposed to decided — and the
+ * thing being recorded IS its current state.
+ *
+ * APPROVAL MATERIALISES A MISSION, and the database says so rather than a
+ * service promising it. The check below refuses an `approved` row that names no
+ * mission: approval whose mission never got created is the exact half-state
+ * this entity exists to prevent, since the whole point is that nothing Canon
+ * writes becomes executable until an operator says so.
+ */
+export const intakes = pgTable(
+	"intakes",
+	{
+		...identity,
+		engagementId: uuid("engagement_id")
+			.notNull()
+			.references(() => engagements.id),
+		status: intakeStatus("status").notNull().default("draft"),
+		/** Raw input: call notes, a transcript, an email thread. */
+		sourceMd: text("source_md"),
+		/** Structured — Canon's output. Shape owned by the mission type. */
+		proposedBrief: jsonb("proposed_brief").$type<Record<string, unknown>>(),
+		/** Ambiguities Canon surfaced. Empty is "none", never "not asked". */
+		openQuestions: text("open_questions").array().notNull().default([]),
+		/**
+		 * COMPUTED BY READING THE REPOSITORY, never proposed. Reuses the existing
+		 * `mission_cut` enum rather than declaring a second vocabulary for the
+		 * same fact — DATA-CONTRACTS-V2:231 is emphatic that the cut is derived,
+		 * and two enums would let the two sides drift.
+		 *
+		 * Nullable for the same reason `missions.cut` is: at draft there may be no
+		 * connected repository to derive from, and a default would write a
+		 * derived-looking value nobody derived.
+		 */
+		derivedCut: missionCut("derived_cut"),
+		/**
+		 * The directory structure that decided it. This is the field that makes an
+		 * automated decision reviewable, which is why the review screen puts it in
+		 * front of the operator rather than behind a disclosure.
+		 */
+		derivedCutEvidence: text("derived_cut_evidence"),
+		/** Follows from the cut. */
+		suggestedPresetId: uuid("suggested_preset_id").references(
+			() => rosterPresets.id,
+		),
+		/**
+		 * TEXT, not a FK. `User` is one of the five core entities still unbuilt, so
+		 * a foreign key here would be to a table that does not exist. Recording the
+		 * approver as a string now and tightening it when User lands is the smaller
+		 * assumption than blocking intake on an entity nobody has specced.
+		 */
+		approvedBy: text("approved_by"),
+		approvedAt: timestamp("approved_at", { withTimezone: true }),
+		/** Set on approval. The Mission this proposal became. */
+		missionId: uuid("mission_id").references(() => missions.id),
+		...softDelete,
+		...timestamps,
+	},
+	(t) => [
+		index("intakes_engagement_idx").on(t.engagementId),
+		index("intakes_status_idx").on(t.status),
+		index("intakes_mission_idx").on(t.missionId),
+		// An approved intake NAMES ITS MISSION. In the database rather than in the
+		// approval service, for the reason every other check here is: a service can
+		// be bypassed, and an approval that produced no mission is a proposal the
+		// product believes is executable and which nothing is executing.
+		check(
+			"intakes_approved_has_mission",
+			sql`${t.status} <> 'approved' or (${t.missionId} is not null and ${t.approvedAt} is not null)`,
+		),
+		// The other direction, one-sided: a mission may not be attached to a row
+		// still sitting in draft. Materialisation is what approval MEANS, so a
+		// mission on an undecided proposal is a mission nobody approved.
+		check(
+			"intakes_mission_requires_decision",
+			sql`${t.missionId} is null or ${t.status} = 'approved'`,
+		),
+	],
+);
+
 /* ── the telemetry layer ────────────────────────────────────────────────── */
 
 /**
@@ -1652,5 +1764,20 @@ export const costEntriesRelations = relations(costEntries, ({ one }) => ({
 	dispatch: one(dispatches, {
 		fields: [costEntries.dispatchId],
 		references: [dispatches.id],
+	}),
+}));
+
+export const intakesRelations = relations(intakes, ({ one }) => ({
+	engagement: one(engagements, {
+		fields: [intakes.engagementId],
+		references: [engagements.id],
+	}),
+	suggestedPreset: one(rosterPresets, {
+		fields: [intakes.suggestedPresetId],
+		references: [rosterPresets.id],
+	}),
+	mission: one(missions, {
+		fields: [intakes.missionId],
+		references: [missions.id],
 	}),
 }));

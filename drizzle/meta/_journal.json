@@ -113,6 +113,20 @@
       "when": 1788057503505,
       "tag": "0015_append_only_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788076027533,
+      "tag": "0016_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788076030779,
+      "tag": "0017_updated_at_trigger_intakes",
+      "breakpoints": true
     }
   ]
 }
