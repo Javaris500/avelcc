@@ -121,7 +121,17 @@ export function TopBar({
 	);
 
 	return (
-		<div className="flex items-start gap-2 px-6 pt-3.5" data-testid="topbar">
+		// `shrink-0` IS LOAD-BEARING. The main pane is a flex COLUMN with
+		// `overflow-hidden`, and `main` below carries `flex-1 min-h-0` so it can
+		// shrink. This header carried nothing, and a flex child defaults to
+		// `flex-shrink: 1` — so when the pane ran short the header was the thing
+		// that compressed, and `overflow-hidden` CLIPPED it rather than scrolling.
+		// The operator saw the top of the header cut off on the chat home, which
+		// fills the pane exactly. Nothing else in the column could give.
+		<div
+			className="flex shrink-0 items-start gap-2 px-6 pt-3.5"
+			data-testid="topbar"
+		>
 			{onOpenNav ? (
 				<button
 					aria-label="Open navigation"
