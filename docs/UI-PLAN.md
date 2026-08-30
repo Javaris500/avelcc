@@ -290,7 +290,7 @@ does not move to the header.
 | `PageHeader` | The slots above. Every route prints its own title inside the content. |
 | `ActionSlot` | Lets a route hand the shell its one primary action without the shell importing route code. |
 | `SectionCard` | Client detail is sections. There is no card with a title, a count, an action and a body. |
-| `SectionRail` | In-page nav for a ten-section page. Without it, "sections rather than tabs" becomes an endless scroll. |
+| `SectionRail` | In-page nav for the detail panel: a masthead and nine numbered sections, ten blocks rendered. Without it, "sections rather than tabs" becomes an endless scroll. |
 | `DefinitionList` | Label and value pairs. Every detail view needs it. There are none today. |
 | `DataTable` | The clients and missions lists are hand-rolled. Sorting, density and empty state should be decided once. |
 | `Timeline` | The telemetry tables are a list of events, and there is no primitive for one. |
@@ -488,8 +488,10 @@ accessibility side of this change is handled. `[built]`
 
 ### What exists
 
-`src/routes/_app/clients.tsx` is a list. There is no client detail route.
-`src/routes/_app/intake.tsx` is the route to be absorbed. `[built]`
+`src/routes/_app/clients.tsx` was a `PageEmpty` placeholder with no query and no
+data, and so was `/intake`. Neither was a list. An earlier draft of this section
+called the first one "a list", which read as though there were something to
+rework. There was not. Corrected by avel-c2. `[built]`
 
 The intake table landed on 2026-08-30 as migrations `0016` and `0017`, with
 `src/contract/intake.ts` and an `intake` route group in the contract barrel.
@@ -585,8 +587,23 @@ row, before anything is clicked.
 **Selection drives the third pane.** The URL carries the selected client, so a
 selected client is linkable and survives a reload.
 
-Sections in the detail panel still render when empty, with a reason. An absent
-section looks the same as one you scrolled past.
+### Three section states, not two
+
+Sections in the detail panel always render. An absent section looks the same as
+one you scrolled past. But "empty" is two different facts and they must not
+share a treatment:
+
+| State | Means | Why it is distinct |
+|---|---|---|
+| `not-built` | No query exists behind this section. | Rule 7. |
+| `empty` | We asked and there is nothing. | The operator's problem to act on. |
+| `populated` | We asked and here it is. | |
+
+A section printing "No deliveries yet" when no query exists is worse than one
+saying it is unbuilt, because it is indistinguishable from a working section
+reporting a true zero. Split by avel-c2; `SectionCard` carries the distinction so
+it is not re-decided at nine call sites. It is the same ruling as `MetricStat`
+taking `null`, one level up.
 
 ```
 +- HEADER --------------------------------------------------------------+
@@ -622,9 +639,12 @@ section looks the same as one you scrolled past.
 | 8 | Cost | Effort and spend. | `cost_entries` |
 | 9 | Activity | One `Timeline` merging dispatches, completions, findings and blockers. Append-only, so it is a log and needs no edit affordance. | telemetry tables |
 
-Sections 5 through 9 are read-only in the first cut. That is deliberate. It
-makes the page answer questions immediately, without waiting on write paths that
-do not exist.
+**One write and nine reads.** Requests is the only section on the page with a
+write path at all, because approval materialises a Mission. Sections 2 through 9
+are exactly as read-only as 5 through 9 — an earlier draft called out the second
+group as "deliberately read-only in the first cut", which implied the first group
+had write paths someone would later go looking for. It does not. Corrected by
+avel-c2.
 
 ### The clients list needs work too
 
