@@ -32,6 +32,7 @@ import { Route as ApiExportsPreviewRouteImport } from './routes/api/exports.prev
 import { Route as ApiMissionsIdRouteImport } from './routes/api/missions.$id'
 import { Route as ApiPreflightBlastRadiusRouteImport } from './routes/api/preflight.blast-radius'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github.callback'
+import { Route as ApiExportsIdArchiveRouteImport } from './routes/api/exports.$id.archive'
 import { Route as AppMissionsMissionIdExportsNewRouteImport } from './routes/_app/missions.$missionId.exports.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -148,6 +149,11 @@ const ApiAuthGithubCallbackRoute = ApiAuthGithubCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGithubRoute,
 } as any)
+const ApiExportsIdArchiveRoute = ApiExportsIdArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
+  getParentRoute: () => ApiExportsIdRoute,
+} as any)
 const AppMissionsMissionIdExportsNewRoute =
   AppMissionsMissionIdExportsNewRouteImport.update({
     id: '/missions/$missionId/exports/new',
@@ -172,12 +178,13 @@ export interface FileRoutesByFullPath {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/exports/$id': typeof ApiExportsIdRoute
+  '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRoute
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesByTo {
@@ -197,12 +204,13 @@ export interface FileRoutesByTo {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/exports/$id': typeof ApiExportsIdRoute
+  '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRoute
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/missions': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesById {
@@ -224,12 +232,13 @@ export interface FileRoutesById {
   '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/exports/$id': typeof ApiExportsIdRoute
+  '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRoute
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/_app/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/_app/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRouteTypes {
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/api/preflight/blast-radius'
     | '/missions/'
     | '/api/auth/github/callback'
+    | '/api/exports/$id/archive'
     | '/missions/$missionId/exports/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/api/preflight/blast-radius'
     | '/missions'
     | '/api/auth/github/callback'
+    | '/api/exports/$id/archive'
     | '/missions/$missionId/exports/new'
   id:
     | '__root__'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/preflight/blast-radius'
     | '/_app/missions/'
     | '/api/auth/github/callback'
+    | '/api/exports/$id/archive'
     | '/_app/missions/$missionId/exports/new'
   fileRoutesById: FileRoutesById
 }
@@ -484,6 +496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGithubCallbackRouteImport
       parentRoute: typeof ApiAuthGithubRoute
     }
+    '/api/exports/$id/archive': {
+      id: '/api/exports/$id/archive'
+      path: '/archive'
+      fullPath: '/api/exports/$id/archive'
+      preLoaderRoute: typeof ApiExportsIdArchiveRouteImport
+      parentRoute: typeof ApiExportsIdRoute
+    }
     '/_app/missions/$missionId/exports/new': {
       id: '/_app/missions/$missionId/exports/new'
       path: '/missions/$missionId/exports/new'
@@ -528,13 +547,25 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ApiExportsIdRouteChildren {
+  ApiExportsIdArchiveRoute: typeof ApiExportsIdArchiveRoute
+}
+
+const ApiExportsIdRouteChildren: ApiExportsIdRouteChildren = {
+  ApiExportsIdArchiveRoute: ApiExportsIdArchiveRoute,
+}
+
+const ApiExportsIdRouteWithChildren = ApiExportsIdRoute._addFileChildren(
+  ApiExportsIdRouteChildren,
+)
+
 interface ApiExportsRouteChildren {
-  ApiExportsIdRoute: typeof ApiExportsIdRoute
+  ApiExportsIdRoute: typeof ApiExportsIdRouteWithChildren
   ApiExportsPreviewRoute: typeof ApiExportsPreviewRoute
 }
 
 const ApiExportsRouteChildren: ApiExportsRouteChildren = {
-  ApiExportsIdRoute: ApiExportsIdRoute,
+  ApiExportsIdRoute: ApiExportsIdRouteWithChildren,
   ApiExportsPreviewRoute: ApiExportsPreviewRoute,
 }
 
