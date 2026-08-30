@@ -1,5 +1,7 @@
 import { initContract } from "@ts-rest/core";
 
+import { clientContract } from "#/contract/client";
+import { engagementContract } from "#/contract/engagement";
 import { exportContract } from "#/contract/export";
 import { missionContract } from "#/contract/mission";
 import { playbookContract } from "#/contract/playbook";
@@ -17,7 +19,7 @@ const c = initContract();
  * this does not define, that is a contract change and it gets filed, not
  * declared locally.
  *
- * BUILT: mission · roster · playbook · export
+ * BUILT: mission · roster · playbook · export · client · engagement
  *
  * NOT BUILT, and each is a documented gap rather than an oversight:
  *   client, engagement, intake   ROUTES.md rates all three BLOCKING. Three
@@ -49,6 +51,8 @@ const c = initContract();
  * is the failure this file exists to prevent.
  */
 export const contract = c.router({
+	client: clientContract,
+	engagement: engagementContract,
 	mission: missionContract,
 	roster: rosterContract,
 	playbook: playbookContract,

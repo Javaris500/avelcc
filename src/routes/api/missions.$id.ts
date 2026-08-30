@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { db } from "#/modules/db/client";
+import { shielded } from "#/modules/http/shielded";
 import { getMission } from "#/modules/mission/service";
 
 /**
@@ -29,46 +30,11 @@ function notFound(id: string) {
 	);
 }
 
-/**
- * The last-resort wrapper. Any throw becomes the contract's envelope.
- *
- * These two mission routes were the only API routes with no catch, so a
- * database failure escaped as a framework 500 carrying `unhandled: true` and no
- * envelope — nothing for a screen to switch on, which is the one guarantee the
- * error contract makes. Found live, not theorised: the roster read 500'd this
- * way against a column the database did not have.
- *
- * The caught error goes to the SERVER LOG and never into the response. An
- * exception message can hold a connection string, a column name, or a row's
- * contents; the operator gets a request id to quote instead, which is the whole
- * reason INTERNAL_ERROR's copy is generic.
- */
-async function shielded(fn: () => Promise<Response>): Promise<Response> {
-	try {
-		return await fn();
-	} catch (error) {
-		const requestId = crypto.randomUUID();
-		console.error(`[${requestId}] mission route failed:`, error);
-		return Response.json(
-			{
-				success: false,
-				error: {
-					code: "INTERNAL_ERROR",
-					message:
-						"Something failed on our side. Quote the request id when reporting it.",
-					requestId,
-				},
-			},
-			{ status: 500 },
-		);
-	}
-}
-
 export const Route = createFileRoute("/api/missions/$id")({
 	server: {
 		handlers: {
 			GET: ({ request }) =>
-				shielded(async () => {
+				shielded("mission read", async () => {
 					const id = new URL(request.url).pathname.split("/").pop() ?? "";
 					if (!uuid.safeParse(id).success) return notFound(id);
 

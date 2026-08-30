@@ -12,8 +12,16 @@ import { ERROR_CODES } from "#/contract/shared/errors";
  */
 
 describe("the assembled contract", () => {
-	it("exposes the four built route groups", () => {
+	/**
+	 * Pinned as a LIST, not a count. The point is which groups are served, and
+	 * the ones absent are absent deliberately — `contract/index.ts` carries a
+	 * reason for each. A test asserting only the number would go green when
+	 * somebody added `preset`, whose entity has no field block at all.
+	 */
+	it("exposes exactly the built route groups", () => {
 		expect(Object.keys(contract).sort()).toEqual([
+			"client",
+			"engagement",
 			"export",
 			"mission",
 			"playbook",
