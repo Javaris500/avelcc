@@ -169,7 +169,7 @@ export function Shell({
 							className={cn(
 								"relative flex min-w-0 flex-col overflow-hidden bg-app-panel",
 								"before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-px",
-								"before:bg-[linear-gradient(to_bottom,transparent,var(--elevation-border-raised)_18%,var(--elevation-border-raised)_82%,transparent)]",
+								"before:bg-[linear-gradient(to_bottom,transparent,var(--color-accent)_18%,var(--color-accent)_82%,transparent)] before:opacity-60",
 							)}
 							data-testid="main-pane"
 						>

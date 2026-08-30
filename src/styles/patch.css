@@ -157,9 +157,17 @@
      floor, not the ramp. Every L* recomputed, not transcribed. */
   --color-app-bg:       #1a1d23;   /* L* 10.7 · = --color-bg [brief] · desktop AND sidebar */
   --color-app-recessed: #16181d;   /* L*  8.2 · wells, inputs, code blocks  */
-  --color-app-panel:    #20242d;   /* L* 14.2 · cards, mission panels       */
-  --color-app-raised:   #262b35;   /* L* 17.4 · hover, active row, controls */
-  --color-app-float:    #2d323d;   /* L* 20.7 · popover, dropdown, modal    */
+  /* THE CONTENT COLUMN IS A SOLID, not a shade off the sidebar. It was
+     #20242d against a #1a1d23 sidebar — 3.5 L* apart, which reads as one
+     surface with a smudge rather than two planes. The panel rises and the
+     two above it rise with it so the steps stay even and nothing collapses
+     into its neighbour. The FLOOR does not move: the operator asked for a
+     dark that is neither too light nor too dark, and dropping app-bg to buy
+     the same separation would also have collided with app-recessed, which
+     the sidebar's own search input sits on. */
+  --color-app-panel:    #242935;   /* L* 16.4 · cards, mission panels, content */
+  --color-app-raised:   #2b313d;   /* L* 19.6 · hover, active row, controls */
+  --color-app-float:    #343b49;   /* L* 23.4 · popover, dropdown, modal    */
 
 
   /* ── 7 · SKELETON + DENSITY ─────────────────────────────────────────────
@@ -263,7 +271,13 @@
      #ffffff panel it was meant to rise from. A raised surface was darker than
      the surface under it. The background drops to make headroom, and light
      elevates by border and shadow alone rather than by lightness. */
-  --color-app-bg:       #e8eaee;   /* L* 92.7 · the desktop AND the sidebar */
+  /* LIGHTER AND CLEANER, BUT DELIBERATELY NOT WHITE. #e8eaee read grey
+     rather than light. This lifts it while keeping the separation the
+     workspace switcher depends on: correction 5 was reverted once already
+     because a white control on a white sidebar left a 1px hairline doing
+     all the work, and that is the failure a full move to #ffffff repeats.
+     5.5 L* of headroom remains against the #ffffff controls and panel. */
+  --color-app-bg:       #eef0f4;   /* L* 94.6 · the desktop AND the sidebar */
   --color-app-recessed: #dcdfe5;   /* L* 88.8 · wells, inputs               */
   --color-app-panel:    #ffffff;   /* L* 100                                */
   /* CORRECTION 5 IS REVERTED HERE, AND ONLY BECAUSE THE SIDEBAR MOVED.
