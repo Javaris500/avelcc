@@ -44,13 +44,21 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 	REPO_NO_ACCESS: {
 		title: "The connection cannot read this repository.",
 		body: "The credential in use does not carry the scope this repository needs. Check which connection is attached and what it was granted.",
-		recovery: { kind: "link", label: "Open connections", to: "/login" },
+		recovery: {
+			kind: "link",
+			label: "Open connections",
+			to: "/settings/connections",
+		},
 		severity: "blocking",
 	},
 	CONNECTION_REVOKED: {
 		title: "This connection has been revoked.",
 		body: "The engagement it belonged to was closed, so the credential no longer resolves. Nothing was sent.",
-		recovery: { kind: "link", label: "Open connections", to: "/login" },
+		recovery: {
+			kind: "link",
+			label: "Open connections",
+			to: "/settings/connections",
+		},
 		severity: "blocking",
 	},
 	POLICY_FORBIDS_TARGET: {
