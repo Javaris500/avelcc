@@ -5,6 +5,12 @@ import type { z } from "zod";
 
 import { missionSchema } from "#/contract/mission";
 import { success } from "#/contract/shared/envelope";
+/**
+ * TYPE-ONLY, and it has to stay that way. mission/service.ts holds the db
+ * client; a value import would ship the connection string to the browser.
+ * verbatimModuleSyntax guarantees an `import type` is erased at build.
+ */
+import type { RosterAgent } from "#/modules/mission/service";
 import { Tag } from "#/ui/badge";
 import { SkeletonRows } from "#/ui/skeleton";
 import { ErrorState } from "#/ui/states";
@@ -46,6 +52,29 @@ async function fetchMission(missionId: string): Promise<MissionResponse> {
 	if (!parsed.success) throw new Error(SHAPE_MISMATCH);
 
 	return parsed.data;
+}
+
+/**
+ * The roster is a SECOND query, matching the endpoint, and it fails
+ * independently: a roster that cannot load must not blank the mission facts
+ * beside it. That is why each has its own Surface rather than one wrapping both.
+ *
+ * The shape is RosterAgent, which the service exports and the route serves. It
+ * is deliberately NOT contract/roster.ts's rosterEntrySchema — that describes a
+ * stored entry, while this carries the template's slug, name, kind and runtime
+ * joined on, and the mount override already resolved.
+ */
+type RosterResponse = { data: RosterAgent[] };
+
+async function fetchRoster(missionId: string): Promise<RosterResponse> {
+	const res = await fetch(`/api/missions/${missionId}/roster`);
+	const body = await res.json().catch(() => null);
+
+	if (body?.success === false) throw new Error(body.error.code);
+	if (!res.ok || body === null) throw new Error(httpFailure(res.status));
+	if (!Array.isArray(body.data)) throw new Error(SHAPE_MISMATCH);
+
+	return { data: body.data as RosterAgent[] };
 }
 
 function describeFailure(code: string): string {
@@ -204,11 +233,131 @@ function Brief({ brief }: { brief: Record<string, unknown> }) {
 	);
 }
 
+/**
+ * THE THREE MOUNT KINDS, AND WHY THEY ARE NOT THREE SHADES OF ONE THING.
+ *
+ * Rendering them as one "paths" list in three colours would destroy the
+ * distinction that makes the boundary enforceable, so each carries its rule in
+ * words beside it. appendOnly is the one that reads like a weaker writable and
+ * is not: an agent may add its own registration to a shared composition root
+ * and may never remove or reorder anyone else's, which is why a mount check
+ * fails on any REMOVED line.
+ *
+ * All three are shown even when empty. An empty set here means the agent
+ * genuinely has no grant of that kind, which is a fact about a boundary; hiding
+ * the row would make "no write access" and "not configured" look the same.
+ */
+const MOUNTS = [
+	{ key: "writablePaths", label: "writable", rule: "edit freely" },
+	{
+		key: "appendOnlyPaths",
+		label: "append-only",
+		rule: "add its own; never remove or reorder another's",
+	},
+	{ key: "readonlyPaths", label: "readonly", rule: "read; never write" },
+] as const;
+
+/**
+ * model | human | code, and a non-model agent is REAL rather than a
+ * placeholder — one role is held by the operator, and one agent is never a
+ * language model. A screen that assumes every agent is an LLM misrepresents the
+ * roster on its first honest render, so the runtime is stated on every agent
+ * rather than only on the exceptions.
+ */
+const RUNTIME_RULE: Record<RosterAgent["runtime"], string> = {
+	model: "a language model runs this",
+	human: "a person does this work",
+	code: "deterministic code; never a language model",
+};
+
+function Mounts({ agent }: { agent: RosterAgent }) {
+	return (
+		<div className="flex flex-col gap-2 pt-2">
+			{MOUNTS.map(({ key, label, rule }) => (
+				<div key={key}>
+					<p className="flex flex-wrap items-baseline gap-x-2">
+						<span
+							className="text-micro text-text"
+							data-testid={`mount-${label}`}
+						>
+							{label}
+						</span>
+						<span className="text-micro text-text-subtle">{rule}</span>
+						{/* An override is shown AS an override: this mission changed what
+						    the template grants, and that was somebody's decision. */}
+						{agent.overridden[key] ? (
+							<Tag data-testid={`mount-${label}-overridden`}>
+								overridden for this mission
+							</Tag>
+						) : null}
+					</p>
+					{agent.effective[key].length === 0 ? (
+						<p className="pt-0.5 text-micro text-text-subtle">none</p>
+					) : (
+						<ul className="flex flex-col gap-0.5 pt-0.5">
+							{agent.effective[key].map((path) => (
+								<li
+									className="font-mono text-micro break-all text-text-muted"
+									key={path}
+								>
+									{path}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			))}
+		</div>
+	);
+}
+
+function Agent({ agent }: { agent: RosterAgent }) {
+	return (
+		<li
+			className="border-b border-[var(--elevation-border-rest)] px-4 py-3"
+			data-active={agent.active}
+			data-testid="roster-agent"
+		>
+			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+				<span
+					className="font-display text-sm font-semibold text-text"
+					data-testid="agent-name"
+				>
+					{agent.name}
+				</span>
+				<Tag data-testid="agent-slug">{agent.slug}</Tag>
+				{/* A SCALAR. Phases are global and sequential, and an agent spanning
+				    waves reintroduces the ordering contradiction they exist to prevent.
+				    Null is "not yet assigned", a real state and not a missing value. */}
+				<span className="text-micro text-text-subtle" data-testid="agent-wave">
+					{agent.wave === null ? "wave not assigned" : `wave ${agent.wave}`}
+				</span>
+				{agent.active ? null : <Tag data-testid="agent-inactive">inactive</Tag>}
+			</div>
+
+			<p className="flex flex-wrap items-baseline gap-x-2 pt-1">
+				<Tag data-testid="agent-runtime">{agent.runtime}</Tag>
+				<span className="text-micro text-text-subtle">
+					{RUNTIME_RULE[agent.runtime]}
+				</span>
+				<Tag data-testid="agent-kind">{agent.kind}</Tag>
+			</p>
+
+			<Mounts agent={agent} />
+		</li>
+	);
+}
+
 function MissionOverview() {
 	const { missionId } = Route.useParams();
 	const query = useQuery<MissionResponse>({
 		queryKey: ["mission", missionId],
 		queryFn: () => fetchMission(missionId),
+		retry: false,
+	});
+	const roster = useQuery<RosterResponse>({
+		queryKey: ["mission", missionId, "roster"],
+		queryFn: () => fetchRoster(missionId),
 		retry: false,
 	});
 
@@ -310,8 +459,44 @@ function MissionOverview() {
 							 * coming, and must never read a placeholder roster as the agents
 							 * that actually ran.
 							 */}
-							<Section built={false} testid="section-roster" title="Roster">
-								<NotBuilt what="Needs an endpoint over roster entries joined to their agent templates. Which agents ran, in which wave, and with which mount boundaries." />
+							<Section testid="section-roster" title="Roster">
+								<Surface
+									empty={
+										/*
+										 * AN EMPTY ROSTER IS A FINDING, NOT MISSING DATA. A
+										 * mission can be run by the operator directly, and one
+										 * was; that emptiness is the recorded outcome. "No data"
+										 * would report a real result as a gap in the record.
+										 */
+										<p
+											className="px-4 py-3 text-sm leading-relaxed text-text-muted"
+											data-testid="roster-empty"
+										>
+											No agents were assigned to this mission. That is a
+											recorded outcome rather than a gap: a mission can be run
+											by the operator directly, and this one was.
+										</p>
+									}
+									error={({ error, retry }) => (
+										<ErrorState
+											body={describeFailure(error.message)}
+											code={error.message}
+											retry={retry}
+											title="The roster could not be read."
+										/>
+									)}
+									isEmpty={(r) => r.data.length === 0}
+									loading={<SkeletonRows count={3} />}
+									query={roster}
+								>
+									{(r) => (
+										<ul data-testid="roster-agents">
+											{r.data.map((agent) => (
+												<Agent agent={agent} key={agent.entryId} />
+											))}
+										</ul>
+									)}
+								</Surface>
 							</Section>
 
 							<Section built={false} testid="section-activity" title="Activity">
