@@ -109,6 +109,32 @@ running off the bottom.
 it**. `ml-auto` fixes horizontal position and says nothing about vertical, so
 the run pill had been drifting with the title block on every page.
 
+### 4b. A scripted edit that silently does nothing
+
+The instance above was found in someone else's code. Hours later I wrote a new
+one into the same file, the same night, having already documented the pattern.
+
+A script swapped the seam from neutral to accent. It changed the class and
+tried to change the comment beside it:
+
+```python
+s = s.replace(old_class, new_class)     # asserted, and applied
+s = s.replace(old_comment, new_comment) # NOT asserted, and silently no-opped
+print("divider is now accent at 60%")   # true of the class, not the comment
+```
+
+The comment string had been reflowed by the formatter since it was written, so
+it no longer matched. `str.replace` does not raise on a miss — it returns the
+input unchanged. The commit therefore shipped a comment reading "NEUTRAL RATHER
+THAN ACCENT, deliberately" directly above `var(--color-accent)`, and the success
+message printed anyway.
+
+**Every scripted replacement needs `assert old in s` before it runs.** One
+unasserted `.replace()` in a script whose other replacements all succeed is
+invisible: the diff looks right, the file compiles, the tests pass, and the
+comment now lies. A print statement confirms the script ran, never that it
+matched.
+
 **Grep for the class a comment claims.** This is miss-pattern M2 from the
 CounselOS corpus: *a load-bearing comment is a claim to verify, never
 evidence.* It survived because it was specific and confident.
