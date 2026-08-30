@@ -263,10 +263,18 @@ async function prepare(
 	 * `pass`, so this reports the truth that almost nothing has been checked
 	 * rather than manufacturing a clean bill.
 	 */
+	/**
+	 * `isNull(deletedAt)` matters here more than anywhere. The live-uniqueness
+	 * index on mission_type is PARTIAL, so once a playbook is soft-deleted
+	 * several rows share a type and an unfiltered limit(1) may return the dead
+	 * one — which would decide WHICH GATES BLOCK THIS DELIVERY.
+	 */
 	const [playbook] = await db
 		.select({ gates: playbooks.gates })
 		.from(playbooks)
-		.where(eq(playbooks.missionType, mission.type))
+		.where(
+			and(eq(playbooks.missionType, mission.type), isNull(playbooks.deletedAt)),
+		)
 		.limit(1);
 
 	const verification = {
@@ -553,6 +561,24 @@ export function refForDelivery(
 	return previewRef ?? requestedRef ?? "main";
 }
 
+/**
+ * Is this replayed key the SAME preview request, or a different one wearing it?
+ *
+ * One definition, used by both the read path and the unique-violation race
+ * path. Two copies is how the race path came to be missing the check the read
+ * path had.
+ */
+function isSamePreviewRequest(
+	row: ExportRow,
+	input: { missionId: string; target: ExportTargetKind },
+): boolean {
+	return (
+		row.dryRun &&
+		row.missionId === input.missionId &&
+		row.targetKind === input.target
+	);
+}
+
 async function loadMission(db: Db, id: string) {
 	const [m] = await db
 		.select()
@@ -601,11 +627,7 @@ export async function previewExport(
 	 */
 	const existing = await findByKey(db, input.idempotencyKey);
 	if (existing) {
-		const sameRequest =
-			existing.dryRun &&
-			existing.missionId === input.missionId &&
-			existing.targetKind === input.target;
-		if (!sameRequest) {
+		if (!isSamePreviewRequest(existing, input)) {
 			return fail(
 				"IDEMPOTENCY_REPLAY",
 				409,
@@ -667,7 +689,26 @@ export async function previewExport(
 		// Lost the race with a concurrent request holding the same key.
 		if (!isUniqueViolation(error)) throw error;
 		const winner = await findByKey(db, input.idempotencyKey);
-		if (winner) return { ok: true, export: winner };
+		/**
+		 * THE RACE PATH MUST APPLY THE SAME CHECK AS THE READ PATH. The guard a
+		 * few lines above refuses a replay whose mission, target or dryRun
+		 * differ; this branch returned the winner unconditionally, so two
+		 * concurrent previews sharing a key but naming DIFFERENT MISSIONS left
+		 * the loser holding the winner's unrelated export as a 201 success —
+		 * exactly what that guard exists to prevent, reachable by losing a race
+		 * instead of by reading first.
+		 */
+		if (winner) {
+			if (isSamePreviewRequest(winner, input)) {
+				return { ok: true, export: winner };
+			}
+			return fail(
+				"IDEMPOTENCY_REPLAY",
+				409,
+				`Idempotency key ${input.idempotencyKey} already belongs to a different export.`,
+				{ exportId: winner.id, dryRun: winner.dryRun },
+			);
+		}
 		throw error;
 	}
 	if (!created) throw new Error("The export row was not created.");

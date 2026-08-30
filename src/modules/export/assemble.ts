@@ -14,6 +14,7 @@ import {
 } from "#/modules/db/schema";
 import { byCodepoint } from "#/modules/export/render/bytes";
 import type { JsonValue } from "#/modules/export/render/json";
+import { canonicalJson } from "#/modules/export/render/json";
 import type {
 	DecisionLogEntry,
 	RenderAgent,
@@ -107,13 +108,88 @@ export function briefToMarkdown(brief: Record<string, unknown>): string {
 	return `${keys
 		.map((k) => {
 			const v = brief[k];
+			/**
+			 * `canonicalJson`, NOT `JSON.stringify` with a replacer array.
+			 *
+			 * The first version passed `Object.keys(v).sort()` as a replacer to
+			 * get deterministic ordering. A replacer ARRAY is an allowlist applied
+			 * at EVERY DEPTH, not a top-level key order — so a nested object kept
+			 * only the keys that happened to appear at depth 1, and
+			 * `{items:[{name:"x"}]}` serialized as `[{}]`. Silent, total loss of
+			 * nested brief content in a file handed to a client and covered by
+			 * package_sha256.
+			 *
+			 * canonicalJson already sorts by codepoint at every depth and leaves
+			 * array order alone, which is exactly what was wanted. It existed the
+			 * whole time.
+			 */
 			const body =
-				typeof v === "string"
-					? v
-					: JSON.stringify(v, Object.keys(v ?? {}).sort(byCodepoint));
+				typeof v === "string" ? v : canonicalJson(v as JsonValue).trimEnd();
 			return `## ${k}\n\n${body}`;
 		})
 		.join("\n\n")}\n`;
+}
+
+/**
+ * One roster entry + its template -> the agent the renderer receives.
+ *
+ * PURE, and extracted for that reason. It carries two rules that decide what
+ * reaches a client package, and both were previously buried inside a function
+ * that needs a database, so neither had a test.
+ */
+export function toRenderAgent(
+	entry: {
+		wave: string | null;
+		writablePaths: string[] | null;
+		appendOnlyPaths: string[] | null;
+		readonlyPaths: string[] | null;
+	},
+	template: {
+		slug: string;
+		kind: "horizontal" | "feature";
+		runtime: "model" | "human" | "code";
+		writablePaths: string[];
+		appendOnlyPaths: string[];
+		readonlyPaths: string[];
+		identityMd: string;
+		depthMd: string | null;
+	},
+	owns: Record<string, string>,
+	/** Resolved by the caller: entry grants override the template's. */
+	skills: { slug: string; body: string }[],
+): RenderAgent {
+	return {
+		slug: template.slug,
+		// Null wave renders as unassigned rather than as a guess.
+		phase: entry.wave ?? "",
+		kind: template.kind,
+		runtime: template.runtime,
+		/**
+		 * The entry's mount OVERRIDES the template's; null inherits, [] is a
+		 * real empty grant. Resolved exactly as the roster endpoint resolves it,
+		 * so a rendered package and the screen cannot disagree about what an
+		 * agent may write.
+		 */
+		writable: entry.writablePaths ?? template.writablePaths,
+		appendOnly: entry.appendOnlyPaths ?? template.appendOnlyPaths,
+		readonly: entry.readonlyPaths ?? template.readonlyPaths,
+		owns: owns[template.slug] ?? "",
+		/**
+		 * MODEL CONTEXT ONLY FOR A MODEL. render.ts branches on PRESENCE — "a
+		 * runtime:human agent loads no model context, so it has neither file" —
+		 * and identity_md is NOT NULL, so passing it unconditionally would ship
+		 * an identity.md into a client package for something that is not a
+		 * language model. That is the exact case `runtime` was added to tell
+		 * apart.
+		 */
+		...(template.runtime === "model"
+			? {
+					identityMd: template.identityMd,
+					...(template.depthMd === null ? {} : { depthMd: template.depthMd }),
+				}
+			: {}),
+		skills,
+	};
 }
 
 export async function assembleRenderMission(
@@ -150,10 +226,17 @@ export async function assembleRenderMission(
 		};
 	}
 
+	/**
+	 * `isNull(deletedAt)` is load-bearing, not decoration. The live-uniqueness
+	 * index on mission_type is PARTIAL — `where deleted_at is null` — so once a
+	 * playbook is soft-deleted, several rows can share a mission_type and an
+	 * unfiltered `limit(1)` may return the dead one. Here that decides the
+	 * playbook block rendered into a client package.
+	 */
 	const [playbook] = await db
 		.select()
 		.from(playbooks)
-		.where(eq(playbooks.missionType, m.type))
+		.where(and(eq(playbooks.missionType, m.type), isNull(playbooks.deletedAt)))
 		.limit(1);
 
 	if (!playbook) {
@@ -184,7 +267,16 @@ export async function assembleRenderMission(
 			body: skills.contentMd,
 		})
 		.from(rosterEntrySkills)
-		.innerJoin(skills, eq(rosterEntrySkills.skillId, skills.id));
+		.innerJoin(skills, eq(rosterEntrySkills.skillId, skills.id))
+		// A revoked skill must not be written into the package, and the join is
+		// scoped to this mission rather than fetching every grant in the system.
+		.innerJoin(
+			rosterEntries,
+			eq(rosterEntrySkills.rosterEntryId, rosterEntries.id),
+		)
+		.where(
+			and(eq(rosterEntries.missionId, missionId), isNull(skills.deletedAt)),
+		);
 
 	const templateSkills = await db
 		.select({
@@ -193,7 +285,8 @@ export async function assembleRenderMission(
 			body: skills.contentMd,
 		})
 		.from(agentTemplateSkills)
-		.innerJoin(skills, eq(agentTemplateSkills.skillId, skills.id));
+		.innerJoin(skills, eq(agentTemplateSkills.skillId, skills.id))
+		.where(isNull(skills.deletedAt));
 
 	const byEntry = new Map<string, { slug: string; body: string }[]>();
 	for (const s of entrySkills) {
@@ -215,27 +308,24 @@ export async function assembleRenderMission(
 			agentTemplates,
 			eq(rosterEntries.agentTemplateId, agentTemplates.id),
 		)
-		.where(eq(rosterEntries.missionId, missionId));
+		// A soft-deleted template must not render an agent into the package.
+		.where(
+			and(
+				eq(rosterEntries.missionId, missionId),
+				isNull(agentTemplates.deletedAt),
+			),
+		);
 
 	const agents: RenderAgent[] = entries
 		.filter((r) => r.entry.active)
-		.map((r) => ({
-			slug: r.template.slug,
-			// Null wave renders as unassigned rather than as a guess.
-			phase: r.entry.wave ?? "",
-			kind: r.template.kind,
-			runtime: r.template.runtime,
-			// The entry's mount OVERRIDES the template's; null inherits, [] is
-			// a real empty grant. Resolved here exactly as the roster endpoint
-			// resolves it, so a rendered package and the screen cannot disagree.
-			writable: r.entry.writablePaths ?? r.template.writablePaths,
-			appendOnly: r.entry.appendOnlyPaths ?? r.template.appendOnlyPaths,
-			readonly: r.entry.readonlyPaths ?? r.template.readonlyPaths,
-			owns: unsourced.owns[r.template.slug] ?? "",
-			identityMd: r.template.identityMd,
-			...(r.template.depthMd === null ? {} : { depthMd: r.template.depthMd }),
-			skills: byEntry.get(r.entry.id) ?? byTemplate.get(r.template.id) ?? [],
-		}));
+		.map((r) =>
+			toRenderAgent(
+				r.entry,
+				r.template,
+				unsourced.owns,
+				byEntry.get(r.entry.id) ?? byTemplate.get(r.template.id) ?? [],
+			),
+		);
 
 	return {
 		ok: true,
