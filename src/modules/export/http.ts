@@ -32,7 +32,14 @@ export function exportResponse(
 
 export function errorResponse(
 	status: number,
-	code: ErrorCode,
+	/**
+	 * BOTH VOCABULARIES, matching ExportFailure.code. The export routes emit the
+	 * export codes plus CRUD_CODES' PRECONDITION_FAILED for a blocked gate and
+	 * VALIDATION_FAILED for a malformed body, because ERROR_CODES can express
+	 * neither. Narrowing this to ErrorCode alone forced a cast at the call site,
+	 * which hid that fact instead of stating it.
+	 */
+	code: ErrorCode | CrudCode,
 	message: string,
 	details?: unknown,
 ): Response {
