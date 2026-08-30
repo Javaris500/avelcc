@@ -3,6 +3,7 @@ import { initContract } from "@ts-rest/core";
 import { clientContract } from "#/contract/client";
 import { engagementContract } from "#/contract/engagement";
 import { exportContract } from "#/contract/export";
+import { intakeContract } from "#/contract/intake";
 import { missionContract } from "#/contract/mission";
 import { playbookContract } from "#/contract/playbook";
 import { rosterContract } from "#/contract/roster";
@@ -19,11 +20,9 @@ const c = initContract();
  * this does not define, that is a contract change and it gets filed, not
  * declared locally.
  *
- * BUILT: mission · roster · playbook · export · client · engagement
+ * BUILT: mission · roster · playbook · export · client · engagement · intake
  *
  * NOT BUILT, and each is a documented gap rather than an oversight:
- *   client, engagement, intake   ROUTES.md rates all three BLOCKING. Three
- *                                entities with no procedures anywhere.
  *   preset                       BLOCKING, and worse than a missing route group.
  *                                RosterPreset is the ONLY entity in
  *                                DATA-CONTRACTS-V2's reference with NO FIELD
@@ -53,6 +52,7 @@ const c = initContract();
 export const contract = c.router({
 	client: clientContract,
 	engagement: engagementContract,
+	intake: intakeContract,
 	mission: missionContract,
 	roster: rosterContract,
 	playbook: playbookContract,

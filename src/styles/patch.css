@@ -142,11 +142,24 @@
      text did not. The plan flagged text-subtle on panel as the pair most
      likely to fail; measured, it was ALREADY failing at 4.39:1 on the old
      panel and now passes at 5.32:1. Full table in the commit message. */
-  --color-app-bg:       #16181d;   /* L*  8.2 · the desktop AND the sidebar */
-  --color-app-recessed: #111317;   /* L*  5.8 · wells, inputs, code blocks  */
-  --color-app-panel:    #1c1f25;   /* L* 11.7 · cards, mission panels       */
-  --color-app-raised:   #23272e;   /* L* 15.5 · hover, active row, controls */
-  --color-app-float:    #2a2f37;   /* L* 19.2 · popover, dropdown, modal    */
+  /* CORRECTION 7: THE FLOOR CAME BACK UP. The first pass compressed the ramp
+     AND dropped the background, and only the compression was asked for. The
+     operator asked to remove the LIGHTER parts, which means pulling the
+     surfaces down toward the desktop. Lowering the desktop as well took the
+     whole screen down with it, and the result read murky rather than solid.
+
+     It also broke provenance, which is the part that should have caught it
+     before a person did. --color-app-bg was `= bg`, and --color-bg is #1a1d23
+     [brief] Ink. Re-pointing app-bg at #16181d silently redefined a shared
+     brand value in terms of a value nothing sourced. app-bg IS bg again.
+
+     The compression survives: 23.1 L* originally, 10.0 now. What moved is the
+     floor, not the ramp. Every L* recomputed, not transcribed. */
+  --color-app-bg:       #1a1d23;   /* L* 10.7 · = --color-bg [brief] · desktop AND sidebar */
+  --color-app-recessed: #16181d;   /* L*  8.2 · wells, inputs, code blocks  */
+  --color-app-panel:    #20242d;   /* L* 14.2 · cards, mission panels       */
+  --color-app-raised:   #262b35;   /* L* 17.4 · hover, active row, controls */
+  --color-app-float:    #2d323d;   /* L* 20.7 · popover, dropdown, modal    */
 
 
   /* ── 7 · SKELETON + DENSITY ─────────────────────────────────────────────
@@ -157,7 +170,7 @@
      placeholder the most prominent surface on the page. Now app-raised's
      value: distinct from the panel it sits on by 3.8 L*, and never the
      brightest thing in view. */
-  --color-skeleton: #23272e;
+  --color-skeleton: #262b35;
 
   --row-comfortable: 12px;   /* reading                                    */
   --row-compact:      6px;   /* scanning a 40-row gate result              */
@@ -472,5 +485,9 @@ body {
    Fixed with a compound selector so light keeps its own value. Found by
    session 3 measuring the painted colour and noticing it came back #8b939e
    where the light token says #6e7681. */
-.app { --color-text-subtle: #8b939e; }
+/* Raised with CORRECTION 7's floor. The surfaces came up 2.5 L* and the text
+   did not, so text-subtle on float fell to 3.79:1. It was ALREADY under AA at
+   4.34:1 before that change, which no one had measured. Now 4.52:1, and every
+   text/surface pair in dark clears 4.5:1. */
+.app { --color-text-subtle: #929aa5; }
 .app.light { --color-text-subtle: #6e7681; }

@@ -23,6 +23,7 @@ describe("the assembled contract", () => {
 			"client",
 			"engagement",
 			"export",
+			"intake",
 			"mission",
 			"playbook",
 			"roster",
@@ -35,6 +36,7 @@ describe("the assembled contract", () => {
 			...Object.values(contract.mission),
 			...Object.values(contract.roster),
 			...Object.values(contract.playbook),
+			...Object.values(contract.intake),
 		];
 		for (const r of routes) {
 			const codes = Object.keys(r.responses).map(Number);
