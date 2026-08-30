@@ -67,6 +67,22 @@ export const agentTeam = pgEnum("agent_team", [
  */
 export const skillType = pgEnum("skill_type", ["knowledge", "capability"]);
 
+/**
+ * WHAT EXECUTES AN AGENT, as distinct from `kind`, which describes the cut.
+ *
+ * A pgEnum, and the one place in this round where the vocabulary was GIVEN
+ * rather than chosen: `render/types.ts` declares `'model' | 'human' | 'code'`,
+ * and render.ts branches on it — a non-model agent loads no model context, so it
+ * renders neither identity.md nor depth.md. Code branching on the value is the
+ * doc's own enum test, and the values come from the renderer rather than from
+ * anyone's guess, which is the distinction that kept `pr_status` as text.
+ *
+ * GOLDEN-FIXTURE's MISSION.md says "Foundations for this mission is the
+ * operator", and ROSTER-V2:315 describes an agent that is "never a language
+ * model" — so `human` and `code` are both real states, not speculative ones.
+ */
+export const agentRuntime = pgEnum("agent_runtime", ["model", "human", "code"]);
+
 /* ── step 0 · the agency layer ──────────────────────────────────────────── */
 
 export const clients = pgTable("clients", {
@@ -157,15 +173,42 @@ export const agentTemplates = pgTable(
 		 * Glob patterns this agent may modify. Backs the file-ownership check at
 		 * render time: a file modified outside these globs is a gate failure.
 		 *
-		 * REPORTED, NOT INVENTED: the golden fixture's roster.json also carries
-		 * `append_only`, `readonly` and `runtime`, and NO entity in
-		 * DATA-CONTRACTS-V2 declares any of the three. GOLDEN-FIXTURE calls
-		 * append_only "the Mission 002 finding encoded" and the most important
-		 * thing in that file. They are absent here deliberately — adding columns
-		 * the contract does not define would be inventing a shape, which is the
-		 * one thing the contract rule forbids.
+		 * The note that used to sit here — that `append_only`, `readonly` and
+		 * `runtime` appear in the golden fixture and in no entity — is DISCHARGED.
+		 * All three are built below, on an operator ruling, after the renderer's
+		 * own types supplied the shapes that DATA-CONTRACTS-V2 never did.
 		 */
 		writablePaths: text("writable_paths").array().notNull().default([]),
+		/**
+		 * Paths this agent may APPEND to but never rewrite.
+		 *
+		 * GOLDEN-FIXTURE:221 calls this "the Mission 002 finding encoded": the
+		 * composition root belongs to no feature and every feature must register
+		 * in it, so omitting it means the first agent cannot load its own module.
+		 * `process/reports/` and the decision log are the same shape — every agent
+		 * is required to write there and none may rewrite another's entries.
+		 *
+		 * DEFAULT '{}', never NOT NULL without one. An agent with no append-only
+		 * grant is the safe state and needs no setup, which is RepoPolicy's
+		 * principle applied one table over.
+		 */
+		appendOnlyPaths: text("append_only_paths").array().notNull().default([]),
+		/**
+		 * Paths this agent may read but not write. The fixture uses `["**"]` for a
+		 * quality agent, so "everything" is a real value rather than an edge case.
+		 *
+		 * DECLARATIVE, NOT ENFORCED, the same caveat `skill_type='capability'`
+		 * carries: nothing restricts a read at runtime. It renders into the
+		 * package and backs the ownership check on writes; a UI implying the
+		 * filesystem enforces it would be the product lying about itself.
+		 */
+		readonlyPaths: text("readonly_paths").array().notNull().default([]),
+		/**
+		 * DEFAULT 'model' because every template that exists today is a model
+		 * agent, so the default is what the live rows already mean rather than a
+		 * value invented to make the column insertable.
+		 */
+		runtime: agentRuntime("runtime").notNull().default("model"),
 		...softDelete,
 		...timestamps,
 	},
@@ -429,6 +472,18 @@ export const rosterEntries = pgTable(
 		 * write nothing". An empty array is a real, different instruction.
 		 */
 		writablePaths: text("writable_paths").array(),
+		/**
+		 * The same override shape as `writablePaths` above, deliberately: nullable
+		 * means "inherit the template's", `{}` means "genuinely none".
+		 *
+		 * COLLAPSING THOSE TWO WOULD BE THE BUG. If null and `{}` meant the same
+		 * thing there would be no way to say "this agent, on this mission, may
+		 * append nowhere" — the instruction would silently read as "use whatever
+		 * the template grants", which is the opposite. That is the entire reason
+		 * the writable_paths precedent is shaped this way.
+		 */
+		appendOnlyPaths: text("append_only_paths").array(),
+		readonlyPaths: text("readonly_paths").array(),
 		...timestamps,
 	},
 	(t) => [
