@@ -5,6 +5,7 @@ import { type ChatModeId, DEFAULT_MODE } from "#/modules/chat/modes";
 import { StatusStrip } from "#/modules/chat/status-strip";
 import { Suggestions } from "#/modules/chat/suggestions";
 import type { ChatStatus, UIMessage } from "#/modules/chat/types";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 
 /**
  * Home. A conversation with the Command Center, plus a strip that says what the
@@ -49,6 +50,22 @@ import type { ChatStatus, UIMessage } from "#/modules/chat/types";
 const NOT_CONNECTED =
 	"The Command Center agent is not connected yet. There is no /api/chat and no model behind this box, so nothing would be sent.";
 
+/**
+ * STRINGS, NOT NODES, AND IT IS NOT A STYLE CHOICE.
+ *
+ * `usePageHeader` depends on its own arguments: `[set, title, subtitle,
+ * definition, actions]`. Strings compare by value across renders, so a string
+ * title settles after one pass. A `ReactNode` is a fresh object every render,
+ * so the effect re-runs, calls `set`, re-renders, and builds another one. That
+ * is an unbounded loop, and it is the `actions` slot the hook exists for.
+ *
+ * Reported to the shell owner rather than worked around here. These two are
+ * strings, so this route is safe either way.
+ */
+const HEADER_TITLE = "Command Center";
+const HEADER_SUBTITLE =
+	"Ask about a mission, a client, or what is holding a delivery up.";
+
 export function ChatHome() {
 	// Stand-ins for `useChat`, in its exact shape. `messages` and `status` are
 	// held rather than hardcoded so the components below are driven by state the
@@ -58,6 +75,21 @@ export function ChatHome() {
 	const [input, setInput] = useState("");
 	const [mode, setMode] = useState<ChatModeId>(DEFAULT_MODE);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+
+	/**
+	 * NO `actions` HERE, AND IT IS DELIBERATE. Home's module slot is meant to
+	 * carry `New chat` primary and `History` secondary. Neither can work yet.
+	 * `New chat` clears a conversation, and there is no conversation to clear;
+	 * `History` opens a thread list, and UI-PLAN section 14 still has thread
+	 * persistence open, so there is nothing to list. Shipping both would put two
+	 * dead controls in the one slot the header reserves for the page's real
+	 * action, which is section 12 rule 6 in the place it is most visible.
+	 *
+	 * Section 2 already allows for this: "Empty is a valid state, and the header
+	 * must not reserve space for it." They land with `useChat` and the
+	 * persistence decision, in that order.
+	 */
+	usePageHeader({ subtitle: HEADER_SUBTITLE, title: HEADER_TITLE });
 
 	return (
 		// h-full rather than min-h-screen: `main` in the shell is the scroll

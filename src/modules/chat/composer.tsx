@@ -1,5 +1,17 @@
 import { ArrowUp, Square } from "lucide-react";
-import { type ReactNode, type RefObject, useId } from "react";
+import {
+	type ReactNode,
+	type RefObject,
+	useCallback,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
+import {
+	composerShapeClasses,
+	composerShapeFor,
+} from "#/modules/chat/composer-shape";
 import { ModePill } from "#/modules/chat/mode-pill";
 import type { ChatModeId } from "#/modules/chat/modes";
 import { sendControlFor, shouldSendOnKey } from "#/modules/chat/send-control";
@@ -7,7 +19,8 @@ import type { ChatStatus } from "#/modules/chat/types";
 import { cn } from "#/utils/cn";
 
 /**
- * The composer. UI-PLAN section 10.
+ * The composer. UI-PLAN section 10, plus the operator's ruling that it is a
+ * rounded pill.
  *
  * IT TAKES `status` AND `onStop` DIRECTLY, because those are what `useChat`
  * returns. When `@ai-sdk/react` lands, wiring this is:
@@ -17,6 +30,13 @@ import { cn } from "#/utils/cn";
  *
  * No adapter, no rename. The component was built against the hook's shape
  * rather than against a shape that would need translating later.
+ *
+ * ONE ROW, NOT TWO. The section 10 reference stacks a control row under the
+ * text, which is the right shape for a box and the wrong one for a pill: a pill
+ * wrapped around two stacked rows reads as a stadium at rest, before anything
+ * has been typed. So the text, the mode pill and send sit on one line, and the
+ * whole control is one line tall until the text wraps. The radius steps down to
+ * a box when it does, which is `composer-shape.ts`.
  *
  * WHAT IS NOT HERE, AND WHY. The reference's control row also carries an attach
  * button, a model dropdown and a microphone. None of the three is built, none
@@ -67,6 +87,7 @@ export function Composer({
 		hasText: value.trim() !== "",
 		blockedReason,
 	});
+	const { measureRef, shape } = useComposerShape(textareaRef);
 
 	const send = () => {
 		if (control.kind !== "send" || control.disabled) return;
@@ -77,23 +98,30 @@ export function Composer({
 		<div className="flex flex-col gap-1.5" data-testid="chat-composer">
 			<div
 				className={cn(
-					"flex flex-col gap-2 rounded-md border border-[var(--elevation-border-rest)] bg-app-panel p-2",
-					"shadow-e1 transition-colors duration-[var(--duration-state)] ease-[var(--ease-avel)]",
+					"flex gap-2 border border-[var(--elevation-border-rest)] bg-app-panel px-2 py-1.5 shadow-e1",
+					// The radius is what animates, so it is named rather than left to
+					// `transition-all`. On `--duration-state`, like every other shape
+					// change in the shell.
+					"transition-[border-radius,border-color] duration-[var(--duration-state)] ease-[var(--ease-avel)]",
 					"focus-within:border-[var(--elevation-border-raised)] motion-reduce:transition-none",
+					composerShapeClasses(shape),
 				)}
+				data-shape={shape}
 			>
 				<label className="sr-only" htmlFor={labelId}>
 					Ask the Command Center
 				</label>
 				{/*
-				  `field-sizing-content` grows the box with the text in CSS. The
-				  usual version of this is a ref, a scrollHeight read and a layout
-				  write on every keystroke, which is a lot of JavaScript for
-				  something the platform now does.
+				  `field-sizing-content` grows the box with the text in CSS, and it
+				  is also what `composer-shape.ts` measures. The usual version of
+				  this is a ref, a scrollHeight read and a layout write on every
+				  keystroke, which is a lot of JavaScript for something the platform
+				  now does. Firefox and Safari do not support it yet and hold the
+				  one-line height, where the control stays a pill.
 				*/}
 				<textarea
 					aria-describedby={control.reason ? `${labelId}-reason` : undefined}
-					className="app-scroll max-h-48 min-h-16 w-full resize-none bg-transparent px-2 pt-1 text-sm leading-relaxed text-text outline-none placeholder:text-text-subtle field-sizing-content"
+					className="app-scroll max-h-40 min-w-0 flex-1 resize-none self-center bg-transparent py-1.5 pl-2 text-sm leading-relaxed text-text outline-none placeholder:text-text-subtle field-sizing-content"
 					data-testid="chat-input"
 					id={labelId}
 					onChange={(event) => onChange(event.target.value)}
@@ -103,27 +131,24 @@ export function Composer({
 						send();
 					}}
 					placeholder="Ask the Command Center"
-					ref={textareaRef}
+					ref={measureRef}
+					rows={1}
 					value={value}
 				/>
 
-				<div className="flex items-center gap-2">
-					<ModePill mode={mode} onChange={onModeChange} />
-
-					<div className="ml-auto flex items-center gap-2">
-						<SendStopButton control={control} onSend={send} onStop={onStop} />
-					</div>
-				</div>
+				<ModePill mode={mode} onChange={onModeChange} />
+				<SendStopButton control={control} onSend={send} onStop={onStop} />
 			</div>
 
 			{/*
 			  The reason sits under the composer in the reading order, so it is
-			  found by someone who has just tried to press the button. Under
-			  `aria-describedby` it would also be read out on focus.
+			  found by someone who has just tried to press the button, and it is
+			  wired to the textarea by `aria-describedby` so it is also read out
+			  on focus.
 			*/}
 			{control.reason ? (
 				<p
-					className="px-1 text-xs leading-relaxed text-text-subtle"
+					className="px-3 text-xs leading-relaxed text-text-subtle"
 					data-testid="chat-blocked-reason"
 					id={`${labelId}-reason`}
 				>
@@ -132,6 +157,57 @@ export function Composer({
 			) : null}
 		</div>
 	);
+}
+
+/**
+ * Measures the textarea so the composer knows whether it is still one line.
+ *
+ * A `ResizeObserver` rather than a keystroke handler, because the height
+ * changes for reasons that are not keystrokes: a paste, a window resize that
+ * rewraps the text, a font loading late. Counting newlines in the value would
+ * miss every soft wrap, which is most of them.
+ *
+ * The baseline is whatever the element measures the first time it has a real
+ * height. The box is empty then, so that measurement IS one line, and taking it
+ * rather than hardcoding it means a change to the type scale cannot strand it.
+ */
+function useComposerShape(external?: RefObject<HTMLTextAreaElement | null>) {
+	const element = useRef<HTMLTextAreaElement | null>(null);
+	const oneLine = useRef(0);
+	const [height, setHeight] = useState(0);
+
+	const measureRef = useCallback(
+		(node: HTMLTextAreaElement | null) => {
+			element.current = node;
+			// Kept in sync so the caller can still focus it, which is what the
+			// suggestions do.
+			if (external) external.current = node;
+		},
+		[external],
+	);
+
+	useEffect(() => {
+		const el = element.current;
+		// Undefined in a non-browser render and in older Safari. Without it the
+		// shape stays a pill, which is the resting shape anyway.
+		if (!el || typeof ResizeObserver === "undefined") return;
+
+		const observer = new ResizeObserver(() => {
+			const next = el.getBoundingClientRect().height;
+			// A zero height means the element is not laid out yet: a drawer that
+			// has not opened, a pane still display:none. Recording that as the
+			// baseline would make every later height read as wrapped.
+			if (oneLine.current === 0 && next > 0) oneLine.current = next;
+			setHeight(next);
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
+
+	return {
+		measureRef,
+		shape: composerShapeFor({ height, oneLine: oneLine.current }),
+	};
 }
 
 /**
@@ -145,10 +221,10 @@ export function Composer({
  * test covering all four statuses. This is only the paint.
  *
  * The crossfade is CSS. Both glyphs are stacked in the same box and swap on
- * opacity and scale, driven off `data-kind` on the button, on
- * `--duration-state` and `--ease-avel`. Nothing is imported to do it. UI-PLAN
- * section 11 recommends staying CSS-only for the first cut and revisiting when
- * a morph fails to look right in CSS; a two-glyph crossfade is not that morph.
+ * opacity and scale, on `--duration-state` and `--ease-avel`. Nothing is
+ * imported to do it. UI-PLAN section 11 recommends staying CSS-only for the
+ * first cut and revisiting when a morph fails to look right in CSS; a two-glyph
+ * crossfade is not that morph.
  */
 function SendStopButton({
 	control,
@@ -161,15 +237,20 @@ function SendStopButton({
 }) {
 	const isStop = control.kind === "stop";
 
+	// Stop is RECESSED, not raised. In light mode `app-raised` resolves to the
+	// same white as `app-panel`, which is the composer it sits inside, so a
+	// raised stop button would have no edge of its own in exactly the theme and
+	// exactly the moment the operator most needs to find it. Recessed separates
+	// downward, which is the one direction light mode still has.
 	return (
 		<button
 			aria-label={control.label}
 			className={cn(
-				"group relative inline-flex size-8 shrink-0 items-center justify-center rounded-full",
+				"relative inline-flex size-8 shrink-0 items-center justify-center self-end rounded-full",
 				"transition-colors duration-[var(--duration-micro)] ease-[var(--ease-avel)] motion-reduce:transition-none",
 				"disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]",
 				isStop
-					? "border border-[var(--elevation-border-raised)] bg-app-raised text-text hover:bg-app-float"
+					? "border border-[var(--elevation-border-raised)] bg-app-recessed text-text"
 					: "bg-primary text-primary-foreground hover:bg-accent-hover",
 			)}
 			data-kind={control.kind}
