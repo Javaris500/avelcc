@@ -266,6 +266,40 @@ function Brief({ brief }: { brief: Record<string, unknown> }) {
  * genuinely has no grant of that kind, which is a fact about a boundary; hiding
  * the row would make "no write access" and "not configured" look the same.
  */
+/**
+ * WHICH OTHER AGENTS HOLD THE SAME PATH, AND UNDER WHICH RULE.
+ *
+ * Built because the real roster made the gap obvious. `apps/web/e2e/` is
+ * READONLY for transactions and WRITABLE for nemi — the same path, two agents,
+ * opposite grants — and on screen it sat second-from-last in a list of nine and
+ * first in a list of four, four hundred pixels apart in identical type. Nothing
+ * connected them. An operator would have had to read twenty paths and notice a
+ * repeat, which is not a design, it is a memory test.
+ *
+ * EXACT STRING MATCH ONLY, deliberately. `apps/api/src/` for one agent and
+ * `apps/api/src/modules/transactions/` for another almost certainly overlap
+ * too, and saying so would mean deciding what a trailing slash means, what a
+ * glob covers, and whether a prefix implies containment. Those are claims about
+ * a BOUNDARY, and a wrong one here is worse than a missing one — it would tell
+ * an operator two agents collide when they may not. What this reports is only
+ * what it can prove: the identical path, written twice.
+ */
+type PathHolder = { slug: string; label: string };
+
+function sharedPathIndex(agents: RosterAgent[]): Map<string, PathHolder[]> {
+	const index = new Map<string, PathHolder[]>();
+	for (const agent of agents) {
+		for (const { key, label } of MOUNTS) {
+			for (const path of agent.effective[key]) {
+				const holders = index.get(path) ?? [];
+				holders.push({ slug: agent.slug, label });
+				index.set(path, holders);
+			}
+		}
+	}
+	return index;
+}
+
 const MOUNTS = [
 	{ key: "writablePaths", label: "writable", rule: "edit freely" },
 	{
@@ -289,7 +323,13 @@ const RUNTIME_RULE: Record<RosterAgent["runtime"], string> = {
 	code: "deterministic code; never a language model",
 };
 
-function Mounts({ agent }: { agent: RosterAgent }) {
+function Mounts({
+	agent,
+	shared,
+}: {
+	agent: RosterAgent;
+	shared: Map<string, PathHolder[]>;
+}) {
 	return (
 		<div className="flex flex-col gap-2 pt-2">
 			{MOUNTS.map(({ key, label, rule }) => (
@@ -302,26 +342,55 @@ function Mounts({ agent }: { agent: RosterAgent }) {
 							{label}
 						</span>
 						<span className="text-micro text-text-subtle">{rule}</span>
-						{/* An override is shown AS an override: this mission changed what
-						    the template grants, and that was somebody's decision. */}
+						{/*
+						 * Still shown, because an override is somebody's decision and the
+						 * template's default is not what applies. Demoted from a Tag to
+						 * muted text after seeing the real roster: every set on every
+						 * agent is overridden there, so six identical badges were the
+						 * loudest thing in the section and crowded out the paths, which
+						 * are the content. A fact that is always true carries no signal
+						 * at full volume.
+						 */}
 						{agent.overridden[key] ? (
-							<Tag data-testid={`mount-${label}-overridden`}>
+							<span
+								className="text-micro text-text-subtle"
+								data-testid={`mount-${label}-overridden`}
+							>
 								overridden for this mission
-							</Tag>
+							</span>
 						) : null}
 					</p>
 					{agent.effective[key].length === 0 ? (
 						<p className="pt-0.5 text-micro text-text-subtle">none</p>
 					) : (
 						<ul className="flex flex-col gap-0.5 pt-0.5">
-							{agent.effective[key].map((path) => (
-								<li
-									className="font-mono text-micro break-all text-text-muted"
-									key={path}
-								>
-									{path}
-								</li>
-							))}
+							{agent.effective[key].map((path) => {
+								const others = (shared.get(path) ?? []).filter(
+									(h) => h.slug !== agent.slug,
+								);
+								return (
+									<li key={path}>
+										<span className="font-mono text-micro break-all text-text-muted">
+											{path}
+										</span>
+										{others.map((other) => (
+											<span
+												className="block text-micro text-text-subtle"
+												data-testid={
+													other.label === label
+														? "shared-path"
+														: "shared-path-conflict"
+												}
+												key={`${other.slug}-${other.label}`}
+											>
+												{other.label === label
+													? `also ${other.slug}, same rule`
+													: `${other.slug} holds this as ${other.label}`}
+											</span>
+										))}
+									</li>
+								);
+							})}
 						</ul>
 					)}
 				</div>
@@ -330,7 +399,13 @@ function Mounts({ agent }: { agent: RosterAgent }) {
 	);
 }
 
-function Agent({ agent }: { agent: RosterAgent }) {
+function Agent({
+	agent,
+	shared,
+}: {
+	agent: RosterAgent;
+	shared: Map<string, PathHolder[]>;
+}) {
 	return (
 		<li
 			className="border-b border-[var(--elevation-border-rest)] px-4 py-3"
@@ -362,7 +437,7 @@ function Agent({ agent }: { agent: RosterAgent }) {
 				<Tag data-testid="agent-kind">{agent.kind}</Tag>
 			</p>
 
-			<Mounts agent={agent} />
+			<Mounts agent={agent} shared={shared} />
 		</li>
 	);
 }
@@ -525,13 +600,20 @@ function MissionOverview() {
 									loading={<SkeletonRows count={3} />}
 									query={roster}
 								>
-									{(r) => (
-										<ul data-testid="roster-agents">
-											{r.data.map((agent) => (
-												<Agent agent={agent} key={agent.entryId} />
-											))}
-										</ul>
-									)}
+									{(r) => {
+										const shared = sharedPathIndex(r.data);
+										return (
+											<ul data-testid="roster-agents">
+												{r.data.map((agent) => (
+													<Agent
+														agent={agent}
+														key={agent.entryId}
+														shared={shared}
+													/>
+												))}
+											</ul>
+										);
+									}}
 								</Surface>
 							</Section>
 
