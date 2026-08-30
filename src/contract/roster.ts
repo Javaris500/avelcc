@@ -10,15 +10,94 @@ export const rosterEntrySchema = z.object({
 	missionId: z.string().uuid(),
 	agentTemplateId: z.string().uuid(),
 	active: z.boolean(),
-	waves: z.array(z.string()),
+	/**
+	 * A SCALAR, and nullable. Was `waves: string[]` and drifted behind the schema.
+	 *
+	 * ROSTER-V2:33 makes phases global and sequential — "Team or feature is a
+	 * label, not a schedule" — and an agent spanning waves reintroduces the
+	 * ordering contradiction that global phases exist to prevent. Every consumer
+	 * is already singular: MISSION.md renders one Phase cell per agent and
+	 * roster.json emits `phase`. Null means not yet assigned, which is a real
+	 * state and not a missing value.
+	 */
+	wave: z.string().nullable(),
 	monitorPriority: z.number().int().nullable(),
 	customizedMd: z.string().nullable(),
-	/** Overrides the template's, per mission. */
+	/**
+	 * THE THREE MOUNT KINDS, and they are not three shades of one thing.
+	 *
+	 * `writable` is edit freely. `appendOnly` is add your own and never remove or
+	 * reorder anyone else's — the distinction a mount check enforces by failing
+	 * on any REMOVED line, and the reason a feature agent can register its own
+	 * module without being able to unregister another's. `readonly` is read but
+	 * never write.
+	 *
+	 * All three are nullable OVERRIDES of the template's. Null means inherit;
+	 * `[]` means genuinely none. Collapsing those two would lose the difference
+	 * between an agent nobody configured and one configured to have no grant.
+	 */
 	writablePaths: z.array(z.string()).nullable(),
+	appendOnlyPaths: z.array(z.string()).nullable(),
+	readonlyPaths: z.array(z.string()).nullable(),
 	skillIds: z.array(z.string().uuid()),
 });
 
 /**
+ * One agent as the roster screen needs it: the entry joined to its template,
+ * with the override rule already applied.
+ *
+ * THE SERVER RESOLVES THE OVERRIDE, not the screen. Each path set is a nullable
+ * override of the template's, and having every consumer re-derive
+ * `entry.paths ?? template.paths` is how two screens end up disagreeing about
+ * what an agent may write. Both layers are returned so a UI can show that an
+ * override happened; `effective` is what actually applies.
+ */
+export const rosterAgentSchema = z.object({
+	entryId: z.string().uuid(),
+	agentTemplateId: z.string().uuid(),
+	slug: z.string(),
+	name: z.string(),
+	kind: z.enum(["horizontal", "feature"]),
+	/**
+	 * What EXECUTES the agent, as distinct from `kind`, which describes the cut.
+	 * A non-model agent is real, not a placeholder — a roster can hold a role
+	 * carried by a person or by a script, and a screen that assumes every agent
+	 * is a language model misrepresents the roster on its first real render.
+	 */
+	runtime: z.enum(["model", "human", "code"]),
+	active: z.boolean(),
+	wave: z.string().nullable(),
+	monitorPriority: z.number().int().nullable(),
+	effective: z.object({
+		writablePaths: z.array(z.string()),
+		appendOnlyPaths: z.array(z.string()),
+		readonlyPaths: z.array(z.string()),
+	}),
+	/** True where the entry overrode the template rather than inheriting it. */
+	overridden: z.object({
+		writablePaths: z.boolean(),
+		appendOnlyPaths: z.boolean(),
+		readonlyPaths: z.boolean(),
+	}),
+});
+
+/**
+ * CLOSED 2026-08-29, and kept because what it got wrong is the useful part.
+ *
+ * The gap below was real when written and is now filled on both layers:
+ * agent_templates carries `runtime`, `append_only_paths` and `readonly_paths`
+ * (migration 0011), and roster_entries carries nullable overrides for the two
+ * path sets. `rosterEntrySchema` above declares them.
+ *
+ * The note said "two sessions are hitting this from opposite directions — the
+ * renderer needs them to emit, the schema needs them to store." A third arrived
+ * later and settled it: the real client roster this project is being built for
+ * enforces exactly these three boundaries in practice, as may_edit /
+ * may_append_only / must_not_touch. The shapes were derived from the renderer
+ * before anyone had read that, and they matched.
+ *
+ * The original text follows.
+ *
  * OPEN CONTRACT GAP, recorded rather than filled.
  *
  * GOLDEN-FIXTURE's roster.json carries `append_only`, `readonly` and `runtime`
