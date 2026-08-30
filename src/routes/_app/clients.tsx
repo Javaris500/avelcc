@@ -11,7 +11,10 @@ import type { z } from "zod";
 
 import { clientListRow, clientStatus } from "#/contract/client";
 import { successList } from "#/contract/shared/envelope";
-import { blockedTone, CLIENT_STATUS_TONE } from "#/modules/client/ui/status";
+import {
+	CLIENT_STATUS_TONE,
+	clientBlockedTone,
+} from "#/modules/client/ui/status";
 import { StatusBadge } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import {
@@ -316,26 +319,29 @@ function ClientSwitcher({
 						>
 							{r.name}
 							{/*
-							 * `blockedTone`, NOT a literal. This read `tone="warn"` and
-							 * the shared mapping returns `block`, so the same count would
-							 * have rendered a warn triangle here and a block cross on the
-							 * client detail page. That seam exists precisely to stop it:
-							 * the badge stays presentational over the existing tones and
-							 * the domain-to-tone decision lives in one function. A
-							 * literal at a call site is the second place, and the second
-							 * place is where two screens start disagreeing about what a
-							 * state looks like.
+							 * `clientBlockedTone`, NOT a literal. This read `tone="warn"`
+							 * hardcoded, against a shared mapping that returned `block` —
+							 * so the same count rendered a warn triangle here and a block
+							 * cross on the client detail page. A literal at a call site is
+							 * the second place a state gets a colour, and the second place
+							 * is where two screens start disagreeing.
 							 *
-							 * If `warn` is the better read for a list row — attention
-							 * rather than a hard failure of the row itself — then
-							 * `blockedTone` changes and every surface moves together,
-							 * which is the point. Found by avel-c2.
+							 * CHASING THAT DOWN FOUND THE REAL ANSWER: the literal was
+							 * half right. A CLIENT with blocked missions is not itself
+							 * blocked — it is a rollup, and `warn` is the honest tone for
+							 * it. A MISSION with open blockers genuinely cannot proceed,
+							 * and keeps `block`. Two entities, two questions, so the
+							 * mapping is now two named functions rather than one.
+							 *
+							 * Clicking a warned client through to a blocked mission is not
+							 * a contradiction. It is a summary resolving into the specific
+							 * thing it was summarising.
 							 */}
 							{r.openBlockers > 0 ? (
 								<StatusBadge
 									className="ml-auto"
 									data-testid="client-switcher-blocked"
-									tone={blockedTone(r.openBlockers)}
+									tone={clientBlockedTone(r.openBlockers)}
 								>
 									{r.openBlockers}
 								</StatusBadge>
@@ -719,7 +725,7 @@ function ClientsLayout() {
 															{client.openBlockers > 0 ? (
 																<StatusBadge
 																	data-testid="client-blocked-badge"
-																	tone="warn"
+																	tone={clientBlockedTone(client.openBlockers)}
 																>
 																	{client.openBlockers}
 																</StatusBadge>

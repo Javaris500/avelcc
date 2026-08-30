@@ -123,16 +123,55 @@ export function missionStatusTone(_status: string): Tone | null {
 }
 
 /**
- * THE BLOCKED SIGNAL. UI-PLAN section 5: "a client with a blocked mission
- * should look different in the list, before you click."
+ * THE BLOCKED SIGNAL, in two scopes. UI-PLAN section 5: "a client with a
+ * blocked mission should look different in the list, before you click."
  *
  * Deliberately NOT derived from `missions.status`. A blocker is its own table
- * with its own `blocker_status` enum, so "is this client blocked" is a real
- * question with a real answer, and answering it by string-matching a mission
- * status column that has no vocabulary would be a guess dressed as a signal.
+ * with its own `blocker_status` enum, so "is this blocked" is a real question
+ * with a real answer, and answering it by string-matching a mission status
+ * column that has no vocabulary would be a guess dressed as a signal.
  *
- * The count comes from the aggregate, which does not exist yet.
+ * The count is a server-side anti-join over unclosed blockers: closure is a NEW
+ * ROW referencing the old one, so a blocker's own `status` column records only
+ * what was true when it was written. Both counts were silently zero until the
+ * telemetry tables had rows, because an empty table makes a working query and a
+ * broken one give the same answer.
  */
-export function blockedTone(openBlockers: number): Tone {
+
+/**
+ * A MISSION with open blockers IS blocked. Work on it cannot proceed until
+ * something is resolved, so this is a hard state and it gets the hard tone.
+ * `block` carries the ✕ glyph, which is the right claim about a mission.
+ */
+export function missionBlockedTone(openBlockers: number): Tone {
 	return openBlockers > 0 ? "block" : "neutral";
+}
+
+/**
+ * A CLIENT with blocked missions is NOT itself blocked, and this is the
+ * distinction that took two screens and a hardcoded literal to surface.
+ *
+ * Both call sites were reaching for one `blockedTone`, and the argument that
+ * settled it is that they are asking different questions about different
+ * entities. "This mission cannot proceed" is a fact about the mission. "One of
+ * this client's missions cannot proceed" is a rollup, and nothing about the
+ * client is broken — there is still work to look at, deliveries to read and a
+ * brief to write.
+ *
+ * So it is `warn`, and the ⚠ against ✕ is the difference being said out loud.
+ * Clicking a warned client through to a blocked mission is not a contradiction;
+ * it is a summary resolving into the specific thing it was summarising.
+ *
+ * TWO REASONS BEYOND THE SEMANTICS. `block` is the GATE vocabulary — in this
+ * product a block is a mandatory gate refusing a delivery — and a client is not
+ * a gate. And in a list of clients, red spent on a rollup is red unavailable for
+ * the thing that actually failed; the loudest colour on the screen should mean
+ * the most specific thing, not the broadest.
+ *
+ * This is NOT the two-mappings failure the seam exists to prevent. That is one
+ * state getting two colours in two files. This is two states, distinguished
+ * once, here.
+ */
+export function clientBlockedTone(openBlockers: number): Tone {
+	return openBlockers > 0 ? "warn" : "neutral";
 }
