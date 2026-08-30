@@ -221,8 +221,26 @@ between them and the frame. The gap is the separator, and the tone step does the
 rest. A hairline is what you reach for when two surfaces are the same colour,
 and after section 1 they are not.
 
-Where a boundary still needs marking after tone and gap, use `shadow-e1`. Never
-a 1px line.
+Where a boundary still needs marking after tone and gap, use `shadow-e1`.
+
+**A rule is a line drawn BETWEEN two things. A border AROUND one thing is not a
+rule, it is half of the elevation mechanism**, and it stays. `patch.css` says so
+directly: a raised surface gets a stronger border, not just a shadow.
+
+That distinction is load-bearing in light, not cosmetic. `app-panel`,
+`app-raised` and `app-float` are ALL `#ffffff` there — section 1 chose that
+deliberately, because light has no headroom upward and elevates by border and
+shadow instead. Strip container borders in light and a white card goes invisible
+on a white surface with only `shadow-e1` left. Dark survives it because the ramp
+has real steps; light does not. `[built]`
+
+So: dividers go, container and control borders stay. Removing the second group
+requires a light-mode elevation answer first, and there isn't one. Boundary
+drawn by avel-bb, verified here.
+
+The app window's own outer frame also stays. It is the edge against the mat, not
+a rule between panes, and without it the rounded corners have nothing to
+describe them against.
 
 ### Ruling: header buttons are two-tier
 
@@ -1048,6 +1066,15 @@ state.
 6. **Never show a control that does not work.** Section 2's finding promoted to
    a rule, because it is the one already violated. Sections 6 and 10 are where
    it would be violated next.
+7. **A screen with no query behind it says it is not built, in plain words.** It
+   does not borrow the empty state, and it never renders fixtures. An empty
+   state means "there is nothing here yet"; a missing endpoint means "this does
+   not work yet". A screen that confuses the two tells the operator their
+   catalogue is empty when it is actually unreachable. Fixtures are worse again:
+   a screen of invented rows looks finished, which is the failure `CLAUDE.md`
+   opens with. The pre-flight screen already does this correctly and three
+   sessions reinvented it independently, which is why it is a rule rather than a
+   note. Raised by avel-fa.
 
 ---
 
@@ -1067,7 +1094,8 @@ state.
 | 10 | Chat: dependencies, `/api/chat`, read-only tools | Backend first, verified against the method-guard and envelope mechanisms before any UI. |
 | 11 | Sidebar redesign (section 9) | Independent of the chat. One background class, the underglow, the fade mask, then the recents list. |
 | 12 | Chat UI: composer, AI Elements, `InlineEntityCard`, status strip | The mode pill in section 10 is what makes step 10's read-only cut legible. |
-| 13 | Remaining shell polish, items 4 to 9 | Command palette, content width, scroll affordance, pending states, frame height, header wrap. |
+| 13 | **Catalog procedures** | Missing from this table entirely rather than deferred. The Library group is five nav items and four have no endpoints: skills, agent templates, skill sources, presets. Those screens are built and render "not built" until these exist. Preset is the hard one — the only entity in `DATA-CONTRACTS-V2` with no field block at all. Raised by avel-fa. |
+| 14 | Remaining shell polish, items 4 to 9 | Command palette, content width, scroll affordance, pending states, frame height, header wrap. |
 
 Steps 1 to 6 are shell work and touch no data. Step 7 is a schema change and
 belongs to whoever owns the schema. Soft-delete and append-only conventions
