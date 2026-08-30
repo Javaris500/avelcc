@@ -190,9 +190,17 @@ function Metrics({ metrics }: { metrics: Detail["metrics"] }) {
 			 * round-trip as a float. Rendered verbatim rather than reformatted: a
 			 * currency formatter here would parse it back to a float and undo the
 			 * exact thing the string type is protecting.
+			 *
+			 * NULL READS AS "NOT LOGGED", NOT AS AN EM DASH. The dash was
+			 * ambiguous between "nothing spent", "not yet entered" and "we do not
+			 * know" — and here it is the third. Mission 001's cost row exists with
+			 * every measure null: no model, no tokens, no usd. That row is the
+			 * corpus deliberately recording that slice 0's spend is permanently
+			 * unrecoverable, so a dash that reads as "coming soon" would quietly
+			 * promise a number nobody can ever supply.
 			 */
 			label: "Spend",
-			value: metrics.spendUsd === null ? "—" : `$${metrics.spendUsd}`,
+			value: metrics.spendUsd === null ? "Not logged" : `$${metrics.spendUsd}`,
 		},
 	];
 

@@ -13,7 +13,6 @@ const BUILT: Record<string, string> = {
 	Home: "/",
 	Missions: "/missions",
 	Clients: "/clients",
-	Intake: "/intake",
 	"Agent templates": "/catalog/agents",
 	Skills: "/catalog/skills",
 	Sources: "/catalog/sources",

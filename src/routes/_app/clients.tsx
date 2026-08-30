@@ -221,14 +221,29 @@ function ClientsLayout() {
 
 	return (
 		/*
-		 * Two panes side by side on a wide screen, stacked on a narrow one. The
-		 * table keeps a fixed measure and the detail takes the rest: the detail is
-		 * where the nine sections live and is the pane that benefits from width.
+		 * TWO PANES AT `/clients`, THREE AT `/clients/:id`. Operator ruling: an
+		 * empty detail pane whose only content is "pick a client" is waste, and
+		 * the table should have the room instead.
+		 *
+		 * The shape is decided by the ROUTE — `selectedId` is a param — and never
+		 * by whether the Outlet rendered anything. A layout that infers its
+		 * columns from its child's output breaks the first time a child returns
+		 * null for an unrelated reason, and it would fail silently, as a layout
+		 * that is merely wrong rather than broken.
+		 *
+		 * With nothing selected the table takes the full width. With a client
+		 * selected it drops to a fixed measure and the detail takes the rest,
+		 * because the detail is where the nine sections live and is the pane that
+		 * benefits from width.
 		 */
 		<div className="flex h-full flex-col gap-4 p-6 lg:flex-row">
 			<section
 				aria-label="Clients"
-				className="flex shrink-0 flex-col gap-3 lg:w-[26rem]"
+				className={
+					selectedId === undefined
+						? "flex min-w-0 flex-1 flex-col gap-3"
+						: "flex shrink-0 flex-col gap-3 lg:w-[26rem]"
+				}
 				data-testid="clients-pane"
 			>
 				<div className="flex flex-wrap items-center gap-2">
@@ -462,17 +477,26 @@ function ClientsLayout() {
 			</section>
 
 			{/*
-			 * The third pane. Separated by tone and gap rather than a rule, per the
-			 * operator's "every divider removed", and it scrolls independently so
-			 * the table stays put while nine sections move past it.
+			 * The third pane, and it does not exist until a client is selected.
+			 *
+			 * Separated by tone and gap rather than a rule, per the operator's
+			 * "every divider removed", and it scrolls independently so the table
+			 * stays put while nine sections move past it.
+			 *
+			 * There is no index route behind this any more. `clients.index.tsx` was
+			 * a "No client selected" placeholder and the operator called the pane
+			 * itself the waste, not just its emptiness — so the pane goes rather
+			 * than getting smaller, and the table takes the width it was holding.
 			 */}
-			<section
-				aria-label="Client detail"
-				className="min-w-0 flex-1 overflow-y-auto rounded-md bg-app-panel"
-				data-testid="clients-detail-pane"
-			>
-				<Outlet />
-			</section>
+			{selectedId === undefined ? null : (
+				<section
+					aria-label="Client detail"
+					className="min-w-0 flex-1 overflow-y-auto rounded-md bg-app-panel"
+					data-testid="clients-detail-pane"
+				>
+					<Outlet />
+				</section>
+			)}
 		</div>
 	);
 }

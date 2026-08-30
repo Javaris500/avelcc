@@ -87,11 +87,12 @@ export function Shell({
 					data-testid="app-shell"
 					data-theme={theme}
 				>
-					{/* THIRTEEN nav items sit before the content in tab order. Visually
+					{/* TWELVE nav items sit before the content in tab order. Visually
 			    hidden until focused, then a real, visible target.
-			    The count was wrong: nav.ts holds 16 `label:` fields, three of
-			    which are GROUP labels, leaving 13 destinations. It drops to 12
-			    when Intake goes, which is avel-c2's commit, not this one. */}
+			    The comment said twelve while the tree held thirteen, so it
+			    carries the derivation now rather than the number alone: nav.ts
+			    holds 15 `label:` fields, three of which are GROUP labels,
+			    leaving 12 destinations. Recount that way rather than by eye. */}
 					<a
 						className="sr-only rounded-sm bg-app-float px-3 py-2 text-sm text-text focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
 						data-testid="skip-to-content"
