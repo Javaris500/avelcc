@@ -1183,6 +1183,17 @@ The cheap discipline: stage by path, and read `git status --short` for entries
 you did not create before committing. The same root cause produced the
 `routeTree.gen.ts` merge blocks. Raised by avel-c2.
 
+**And `tsc` on the working tree cannot see this class of break.** A rename split
+across two commits leaves every file individually correct: the working tree
+compiles, each file compiles, and `HEAD` imports a symbol `HEAD` does not export.
+It happened to a `blockedTone` rename that touched three files where two were
+believed — the third was still on disk. `[built]`
+
+So before committing a rename in a shared tree: **stash and type-check `HEAD`
+alone.** That is the only check that answers the question the pre-commit hook is
+assumed to answer. Found by avel-c2, who broke `HEAD` for four minutes and caught
+it by running exactly that.
+
 Steps 1 to 6 are shell work and touch no data. Step 7 is a schema change and
 belongs to whoever owns the schema. Soft-delete and append-only conventions
 apply to a new table and are easy to miss from outside that module.
