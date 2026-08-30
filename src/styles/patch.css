@@ -131,17 +131,33 @@
      The landing keeps using --color-surface directly and is unaffected.
      Measured in L* (perceptually uniform) the steps are 8.15, 7.18, 7.74 —
      even and comfortably visible without being loud. */
-  --color-app-bg:       #1a1d23;   /* = bg               · the desktop      */
-  --color-app-recessed: #1a1d23;   /* = bg               · wells, inputs    */
-  --color-app-panel:    #2a2e36;   /* = surface-muted    · cards, panels    */
-  --color-app-raised:   #393e46;   /* = surface          · hover, active row*/
-  --color-app-float:    #4a5058;   /* = surface-elevated · popover, modal   */
+  /* CORRECTION 7 (UI-PLAN section 1): the ramp was even and climbed too far.
+     bg -> float spanned 23.1 L*, putting float at L* 33.8 — a mid-grey, three
+     of which stack in a mission panel, which is why the screen read washed
+     out. The span is now 11.0 L*, and the sidebar stops being treated as an
+     elevated surface at all: it sits at app-bg in both themes. Values are the
+     plan's; every L* below was recomputed rather than transcribed.
+
+     Contrast IMPROVED on every pair, because the surfaces went down and the
+     text did not. The plan flagged text-subtle on panel as the pair most
+     likely to fail; measured, it was ALREADY failing at 4.39:1 on the old
+     panel and now passes at 5.32:1. Full table in the commit message. */
+  --color-app-bg:       #16181d;   /* L*  8.2 · the desktop AND the sidebar */
+  --color-app-recessed: #111317;   /* L*  5.8 · wells, inputs, code blocks  */
+  --color-app-panel:    #1c1f25;   /* L* 11.7 · cards, mission panels       */
+  --color-app-raised:   #23272e;   /* L* 15.5 · hover, active row, controls */
+  --color-app-float:    #2a2f37;   /* L* 19.2 · popover, dropdown, modal    */
 
 
   /* ── 7 · SKELETON + DENSITY ─────────────────────────────────────────────
      Verification can run for an hour. Skeletons need their own surface,
      distinct from panel, or the pulse does not read. */
-  --color-skeleton: #333842;
+  /* Re-derived with the ramp. At #333842 (L* 23.4) a skeleton was BRIGHTER
+     than the new app-float (L* 19.2), which would have made a loading
+     placeholder the most prominent surface on the page. Now app-raised's
+     value: distinct from the panel it sits on by 3.8 L*, and never the
+     brightest thing in view. */
+  --color-skeleton: #23272e;
 
   --row-comfortable: 12px;   /* reading                                    */
   --row-compact:      6px;   /* scanning a 40-row gate result              */
@@ -229,18 +245,25 @@
 
 
   /* App surfaces — light. Desktop drops to create headroom for the panel. */
-  --color-app-bg:       #eaedf0;
-  --color-app-recessed: #f2f4f6;
-  --color-app-panel:    #ffffff;
-  /* CORRECTION 5 (see header): was #ffffff, identical to --color-app-panel.
-     The patch calls that deliberate — light has no headroom upward, so
-     elevation is "carried by border and shadow alone". That reasoning held
-     until correction 4 showed no border was being carried at all. Measured
-     after the border fix: the workspace switcher still read rgb(255,255,255)
-     on a sidebar of rgb(255,255,255), with a 1px #e5e7eb hairline doing all
-     the work for a control the operator is meant to click.
-     avel-cc-shell.html uses #eeeeee for this surface. Taking the reference. */
-  --color-app-raised:   #eeeeee;   /* [ref] + elevation-border-raised + shadow-e2 */
+  /* CORRECTION 7 (UI-PLAN section 1). The light ramp was NON-MONOTONIC:
+     app-raised #eeeeee (L* 94.1) sat 0.5 above the background and BELOW the
+     #ffffff panel it was meant to rise from. A raised surface was darker than
+     the surface under it. The background drops to make headroom, and light
+     elevates by border and shadow alone rather than by lightness. */
+  --color-app-bg:       #e8eaee;   /* L* 92.7 · the desktop AND the sidebar */
+  --color-app-recessed: #dcdfe5;   /* L* 88.8 · wells, inputs               */
+  --color-app-panel:    #ffffff;   /* L* 100                                */
+  /* CORRECTION 5 IS REVERTED HERE, AND ONLY BECAUSE THE SIDEBAR MOVED.
+     Correction 5 raised this from #ffffff to #eeeeee for a real reason: the
+     workspace switcher read white-on-white against a sidebar that was also
+     white, with a 1px hairline doing all the work. That reason was the
+     SIDEBAR being painted as a panel, not this token's value. With the
+     sidebar at app-bg the control sits white on grey and reads on its own,
+     which is the ruling in UI-PLAN section 1.
+     THE TWO CHANGES ARE ONE CHANGE. Reverting this without moving the
+     sidebar reintroduces correction 5's bug exactly, which is why
+     sidebar.tsx ships in the same commit as this file. */
+  --color-app-raised:   #ffffff;   /* + elevation-border-raised + shadow-e2 */
   --color-app-float:    #ffffff;   /* + elevation-border-raised + shadow-e3 */
 
   /* CORRECTION 4 (see header): re-resolve the elevation border aliases.
@@ -265,6 +288,9 @@
   --color-state-selected: rgb(0 146 202 / 0.100);
   --color-state-drag:     rgb(0 146 202 / 0.060);
 
+  /* Unchanged in value and now unique: with app-raised at #ffffff, #eeeeee is
+     no longer any other surface's colour, so a skeleton cannot be mistaken
+     for a control. */
   --color-skeleton: #eeeeee;
 
   /* Gate states — light */

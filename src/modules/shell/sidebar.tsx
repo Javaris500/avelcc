@@ -146,7 +146,13 @@ export function Sidebar({
 	return (
 		<aside
 			className={cn(
-				"flex flex-col border-r border-[var(--elevation-border-rest)] bg-app-panel py-3.5 transition-[width] duration-[var(--duration-micro)]",
+				// THE SIDEBAR IS A DIFFERENT PLANE, NOT A RAISED ONE. This painted
+				// bg-app-panel, a surface meant for cards, which is most of "the
+				// sidebar is too light". It sits at app-bg in both themes now.
+				// This ships WITH the token change rather than after it: in light,
+				// app-raised reverts to #ffffff, and a white control on a white
+				// sidebar is the exact bug correction 5 was written to fix.
+				"flex flex-col border-r border-[var(--elevation-border-rest)] bg-app-bg py-3.5 transition-[width] duration-[var(--duration-micro)]",
 				collapsed ? "w-16 items-center px-2" : "w-(--frame-sidebar) px-3",
 			)}
 			data-collapsed={collapsed}

@@ -181,6 +181,46 @@
   --color-popover:              var(--color-app-float);
   --color-popover-foreground:   var(--color-text);
 
+  /* ── THE THREE HOLES IN THE SHADCN ALIAS LAYER ────────────────────────────
+     Verified absent by grep before adding. Tailwind v4 emits NOTHING for an
+     undefined utility, so `bg-card` rendered no background at all and failed
+     silently — check-tokens.mjs cannot catch it, because it looks for hex
+     literals and arbitrary values, not for names that resolve to nothing.
+     AI Elements arrives with these class names, so the hole is closed first.
+
+     Every one is declared in BOTH :root and .light. A var() alias declared
+     once resolves at the DECLARING element and freezes against that theme;
+     that is correction 4, which cost every border in light mode. */
+  --color-card:                 var(--color-app-panel);
+  --color-card-foreground:      var(--color-text);
+
+  /* The sidebar is a DIFFERENT PLANE, not a raised one — UI-PLAN section 1.
+     It sits at app-bg in both themes, which is why this maps to app-bg and
+     not to panel or to a surface of its own. */
+  --color-sidebar:                    var(--color-app-bg);
+  --color-sidebar-foreground:         var(--color-text);
+  --color-sidebar-primary:            var(--color-accent);
+  --color-sidebar-primary-foreground: var(--color-bg);
+  --color-sidebar-accent:             var(--color-app-raised);
+  --color-sidebar-accent-foreground:  var(--color-text);
+  --color-sidebar-border:             var(--color-border);
+  --color-sidebar-ring:               var(--color-focus-ring);
+
+  /* PROVISIONAL, and the limitation is the point of saying so. These are a
+     monochromatic ramp off the accent, which is correct for SEQUENTIAL data
+     and wrong for categorical series — five unordered categories need hues
+     that are distinguishable from each other, and a lightness ramp is not.
+     They exist so a chart component renders something rather than nothing.
+     A real categorical palette is a decision nobody has made, and it cannot
+     be derived from a brand with one chromatic colour. Deliberately NOT
+     mapped onto the gate tones: a series coloured gate-block would read as a
+     failure, which is the semantic bleed the token layer already forbids. */
+  --color-chart-1: #0092ca;
+  --color-chart-2: #40b0da;
+  --color-chart-3: #74c8e6;
+  --color-chart-4: #a3dcf0;
+  --color-chart-5: #d0eefa;
+
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -219,4 +259,44 @@
   --color-ring:                 var(--color-focus-ring);
   --color-popover:              var(--color-app-float);
   --color-popover-foreground:   var(--color-text);
+
+  /* ── THE THREE HOLES IN THE SHADCN ALIAS LAYER ────────────────────────────
+     Verified absent by grep before adding. Tailwind v4 emits NOTHING for an
+     undefined utility, so `bg-card` rendered no background at all and failed
+     silently — check-tokens.mjs cannot catch it, because it looks for hex
+     literals and arbitrary values, not for names that resolve to nothing.
+     AI Elements arrives with these class names, so the hole is closed first.
+
+     Every one is declared in BOTH :root and .light. A var() alias declared
+     once resolves at the DECLARING element and freezes against that theme;
+     that is correction 4, which cost every border in light mode. */
+  --color-card:                 var(--color-app-panel);
+  --color-card-foreground:      var(--color-text);
+
+  /* The sidebar is a DIFFERENT PLANE, not a raised one — UI-PLAN section 1.
+     It sits at app-bg in both themes, which is why this maps to app-bg and
+     not to panel or to a surface of its own. */
+  --color-sidebar:                    var(--color-app-bg);
+  --color-sidebar-foreground:         var(--color-text);
+  --color-sidebar-primary:            var(--color-accent);
+  --color-sidebar-primary-foreground: var(--color-bg);
+  --color-sidebar-accent:             var(--color-app-raised);
+  --color-sidebar-accent-foreground:  var(--color-text);
+  --color-sidebar-border:             var(--color-border);
+  --color-sidebar-ring:               var(--color-focus-ring);
+
+  /* PROVISIONAL, and the limitation is the point of saying so. These are a
+     monochromatic ramp off the accent, which is correct for SEQUENTIAL data
+     and wrong for categorical series — five unordered categories need hues
+     that are distinguishable from each other, and a lightness ramp is not.
+     They exist so a chart component renders something rather than nothing.
+     A real categorical palette is a decision nobody has made, and it cannot
+     be derived from a brand with one chromatic colour. Deliberately NOT
+     mapped onto the gate tones: a series coloured gate-block would read as a
+     failure, which is the semantic bleed the token layer already forbids. */
+  --color-chart-1: #0092ca;
+  --color-chart-2: #40b0da;
+  --color-chart-3: #74c8e6;
+  --color-chart-4: #a3dcf0;
+  --color-chart-5: #d0eefa;
 }
