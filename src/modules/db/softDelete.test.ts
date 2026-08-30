@@ -83,9 +83,22 @@ function selectChains(src: string): string[] {
 	 * flagging a line I had just fixed — a false positive rather than a missed
 	 * one, which is the safe direction for a scanner but still wrong.
 	 */
+	/**
+	 * THE OPT-OUT MARKER SURVIVES STRIPPING, and it did not until the catalog
+	 * needed it. The opt-out below is documented as "a sentence someone wrote",
+	 * which means a comment — and comments were being removed before the opt-out
+	 * was looked for, so the only way to claim it was to put the token in code.
+	 * A check whose escape hatch cannot be written the way it is documented is a
+	 * check people route around instead of using.
+	 *
+	 * Comment BODIES still go, semicolons and all, which is what the stripping is
+	 * for. Only the token is kept.
+	 */
+	const keepMarker = (block: string) =>
+		block.includes("includes-deleted") ? " includes-deleted " : "";
 	const stripped = src
-		.replace(/\/\*[\s\S]*?\*\//g, "")
-		.replace(/\/\/.*$/gm, "");
+		.replace(/\/\*[\s\S]*?\*\//g, keepMarker)
+		.replace(/\/\/.*$/gm, keepMarker);
 	return stripped
 		.split(";")
 		.filter((c) => c.includes(".select(") || c.includes(".select()"));

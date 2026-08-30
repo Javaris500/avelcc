@@ -20,6 +20,7 @@ describe("the assembled contract", () => {
 	 */
 	it("exposes exactly the built route groups", () => {
 		expect(Object.keys(contract).sort()).toEqual([
+			"agentTemplate",
 			"client",
 			"engagement",
 			"export",
@@ -27,6 +28,8 @@ describe("the assembled contract", () => {
 			"mission",
 			"playbook",
 			"roster",
+			"skill",
+			"skillSource",
 		]);
 	});
 
@@ -37,6 +40,9 @@ describe("the assembled contract", () => {
 			...Object.values(contract.roster),
 			...Object.values(contract.playbook),
 			...Object.values(contract.intake),
+			...Object.values(contract.skill),
+			...Object.values(contract.agentTemplate),
+			...Object.values(contract.skillSource),
 		];
 		for (const r of routes) {
 			const codes = Object.keys(r.responses).map(Number);

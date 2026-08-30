@@ -1,5 +1,10 @@
 import { initContract } from "@ts-rest/core";
 
+import {
+	agentTemplateContract,
+	skillContract,
+	skillSourceContract,
+} from "#/contract/catalog";
 import { clientContract } from "#/contract/client";
 import { engagementContract } from "#/contract/engagement";
 import { exportContract } from "#/contract/export";
@@ -21,6 +26,13 @@ const c = initContract();
  * declared locally.
  *
  * BUILT: mission · roster · playbook · export · client · engagement · intake
+ *        skill · agent-template · skill-source
+ *
+ * The three catalog groups are LIST ONLY. A `get` is not built because the
+ * catalog's detail panel renders from the row already on screen rather than
+ * fetching again, so it would be a procedure nothing calls. Writes are not
+ * built because the catalog "ships empty and is populated in-app" and what that
+ * write looks like is unspecified — inventing it is what this file prevents.
  *
  * NOT BUILT, and each is a documented gap rather than an oversight:
  *   preset                       BLOCKING, and worse than a missing route group.
@@ -39,10 +51,6 @@ const c = initContract();
  *                                which priorities. That is the whole entity.
  *                                Found by session 2 building the table and
  *                                discovering there was nothing to build.
- *   skill-source                 no procedures exist; the catalogue is
- *                                populated in-app and something must write it.
- *   agent-template, skill        shapes exist; procedures not yet specified
- *                                beyond list/get.
  *   repo-policy, connection      shapes exist in DATA-CONTRACTS-V2.
  *   activity                     append-only, filters are enums.
  *
@@ -50,6 +58,7 @@ const c = initContract();
  * is the failure this file exists to prevent.
  */
 export const contract = c.router({
+	agentTemplate: agentTemplateContract,
 	client: clientContract,
 	engagement: engagementContract,
 	intake: intakeContract,
@@ -57,6 +66,8 @@ export const contract = c.router({
 	roster: rosterContract,
 	playbook: playbookContract,
 	export: exportContract,
+	skill: skillContract,
+	skillSource: skillSourceContract,
 });
 
 export type Contract = typeof contract;
