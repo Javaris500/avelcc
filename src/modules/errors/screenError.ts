@@ -1,3 +1,4 @@
+import type { Recovery } from "#/contract/errors/error-map";
 import { presentError } from "#/contract/errors/error-map";
 import { ERROR_CODES, type ErrorCode } from "#/contract/shared/errors";
 
@@ -29,6 +30,13 @@ export type ScreenError = {
 	body: string;
 	/** False means render no retry, not "render a disabled one". */
 	canRetry: boolean;
+	/**
+	 * The map's own recovery, for codes that have one. Returned rather than
+	 * consumed here because a `link` or a `switch-target` needs a control this
+	 * module cannot build — only the screen knows whether it can act on it.
+	 * Absent for codes outside ERROR_CODES, which have no map entry.
+	 */
+	recovery?: Recovery;
 };
 
 function isErrorCode(code: string): code is ErrorCode {
@@ -47,12 +55,12 @@ export function presentScreenError(
 		title: presentation.title,
 		body: presentation.body,
 		/**
-		 * `retry` ONLY. `link` and `switch-target` are real recoveries that this
-		 * screen shape cannot offer — <ErrorState> takes a retry callback and
-		 * nothing else — so they render as no action rather than as a retry that
-		 * would do the wrong thing. Widening ErrorState to carry the other two is
-		 * worth doing and is not this change.
+		 * `retry` ONLY, and that is the whole point: a `link` or a
+		 * `switch-target` is a real recovery but it is NOT a retry, so it must
+		 * never arrive as one. Those two travel out on `recovery` for a screen
+		 * that can act on them, and ErrorState now has a slot to put them in.
 		 */
 		canRetry: presentation.recovery.kind === "retry",
+		recovery: presentation.recovery,
 	};
 }
