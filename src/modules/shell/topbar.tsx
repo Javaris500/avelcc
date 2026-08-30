@@ -1,73 +1,33 @@
-import { ChevronDown, PanelLeft } from "lucide-react";
-import { type ReactNode, type RefObject, useState } from "react";
-import { FULL_BUILD_GATES } from "#/contract/shared/playbook";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuTrigger,
-} from "#/ui/dropdown-menu";
+import { PanelLeft } from "lucide-react";
+import type { RefObject } from "react";
 import { cn } from "#/utils/cn";
 
 /**
- * Top bar: run state on the left, right-aligned pill controls.
+ * Top bar: run state, and nothing that belongs to a page.
  *
- * Everything here is about the CURRENT VIEW's data. Per-operator preferences —
- * theme, sidebar collapse — live in the sidebar footer beside the account,
- * because they belong to the operator rather than to what is on screen.
+ * THE SHELL HEADER CARRIES NO PAGE-SPECIFIC DATA CONTROLS. Two dropdowns lived
+ * here — "All gates" and a delivery target — and both were global chrome
+ * holding page-specific data. A "Filter by gate" control sat above the Clients
+ * page, the Skills catalog and Account settings, where the concept does not
+ * exist.
  *
- * Every control opens something. A chevron that opens nothing is the product
- * telling the operator a menu exists when it does not.
+ * Worse, neither did anything. Both selections lived in `useState` in this
+ * file: the gate filter filtered nothing and the target targeted nothing. This
+ * file's own comment said "every control opens something — a chevron that opens
+ * nothing is the product telling the operator a menu exists when it does not",
+ * and then stopped one level short. A menu that opens and changes nothing is
+ * the same lie one level deeper, and a non-technical operator has no way to
+ * discover it was never wired.
+ *
+ * Gate filtering belongs on mission detail. Delivery target belongs on the
+ * export screen. They are deleted rather than moved, because the pages that own
+ * that data do not exist yet and a control parked in the wrong place is how
+ * this started.
+ *
+ * Per-operator preferences — theme, sidebar collapse — stay in the sidebar
+ * footer beside the account: they belong to the operator rather than to what is
+ * on screen.
  */
-
-/**
- * Delivery targets. Closed vocabulary from DATA-CONTRACTS-V2.md:275
- * (`target_kind 'zip' | 'github_pr' | 'github_push'`). Not invented, and not
- * extendable here — a fourth target is a contract change.
- */
-const TARGETS = ["zip", "github_pr", "github_push"] as const;
-type Target = (typeof TARGETS)[number];
-
-const GATE_FILTER_ALL = "All gates";
-
-/** Shared pill chrome. Reference `.ctl`. */
-const CTL =
-	"interactive inline-flex items-center gap-2 rounded-full border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-1.5 text-xs text-text-muted hover:border-[var(--elevation-border-raised)] hover:text-text max-md:min-h-11";
-
-function Chevron() {
-	return (
-		<ChevronDown
-			aria-hidden="true"
-			className="opacity-70 transition-transform duration-[var(--duration-micro)] group-data-[state=open]:rotate-180"
-			size={12}
-			strokeWidth={2.4}
-		/>
-	);
-}
-
-/** A pill that opens a real menu. aria-expanded comes from Radix. */
-function MenuControl({
-	label,
-	testId,
-	children,
-}: {
-	label: string;
-	testId: string;
-	children: ReactNode;
-}) {
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger className={cn(CTL, "group")} data-testid={testId}>
-				{label}
-				<Chevron />
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" data-testid={`${testId}-menu`}>
-				{children}
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
 
 export function TopBar({
 	breadcrumb,
@@ -92,8 +52,6 @@ export function TopBar({
 	 */
 	activity?: "idle" | "running";
 }) {
-	const [gateFilter, setGateFilter] = useState<string>(GATE_FILTER_ALL);
-	const [target, setTarget] = useState<Target>("github_pr");
 	const running = activity === "running";
 
 	return (
@@ -131,48 +89,10 @@ export function TopBar({
 				{breadcrumb}
 			</span>
 
+			{/* The spacer stays: it is what keeps the pill left-aligned now that
+			    nothing sits on the right. The header's real content — title,
+			    subtitle and one route-owned action — is section 2 and lands next. */}
 			<span aria-hidden="true" className="flex-1" data-testid="topbar-spacer" />
-
-			<MenuControl label={gateFilter} testId="control-gates">
-				<DropdownMenuLabel>Filter by gate</DropdownMenuLabel>
-				<DropdownMenuItem
-					data-testid="gate-option-all"
-					onSelect={() => setGateFilter(GATE_FILTER_ALL)}
-				>
-					{GATE_FILTER_ALL}
-				</DropdownMenuItem>
-				{/* The five real gates, from the golden fixture's playbook. */}
-				{FULL_BUILD_GATES.map((gate) => (
-					<DropdownMenuItem
-						data-testid={`gate-option-${gate.name}`}
-						key={gate.name}
-						onSelect={() => setGateFilter(gate.name)}
-					>
-						<span className="font-mono">{gate.name}</span>
-						<span className="ml-auto text-micro text-text-subtle">
-							{gate.policy}
-						</span>
-					</DropdownMenuItem>
-				))}
-			</MenuControl>
-
-			<MenuControl label={target} testId="control-target">
-				<DropdownMenuLabel>Delivery target</DropdownMenuLabel>
-				{TARGETS.map((kind) => (
-					<DropdownMenuItem
-						data-testid={`target-option-${kind}`}
-						key={kind}
-						onSelect={() => setTarget(kind)}
-					>
-						<span className="font-mono">{kind}</span>
-						{kind === target ? (
-							<span className="ml-auto text-micro text-text-subtle">
-								current
-							</span>
-						) : null}
-					</DropdownMenuItem>
-				))}
-			</MenuControl>
 		</header>
 	);
 }

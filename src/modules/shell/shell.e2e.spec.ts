@@ -116,8 +116,6 @@ test.describe("shell structure", () => {
 			"live-pill",
 			"live-dot",
 			"control-theme",
-			"control-gates",
-			"control-target",
 			"main",
 		]) {
 			await expect(page.getByTestId(id), `[${id}]`).toHaveCount(1);
@@ -339,8 +337,6 @@ test.describe("type scale", () => {
 		"account",
 		"live-pill",
 		"control-theme",
-		"control-gates",
-		"control-target",
 	];
 
 	test("renders every chrome element at an on-scale size", async ({ page }) => {
@@ -383,40 +379,28 @@ test.describe("wired controls", () => {
 		await expect(page.getByTestId("workspace-option-current")).toBeVisible();
 	});
 
-	test("gate filter offers the five real gates and nothing invented", async ({
+	/**
+	 * The gate-filter and delivery-target tests are GONE WITH THE CONTROLS THEY
+	 * TESTED. Both passed and both were testing that a menu opened and set its
+	 * own useState — the selection filtered nothing and targeted nothing, so the
+	 * assertions confirmed the widget worked while the feature did not exist.
+	 *
+	 * Kept here as a note rather than deleted silently: when gate filtering
+	 * lands on mission detail and target selection on the export screen, those
+	 * screens need tests that assert the DATA changed, not that a label did.
+	 */
+
+	test("the header carries no page-specific data controls", async ({
 		page,
 	}) => {
 		await gotoApp(page);
-		await page.getByTestId("control-gates").click();
-		await expect(page.getByTestId("control-gates-menu")).toBeVisible();
-
-		// From FULL_BUILD_GATES, transcribed from the golden fixture's playbook.
-		for (const gate of [
-			"phase1-close",
-			"alignment",
-			"qa",
-			"security",
-			"acceptance",
-		]) {
-			await expect(page.getByTestId(`gate-option-${gate}`)).toBeVisible();
-		}
-
-		await page.getByTestId("gate-option-alignment").click();
-		await expect(page.getByTestId("control-gates")).toContainText("alignment");
-	});
-
-	test("target offers the closed vocabulary and selection sticks", async ({
-		page,
-	}) => {
-		await gotoApp(page);
-		await page.getByTestId("control-target").click();
-
-		for (const kind of ["zip", "github_pr", "github_push"]) {
-			await expect(page.getByTestId(`target-option-${kind}`)).toBeVisible();
-		}
-
-		await page.getByTestId("target-option-zip").click();
-		await expect(page.getByTestId("control-target")).toContainText("zip");
+		// The ruling from UI-PLAN section 2. These two were global chrome holding
+		// page-specific data, above pages where the concept does not exist.
+		await expect(page.getByTestId("control-gates")).toHaveCount(0);
+		await expect(page.getByTestId("control-target")).toHaveCount(0);
+		// The run state stays: it is the shell's own, and it is the one thing up
+		// there that is about the app rather than about a page.
+		await expect(page.getByTestId("live-pill")).toHaveCount(1);
 	});
 
 	test("account sign-out is a named action, not a bare click", async ({
