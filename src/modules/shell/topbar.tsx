@@ -1,6 +1,7 @@
 import { PanelLeft } from "lucide-react";
 import type { RefObject } from "react";
 import type { NavGroup } from "#/contract/ui/nav";
+import { NAV } from "#/modules/nav";
 import { identifyPage } from "#/modules/shell/page-title";
 import { usePageHeaderState } from "#/modules/shell/use-page-header";
 import { PageHeader } from "#/ui/page-header";
@@ -55,7 +56,13 @@ export function TopBar({
 	breadcrumb: string;
 	/** Current path, for deriving the title until routes claim their own. */
 	pathname: string;
-	navGroups: NavGroup[];
+	/**
+	 * Defaults to NAV, exactly as the sidebar does. `_app.tsx` does not pass
+	 * this — it renders <Shell> without it — so an un-defaulted prop arrived as
+	 * an empty array and every page's title derived to the fallback "AVEL".
+	 * Found by driving the page, not by the type-checker, which was satisfied.
+	 */
+	navGroups?: NavGroup[];
 	/**
 	 * Supplied only below the compact breakpoint, where the sidebar is a
 	 * drawer. Distinct from sidebar-collapse, which is a desktop control for
@@ -74,7 +81,17 @@ export function TopBar({
 }) {
 	const running = activity === "running";
 	const claimed = usePageHeaderState();
-	const derived = identifyPage(navGroups, pathname);
+	/**
+	 * EMPTY COUNTS AS ABSENT, not as "a nav with no items". `??` alone was not
+	 * enough: shell.tsx passes `navGroups ?? []`, so an empty ARRAY arrived
+	 * rather than undefined, the nullish default never fired, and every page
+	 * derived the "no nav entry" fallback — the header read "AVEL" on all of
+	 * them. The type-checker was satisfied throughout; driving the page is what
+	 * found it. A nav with zero groups is never a meaningful state, so treating
+	 * it as absent is honest rather than defensive.
+	 */
+	const groups = navGroups?.length ? navGroups : NAV;
+	const derived = identifyPage(groups, pathname);
 
 	/**
 	 * The route's title wins; the nav-derived one is the fallback. No route
@@ -120,8 +137,16 @@ export function TopBar({
 
 			<PageHeader
 				actions={claimed.actions}
+				/**
+				 * ONLY WHEN IT SAYS SOMETHING THE TITLE DOES NOT. On a nested route
+				 * with no claimed title, the title falls back to the nav label and
+				 * the parent IS that label, so rendering both gave "Missions" above
+				 * "Missions". That is the bare "Missions >" the plan calls noise,
+				 * arrived at from the other direction. Once a route claims its own
+				 * title the two differ and the breadcrumb earns its line.
+				 */
 				breadcrumb={
-					derived.parent ? (
+					derived.parent && derived.parent !== title ? (
 						<span data-testid="breadcrumb-parent">{derived.parent}</span>
 					) : undefined
 				}

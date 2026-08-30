@@ -5,6 +5,7 @@ import {
 	type SetStateAction,
 	useContext,
 	useEffect,
+	useRef,
 	useState,
 } from "react";
 
@@ -15,34 +16,55 @@ import {
  * slot to the ROUTE and the run state to the shell. A route cannot render into
  * the header directly — the header is above `main` in the tree — so it declares
  * what it wants and the shell renders it.
- *
- * NOTHING USES THIS YET, and that is deliberate rather than unfinished. Routes
- * live under `src/routes/_app/`, which this session does not own; the shell
- * falls back to the nav-derived title until each route's owner adopts the hook.
- * The mechanism ships first so adoption is one hook call per route rather than
- * a shell change per route.
  */
+
+/**
+ * An action the route wants in the header, as DATA rather than as an element.
+ *
+ * THE ROUTE NEVER BUILDS A NODE, and that is the whole reason this type exists.
+ * A route writing the obvious thing —
+ *
+ *     usePageHeader({ title: "Northwind", actions: <Button>New request</Button> })
+ *
+ * builds a fresh element object on every render. React compares deps with
+ * Object.is, so the dep changes, the effect runs, state is set, the component
+ * re-renders, a new element is built, and the effect runs again. Unbounded, and
+ * it fails on the first route that uses the slot as designed. Found by avel-bb
+ * adopting the hook, not by me writing it.
+ *
+ * A descriptor cannot loop by construction: the shell builds the Button, so
+ * there is no element identity to change. Asking routes to remember a useMemo
+ * would be an attestation rather than a mechanism, and this project's own note
+ * is that attestations are its recurring failure mode.
+ *
+ * It also fits section 2 better than a node did. The header wants exactly one
+ * primary action plus an overflow, which a descriptor list can enforce and a
+ * ReactNode cannot.
+ */
+export type PageAction = {
+	label: string;
+	/** A link, or a handler. Not both. */
+	to?: string;
+	onClick?: () => void;
+	variant?: "primary" | "secondary";
+	testId?: string;
+};
 
 export type PageHeaderState = {
 	title?: string;
+	/**
+	 * FREE-FORM AND STILL SAFE. These stay ReactNode because they are genuinely
+	 * prose and a descriptor would be a straitjacket — but they are kept OUT of
+	 * the effect's dependency array and read from a ref instead, so a route
+	 * passing an inline fragment cannot loop either. The header re-renders when
+	 * the provider's state changes, so the nodes stay fresh without the effect
+	 * depending on their identity.
+	 */
 	subtitle?: ReactNode;
 	definition?: ReactNode;
-	actions?: ReactNode;
+	actions?: PageAction[];
 };
 
-/**
- * TWO CONTEXTS, NOT ONE, and the split is load-bearing rather than tidy.
- *
- * A single context carrying `{ state, set }` gets a new identity every time the
- * state changes, so a route effect depending on it re-runs on its own update
- * and sets again — a loop. The first version of this file suppressed the lint
- * that said so, which is the wrong half of the problem to silence: the warning
- * was correct and the dependency really was missing.
- *
- * `setState` from useState is referentially stable for the life of the
- * provider, so a route can depend on it honestly and the effect runs only when
- * the route's own values change.
- */
 const StateContext = createContext<PageHeaderState>({});
 const SetContext = createContext<Dispatch<SetStateAction<PageHeaderState>>>(
 	() => {},
@@ -63,6 +85,18 @@ export function usePageHeaderState(): PageHeaderState {
 }
 
 /**
+ * A stable key for a descriptor list, so an array literal rebuilt every render
+ * does not restart the effect. Labels and destinations are the identity of an
+ * action; a fresh array of the same actions is the same header.
+ */
+function actionsKey(actions: PageAction[] | undefined): string {
+	if (!actions) return "";
+	return actions
+		.map((a) => `${a.label}|${a.to ?? ""}|${a.variant ?? ""}`)
+		.join("~");
+}
+
+/**
  * Called by a route to claim the header.
  *
  * Clears on unmount, so navigating away from a route that set a title cannot
@@ -77,8 +111,17 @@ export function usePageHeader({
 }: PageHeaderState): void {
 	const set = useContext(SetContext);
 
+	// Read at effect time rather than depended upon. See PageHeaderState.
+	const nodes = useRef({ subtitle, definition, actions });
+	nodes.current = { subtitle, definition, actions };
+
+	const key = actionsKey(actions);
+
 	useEffect(() => {
-		set({ title, subtitle, definition, actions });
+		const { subtitle: s, definition: d, actions: a } = nodes.current;
+		set({ title, subtitle: s, definition: d, actions: a });
 		return () => set({});
-	}, [set, title, subtitle, definition, actions]);
+		// `title` and `key` are the value-identity of this header. The nodes come
+		// from the ref precisely so their object identity cannot drive this.
+	}, [set, title, key]);
 }

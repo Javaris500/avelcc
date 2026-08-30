@@ -1,4 +1,8 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
+import type { PageAction } from "#/modules/shell/use-page-header";
+import { Button } from "#/ui/button";
 
 import { cn } from "#/utils/cn";
 
@@ -47,8 +51,12 @@ export function PageHeader({
 	 * which is the strongest evidence a slot is real.
 	 */
 	definition?: ReactNode;
-	/** The route's own actions. Changes per page. Empty is a valid state. */
-	actions?: ReactNode;
+	/**
+	 * The route's own actions, as DATA. The header builds the controls, so a
+	 * route never constructs an element and cannot hand the shell a value whose
+	 * identity changes every render. See PageAction.
+	 */
+	actions?: PageAction[];
 	/**
 	 * SHELL-OWNED AND NEVER MOVING. Found by muscle memory, so its position
 	 * cannot depend on whether the route supplied actions — which is why the
@@ -78,7 +86,11 @@ export function PageHeader({
 
 				<h1
 					className="font-display text-title font-semibold text-text"
-					data-testid="page-title"
+					// DISTINCT FROM the routes' own in-content h1, which still exists
+					// on every page. Sharing `page-title` gave two elements one id and
+					// made every selector ambiguous — the same duplicate-testid defect
+					// this codebase already fixed once in the violations list.
+					data-testid="page-header-title"
 				>
 					{title}
 				</h1>
@@ -109,9 +121,40 @@ export function PageHeader({
 				className="ml-auto flex shrink-0 flex-wrap items-center gap-2"
 				data-testid="page-actions"
 			>
-				{actions}
+				{actions?.map((action) => (
+					<PageActionButton action={action} key={action.label} />
+				))}
 				{core}
 			</div>
 		</header>
+	);
+}
+
+/**
+ * One descriptor, one control. A `to` renders a link and an `onClick` renders a
+ * button; a descriptor carrying both is a programming error rather than a
+ * runtime branch, so the link wins and the handler is ignored.
+ */
+function PageActionButton({ action }: { action: PageAction }) {
+	const testId = action.testId ?? `page-action-${action.label}`;
+	if (action.to) {
+		return (
+			<Button
+				asChild
+				data-testid={testId}
+				variant={action.variant ?? "secondary"}
+			>
+				<Link to={action.to}>{action.label}</Link>
+			</Button>
+		);
+	}
+	return (
+		<Button
+			data-testid={testId}
+			onClick={action.onClick}
+			variant={action.variant ?? "secondary"}
+		>
+			{action.label}
+		</Button>
 	);
 }
