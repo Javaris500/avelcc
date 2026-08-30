@@ -294,10 +294,20 @@ test("the collapsed rail keeps an accessible name on every item", async ({
 	}
 
 	// Hidden visually, not removed: an sr-only label has a ~1px box.
+	//
+	// THE UNDERGLOW IS EXCLUDED, and the exclusion is the point rather than a
+	// convenience. This selector was written when the only spans inside a nav
+	// item were its label, so "every span is ~1px" and "every label is sr-only"
+	// were the same assertion. The active-item glow added three decorative spans
+	// that are legitimately wide, and the test went red for a rendering that is
+	// correct — the glow is inside an aria-hidden wrapper and reaches no screen
+	// reader. Narrowing the selector keeps the real assertion; deleting it would
+	// have lost the case it was written for, which is a rail that looks perfect
+	// in a screenshot and has no accessible name on any item.
 	const widths = await page.evaluate(() =>
-		[...document.querySelectorAll("[data-built] span")].map(
-			(el) => el.getBoundingClientRect().width,
-		),
+		[...document.querySelectorAll("[data-built] span")]
+			.filter((el) => !el.closest('[data-testid="nav-underglow"]'))
+			.map((el) => el.getBoundingClientRect().width),
 	);
 	expect(widths.length).toBeGreaterThan(0);
 	expect(widths.every((w) => w <= 1)).toBe(true);
