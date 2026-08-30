@@ -306,7 +306,14 @@ export function Sidebar({
 			    space and shows nothing, so there is no state to track. */}
 			<div
 				className={cn(
-					"app-scroll w-full min-h-0 flex-1 overflow-y-auto",
+					// SCROLLS, BUT SHOWS NO SCROLLBAR. `app-scroll` paints a 10px track
+					// on the right edge of the nav, which reads as a second border inside
+					// a panel that already has one, and it appears and disappears as the
+					// list grows. The fade below already says "there is more" — that is
+					// the signal; the bar was the decoration. Overflow is untouched, so
+					// wheel, trackpad, keyboard and touch all still scroll.
+					"w-full min-h-0 flex-1 overflow-y-auto",
+					"[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
 					"[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]",
 				)}
 				data-nav-groups={(navGroups ?? NAV).length}

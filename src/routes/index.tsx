@@ -37,12 +37,24 @@ export const Route = createFileRoute("/")({
 
 type Entry = {
 	to: string;
-	params?: Record<string, string>;
 	label: string;
 	note: string;
 	state: "built" | "partial";
 };
 
+/**
+ * THE DOOR STATES WHAT IS BUILT, so every claim on it has to be true.
+ *
+ * The pre-flight entry used to deep-link a hardcoded id,
+ * `01J8Z4K2QW3E5R7T9Y1V3J5P7A`. That is a ULID and `missions.id` is a uuid, so
+ * it matched no row and the front door's third link was a 404 — the one link
+ * most likely to be clicked by someone evaluating whether any of this works.
+ * It now points at the list, which is honest and cannot rot: the operator picks
+ * a mission that exists rather than the door guessing one.
+ *
+ * The notes were stale in the same direction. Two of them said nothing had been
+ * captured, which stopped being true when the corpus landed.
+ */
 const ENTRIES: Entry[] = [
 	{
 		to: "/login",
@@ -51,16 +63,27 @@ const ENTRIES: Entry[] = [
 		state: "built",
 	},
 	{
-		to: "/missions",
-		label: "Missions",
-		note: "The app shell, sidebar and nav. The list renders its designed empty state — nothing has been captured.",
+		to: "/clients",
+		label: "Clients",
+		note: "Client detail with its engagements, missions, deliveries, roster, repositories, cost and an append-only activity feed.",
 		state: "built",
 	},
 	{
-		to: "/missions/$missionId/exports/new",
-		params: { missionId: "01J8Z4K2QW3E5R7T9Y1V3J5P7A" },
+		to: "/missions",
+		label: "Missions",
+		note: "The app shell, sidebar and nav, over real missions. Zero have run end to end through the platform.",
+		state: "partial",
+	},
+	{
+		to: "/catalog/agents",
+		label: "Catalog",
+		note: "Agent templates, skills and their sources. Seven agents seeded from a live project.",
+		state: "built",
+	},
+	{
+		to: "/missions",
 		label: "Pre-flight",
-		note: "Gates only, read from the golden fixture's playbook. Every gate reads not run, because none have.",
+		note: "Gates read from the playbook, blast radius against a real tree. Open a mission to reach it.",
 		state: "partial",
 	},
 ];
@@ -115,14 +138,24 @@ function FrontDoor({
 }) {
 	return (
 		<div data-testid="home-body">
-			<div className="mx-auto flex max-w-[64ch] flex-col gap-8 px-6 py-16">
+			{/* Keyboard users land on the link list without walking the header
+			    first. Visually hidden until focused, which is the only state it
+			    needs to exist in. */}
+			<a
+				className="sr-only rounded-sm bg-app-panel px-3 py-2 text-sm focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50"
+				href="#what-is-built"
+			>
+				Skip to what is built
+			</a>
+
+			<main className="mx-auto flex max-w-[64ch] flex-col gap-8 px-6 py-16">
 				<header className="flex items-start justify-between gap-4">
-					<div className="flex flex-col gap-3">
+					<div className="flex min-w-0 flex-col gap-3">
 						<Wordmark />
-						<h1 className="font-display text-title font-semibold tracking-[-0.01em]">
+						<h1 className="font-display text-title font-semibold tracking-[-0.01em] text-balance">
 							Command Center
 						</h1>
-						<p className="text-sm leading-relaxed text-text-muted">
+						<p className="max-w-[58ch] text-sm leading-relaxed text-text-muted text-pretty">
 							Turns a client brief into a deterministic package — mission,
 							roster, conventions — then renders, freezes, gates and delivers
 							it. Nothing ships past a gate it did not pass.
@@ -130,8 +163,14 @@ function FrontDoor({
 					</div>
 					{/* Only on the door. Inside the shell the sidebar footer owns the
 					    toggle, and two useTheme instances would desync the moment
-					    either one was pressed. */}
+					    either one was pressed.
+
+					    `aria-label` names the DESTINATION, not the current state: the
+					    visible word is "Light", and a screen reader announcing only
+					    that leaves it ambiguous whether it reports or switches. */}
 					<Button
+						aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+						className="shrink-0"
 						data-testid="home-theme"
 						onClick={onToggle}
 						size="sm"
@@ -141,35 +180,45 @@ function FrontDoor({
 					</Button>
 				</header>
 
-				<div className="flex flex-col gap-2">
-					<p className="font-mono text-micro tracking-wider text-text-subtle uppercase">
+				<section
+					aria-labelledby="what-is-built"
+					className="flex flex-col gap-2"
+				>
+					<h2
+						className="font-mono text-micro tracking-wider text-text-subtle uppercase"
+						id="what-is-built"
+					>
 						What is built
-					</p>
-					{ENTRIES.map((e) => (
-						<Link
-							className="interactive flex flex-col gap-1 rounded-md border border-[var(--elevation-border-rest)] bg-app-panel p-4"
-							data-testid={`home-link-${e.label.toLowerCase().replace(/\s+/g, "-")}`}
-							key={e.label}
-							params={e.params as never}
-							to={e.to as never}
-						>
-							<span className="flex items-center gap-2">
-								<span className="font-display text-sm font-semibold">
-									{e.label}
-								</span>
-								<StatusBadge
-									data-testid={`home-state-${e.label.toLowerCase()}`}
-									tone={e.state === "built" ? "pass" : "warn"}
+					</h2>
+					{/* A list, because it is one. Screen readers announce the count,
+					    which is the first thing someone evaluating this wants. */}
+					<ul className="flex list-none flex-col gap-2 p-0">
+						{ENTRIES.map((e) => (
+							<li key={e.label}>
+								<Link
+									className="interactive flex flex-col gap-1 rounded-md border border-[var(--elevation-border-rest)] bg-app-panel p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] motion-reduce:transition-none"
+									data-testid={`home-link-${e.label.toLowerCase().replace(/\s+/g, "-")}`}
+									to={e.to as never}
 								>
-									{e.state}
-								</StatusBadge>
-							</span>
-							<span className="text-sm leading-relaxed text-text-muted">
-								{e.note}
-							</span>
-						</Link>
-					))}
-				</div>
+									<span className="flex items-center gap-2">
+										<span className="font-display text-sm font-semibold">
+											{e.label}
+										</span>
+										<StatusBadge
+											data-testid={`home-state-${e.label.toLowerCase()}`}
+											tone={e.state === "built" ? "pass" : "warn"}
+										>
+											{e.state}
+										</StatusBadge>
+									</span>
+									<span className="text-sm leading-relaxed text-text-muted text-pretty">
+										{e.note}
+									</span>
+								</Link>
+							</li>
+						))}
+					</ul>
+				</section>
 
 				{/*
 				  No rule above this. The front door is outside the shell, so the
@@ -177,11 +226,11 @@ function FrontDoor({
 				  reason does: the column's own gap already separates the footer
 				  from the list, and the line was doing nothing the gap was not.
 				*/}
-				<p className="text-sm leading-relaxed text-text-subtle">
-					Not signed in. Missions and pre-flight are behind the session gate —
-					it refuses rather than redirecting, which is deliberate.
+				<p className="text-sm leading-relaxed text-text-subtle text-pretty">
+					Not signed in. Everything above is behind the session gate — it
+					refuses rather than redirecting, which is deliberate.
 				</p>
-			</div>
+			</main>
 		</div>
 	);
 }
