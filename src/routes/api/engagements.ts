@@ -7,7 +7,11 @@ import {
 	createEngagement,
 	listEngagements,
 } from "#/modules/engagement/service";
-import { shielded, validationFailed } from "#/modules/http/shielded";
+import {
+	shielded,
+	validationFailed,
+	withMethodGuard,
+} from "#/modules/http/shielded";
 
 /**
  * GET /api/engagements — the list. POST /api/engagements — create one.
@@ -24,7 +28,7 @@ const createBody = engagementContract.create.body;
 
 export const Route = createFileRoute("/api/engagements")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("engagement list", async () => {
 					const url = new URL(request.url);
@@ -67,6 +71,6 @@ export const Route = createFileRoute("/api/engagements")({
 						{ status: 201 },
 					);
 				}),
-		},
+		}),
 	},
 });

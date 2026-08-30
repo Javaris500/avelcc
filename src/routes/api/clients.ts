@@ -4,7 +4,11 @@ import { clientContract } from "#/contract/client";
 import { paginationQuery } from "#/contract/shared/pagination";
 import { createClient, listClients } from "#/modules/client/service";
 import { db } from "#/modules/db/client";
-import { shielded, validationFailed } from "#/modules/http/shielded";
+import {
+	shielded,
+	validationFailed,
+	withMethodGuard,
+} from "#/modules/http/shielded";
 
 /**
  * GET /api/clients — the client list. POST /api/clients — create one.
@@ -24,7 +28,7 @@ const createBody = clientContract.create.body;
 
 export const Route = createFileRoute("/api/clients")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("client list", async () => {
 					const url = new URL(request.url);
@@ -70,6 +74,6 @@ export const Route = createFileRoute("/api/clients")({
 						{ status: 201 },
 					);
 				}),
-		},
+		}),
 	},
 });

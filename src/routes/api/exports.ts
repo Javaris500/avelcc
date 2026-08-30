@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import { exportContract } from "#/contract/export";
 import { exportDeps } from "#/modules/export/deps";
 import { exportResponse, validationFailed } from "#/modules/export/http";
 import { createExport } from "#/modules/export/service";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * POST /api/exports — the real delivery.
@@ -17,7 +17,7 @@ const body = exportContract.create.body;
 
 export const Route = createFileRoute("/api/exports")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			POST: async ({ request }) => {
 				let raw: unknown;
 				try {
@@ -52,6 +52,6 @@ export const Route = createFileRoute("/api/exports")({
 
 				return exportResponse(result, 201);
 			},
-		},
+		}),
 	},
 });

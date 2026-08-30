@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { paginationQuery } from "#/contract/shared/pagination";
 import { listConnections } from "#/modules/connection/service";
 import { db } from "#/modules/db/client";
-import { shielded } from "#/modules/http/shielded";
+import { shielded, withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * GET /api/connections — the connection list.
@@ -19,7 +19,7 @@ import { shielded } from "#/modules/http/shielded";
  */
 export const Route = createFileRoute("/api/connections")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("connection list", async () => {
 					const url = new URL(request.url);
@@ -36,6 +36,6 @@ export const Route = createFileRoute("/api/connections")({
 						meta: { total, nextCursor },
 					});
 				}),
-		},
+		}),
 	},
 });

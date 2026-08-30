@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import { exportContract } from "#/contract/export";
 import { exportDeps } from "#/modules/export/deps";
 import { exportResponse, validationFailed } from "#/modules/export/http";
 import { previewExport } from "#/modules/export/service";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * POST /api/exports/preview — the dry run.
@@ -21,7 +21,7 @@ const body = exportContract.preview.body;
 
 export const Route = createFileRoute("/api/exports/preview")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			POST: async ({ request }) => {
 				let raw: unknown;
 				try {
@@ -48,6 +48,6 @@ export const Route = createFileRoute("/api/exports/preview")({
 
 				return exportResponse(result, 201);
 			},
-		},
+		}),
 	},
 });

@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-
 import { db } from "#/modules/db/client";
 import { buildArchive } from "#/modules/export/archive";
 import { renderFixturePackage } from "#/modules/export/deps";
 import { errorResponse } from "#/modules/export/http";
 import { getExport } from "#/modules/export/service";
+import { withMethodGuard } from "#/modules/http/shielded";
 import { getMission } from "#/modules/mission/service";
 
 /**
@@ -30,7 +30,7 @@ function exportIdFrom(url: string): string {
 
 export const Route = createFileRoute("/api/exports/$id/archive")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: async ({ request }) => {
 				const id = exportIdFrom(request.url);
 
@@ -92,6 +92,6 @@ export const Route = createFileRoute("/api/exports/$id/archive")({
 					},
 				});
 			},
-		},
+		}),
 	},
 });

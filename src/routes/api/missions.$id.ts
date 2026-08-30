@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { db } from "#/modules/db/client";
-import { shielded } from "#/modules/http/shielded";
+import { shielded, withMethodGuard } from "#/modules/http/shielded";
 import { getMission } from "#/modules/mission/service";
 
 /**
@@ -32,7 +32,7 @@ function notFound(id: string) {
 
 export const Route = createFileRoute("/api/missions/$id")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("mission read", async () => {
 					const id = new URL(request.url).pathname.split("/").pop() ?? "";
@@ -43,6 +43,6 @@ export const Route = createFileRoute("/api/missions/$id")({
 
 					return Response.json({ success: true, data: mission });
 				}),
-		},
+		}),
 	},
 });

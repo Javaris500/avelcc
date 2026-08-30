@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getClient } from "#/modules/client/service";
 import { db } from "#/modules/db/client";
-import { notFound, shielded } from "#/modules/http/shielded";
+import { notFound, shielded, withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * GET /api/clients/:id — one client. The contract allows 200 and 404 only.
@@ -17,7 +17,7 @@ const uuid = z.string().uuid();
 
 export const Route = createFileRoute("/api/clients/$id")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("client get", async () => {
 					const id = new URL(request.url).pathname.split("/").pop() ?? "";
@@ -35,6 +35,6 @@ export const Route = createFileRoute("/api/clients/$id")({
 
 					return Response.json({ success: true, data: client });
 				}),
-		},
+		}),
 	},
 });

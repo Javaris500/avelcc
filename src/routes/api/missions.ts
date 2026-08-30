@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import { missionContract } from "#/contract/mission";
 import { paginationQuery } from "#/contract/shared/pagination";
 import { db } from "#/modules/db/client";
+import { withMethodGuard } from "#/modules/http/shielded";
 import { createMission, listMissions } from "#/modules/mission/service";
 
 /**
@@ -41,7 +41,7 @@ function validationFailed(message: string, details?: unknown) {
 
 export const Route = createFileRoute("/api/missions")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: async ({ request }) => {
 				const url = new URL(request.url);
 				const parsed = paginationQuery.safeParse({
@@ -87,6 +87,6 @@ export const Route = createFileRoute("/api/missions")({
 					{ status: 201 },
 				);
 			},
-		},
+		}),
 	},
 });

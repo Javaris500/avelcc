@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { db } from "#/modules/db/client";
 import { getEngagement } from "#/modules/engagement/service";
-import { notFound, shielded } from "#/modules/http/shielded";
+import { notFound, shielded, withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * GET /api/engagements/:id — one engagement. 200 and 404 only.
@@ -16,7 +16,7 @@ const uuid = z.string().uuid();
 
 export const Route = createFileRoute("/api/engagements/$id")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("engagement get", async () => {
 					const id = new URL(request.url).pathname.split("/").pop() ?? "";
@@ -30,6 +30,6 @@ export const Route = createFileRoute("/api/engagements/$id")({
 
 					return Response.json({ success: true, data: engagement });
 				}),
-		},
+		}),
 	},
 });

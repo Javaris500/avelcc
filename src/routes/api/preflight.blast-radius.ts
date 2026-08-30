@@ -2,12 +2,12 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 import { createFileRoute } from "@tanstack/react-router";
-
 import { computeBlastRadius } from "#/modules/export/blast/computeBlastRadius";
 import { DEFAULT_ALLOWED_PATH_PREFIXES } from "#/modules/export/blast/types";
 import { readTreeOrEmpty } from "#/modules/export/gateway/readTree";
 import { GatewayError } from "#/modules/export/gateway/types";
 import { gitBlobSha } from "#/modules/export/git/gitBlobSha";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * The pre-flight blast radius. SERVER-SIDE, and that is not incidental.
@@ -60,7 +60,7 @@ function renderedFiles() {
 
 export const Route = createFileRoute("/api/preflight/blast-radius")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: async ({ request }) => {
 				const url = new URL(request.url);
 				const owner = url.searchParams.get("owner") ?? "octocat";
@@ -106,6 +106,6 @@ export const Route = createFileRoute("/api/preflight/blast-radius")({
 					);
 				}
 			},
-		},
+		}),
 	},
 });

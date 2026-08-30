@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getConnection } from "#/modules/connection/service";
 import { db } from "#/modules/db/client";
-import { notFound, shielded } from "#/modules/http/shielded";
+import { notFound, shielded, withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * GET /api/connections/:id — one connection. 200 and 404 only.
@@ -17,7 +17,7 @@ const uuid = z.string().uuid();
 
 export const Route = createFileRoute("/api/connections/$id")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) =>
 				shielded("connection get", async () => {
 					const id = new URL(request.url).pathname.split("/").pop() ?? "";
@@ -31,6 +31,6 @@ export const Route = createFileRoute("/api/connections/$id")({
 
 					return Response.json({ success: true, data: connection });
 				}),
-		},
+		}),
 	},
 });

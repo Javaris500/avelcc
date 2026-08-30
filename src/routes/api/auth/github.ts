@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import {
 	authorizeUrl,
 	cookie,
@@ -7,6 +6,7 @@ import {
 	readOAuthConfig,
 	STATE_COOKIE,
 } from "#/modules/auth/oauth";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * Start the GitHub OAuth flow.
@@ -18,7 +18,7 @@ import {
  */
 export const Route = createFileRoute("/api/auth/github")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: ({ request }) => {
 				const config = readOAuthConfig();
 				if (!config) {
@@ -47,6 +47,6 @@ export const Route = createFileRoute("/api/auth/github")({
 					},
 				});
 			},
-		},
+		}),
 	},
 });

@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-
 import {
 	cookie,
 	exchangeCode,
@@ -10,6 +9,7 @@ import {
 	STATE_COOKIE,
 	statesMatch,
 } from "#/modules/auth/oauth";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 function back(code: string): Response {
 	return new Response(null, {
@@ -24,7 +24,7 @@ function back(code: string): Response {
 
 export const Route = createFileRoute("/api/auth/github/callback")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: async ({ request }) => {
 				const config = readOAuthConfig();
 				if (!config) return back("OAUTH_NOT_CONFIGURED");
@@ -67,6 +67,6 @@ export const Route = createFileRoute("/api/auth/github/callback")({
 				headers.append("Set-Cookie", cookie(OPERATOR_COOKIE, profile.login));
 				return new Response(null, { status: 302, headers });
 			},
-		},
+		}),
 	},
 });

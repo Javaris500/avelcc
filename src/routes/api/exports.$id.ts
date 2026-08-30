@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-
 import { db } from "#/modules/db/client";
 import { errorResponse } from "#/modules/export/http";
 import { getExport } from "#/modules/export/service";
+import { withMethodGuard } from "#/modules/http/shielded";
 
 /**
  * GET /api/exports/:id — one export. The contract allows 200 and 404 only.
@@ -17,7 +17,7 @@ const uuid = z.string().uuid();
 
 export const Route = createFileRoute("/api/exports/$id")({
 	server: {
-		handlers: {
+		handlers: withMethodGuard({
 			GET: async ({ request }) => {
 				const id = new URL(request.url).pathname.split("/").pop() ?? "";
 
@@ -47,6 +47,6 @@ export const Route = createFileRoute("/api/exports/$id")({
 
 				return Response.json({ success: true, data: row });
 			},
-		},
+		}),
 	},
 });
