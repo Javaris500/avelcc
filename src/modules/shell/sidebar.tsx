@@ -169,7 +169,9 @@ export function Sidebar({
 			    does nothing. */}
 			<div
 				className={cn(
-					"flex items-center gap-2.5 pt-1 pb-3.5",
+					// shrink-0: see the note on the nav slot below. This is the block the
+					// operator watched get clipped — the mark cut in half at the top.
+					"flex shrink-0 items-center gap-2.5 pt-1 pb-3.5",
 					collapsed ? "justify-center" : "px-1.5",
 				)}
 			>
@@ -196,7 +198,7 @@ export function Sidebar({
 				>
 					<DropdownMenuTrigger
 						className={cn(
-							"interactive group mb-2 flex items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-raised py-2 text-left hover:border-[var(--elevation-border-raised)]",
+							"interactive group mb-2 flex shrink-0 items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-raised py-2 text-left hover:border-[var(--elevation-border-raised)]",
 							collapsed ? "justify-center px-2" : "px-2.5",
 						)}
 						data-testid="workspace-switcher"
@@ -234,7 +236,7 @@ export function Sidebar({
 
 			{/* Search */}
 			{searchOpen && !collapsed ? (
-				<div className="mb-5" data-testid="search-panel">
+				<div className="mb-5 shrink-0" data-testid="search-panel">
 					<input
 						className="w-full rounded-sm border border-[var(--elevation-border-raised)] bg-app-recessed px-2.5 py-2 text-sm text-text placeholder:text-text-subtle"
 						data-testid="search-input"
@@ -305,6 +307,19 @@ export function Sidebar({
 			    space and shows nothing, so there is no state to track. */}
 			<div
 				className={cn(
+					// THE ONLY CHILD OF THE ASIDE THAT MAY SHRINK, and every sibling now
+					// carries shrink-0 to keep it that way. They did not, and a flex child
+					// defaults to `flex-shrink: 1`, so once brand + switcher + search + 12
+					// nav items + 3 footer controls exceeded the pane every block
+					// compressed together instead of the nav scrolling.
+					//
+					// IT CLIPPED THE TOP, not the bottom, which is why it did not read as
+					// ordinary overflow. The footer carries `mt-auto`; when a flex column
+					// overflows, an auto margin resolves against NEGATIVE free space and
+					// pushes the content up past the container edge, where app-window's
+					// `overflow-hidden` cuts it off. The operator saw the brand mark cut
+					// in half. Same class as the topbar crop, one column over.
+					//
 					// SCROLLS, BUT SHOWS NO SCROLLBAR. `app-scroll` paints a 10px track
 					// on the right edge of the nav, which reads as a second border inside
 					// a panel that already has one, and it appears and disappears as the
@@ -326,7 +341,7 @@ export function Sidebar({
 				className={cn(
 					// No rule. The gap above and the muted control tone separate the
 					// footer from the nav, per the operator's ruling.
-					"mt-auto flex w-full flex-col gap-1 pt-4",
+					"mt-auto flex w-full shrink-0 flex-col gap-1 pt-4",
 					collapsed && "items-center",
 				)}
 				data-testid="sidebar-footer"
