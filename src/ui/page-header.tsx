@@ -115,7 +115,7 @@ export function PageHeader({
 
 				{definition ? (
 					<p
-						className="max-w-[68ch] text-sm leading-relaxed text-text-subtle"
+						className="max-w-[52ch] text-sm leading-relaxed text-text-subtle"
 						data-testid="page-definition"
 					>
 						{definition}

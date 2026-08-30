@@ -179,7 +179,7 @@ function Cut({ mission }: { mission: Mission }) {
 		return (
 			<div className="px-4 py-3" data-testid="cut-underived">
 				<p className="text-sm text-text">Not yet derived.</p>
-				<p className="max-w-[60ch] pt-1 text-sm leading-relaxed text-text-muted">
+				<p className="max-w-[52ch] pt-1 text-sm leading-relaxed text-text-muted">
 					The cut is read from the connected repository's directory structure at
 					mission setup, and no repository is connected yet. This is a state,
 					not a gap in the record.
@@ -200,7 +200,7 @@ function Cut({ mission }: { mission: Mission }) {
 				<div className="px-4 pt-1 pb-3">
 					<p className="text-micro text-text-subtle">rationale</p>
 					<p
-						className="max-w-[60ch] pt-1 text-sm leading-relaxed text-text"
+						className="max-w-[52ch] pt-1 text-sm leading-relaxed text-text"
 						data-testid="cut-rationale"
 					>
 						{mission.cutRationale ??
@@ -235,7 +235,7 @@ function Brief({ brief }: { brief: Record<string, unknown> }) {
 					key={key}
 				>
 					<dt className="min-w-[14ch] text-micro text-text-subtle">{key}</dt>
-					<dd className="max-w-[60ch] text-sm leading-relaxed text-text">
+					<dd className="max-w-[52ch] text-sm leading-relaxed text-text">
 						{typeof value === "string" || typeof value === "number" ? (
 							String(value)
 						) : (

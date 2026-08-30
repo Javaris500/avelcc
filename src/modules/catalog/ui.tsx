@@ -110,7 +110,7 @@ export function SectionCard({
 				{action ? <div className="ml-auto">{action}</div> : null}
 				{definition ? (
 					<p
-						className="w-full max-w-[68ch] text-micro leading-relaxed text-text-subtle"
+						className="w-full max-w-[52ch] text-micro leading-relaxed text-text-subtle"
 						data-testid={`${testId}-definition`}
 					>
 						{definition}
@@ -155,7 +155,7 @@ export function DefinitionList({
 					<dd className="min-w-0 text-sm text-text">
 						{item.value}
 						{item.hint ? (
-							<p className="max-w-[64ch] pt-1 text-micro leading-relaxed text-text-subtle">
+							<p className="max-w-[52ch] pt-1 text-micro leading-relaxed text-text-subtle">
 								{item.hint}
 							</p>
 						) : null}
@@ -554,7 +554,7 @@ export function DataNotice({
 				>
 					{title}
 				</p>
-				<p className="max-w-[68ch] pt-1 text-sm leading-relaxed text-text-muted">
+				<p className="max-w-[52ch] pt-1 text-sm leading-relaxed text-text-muted">
 					{body}
 				</p>
 			</div>

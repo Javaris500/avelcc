@@ -74,7 +74,7 @@ export function CatalogSurface<TData extends { data: unknown[] }>({
 							data-built="false"
 							data-testid={`${testId}-not-built`}
 						>
-							<p className="max-w-[68ch] text-sm leading-relaxed text-text-subtle">
+							<p className="max-w-[52ch] text-sm leading-relaxed text-text-subtle">
 								Not built. {shown.body}
 							</p>
 						</div>

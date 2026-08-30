@@ -155,7 +155,7 @@ function FrontDoor({
 						<h1 className="font-display text-title font-semibold tracking-[-0.01em] text-balance">
 							Command Center
 						</h1>
-						<p className="max-w-[58ch] text-sm leading-relaxed text-text-muted text-pretty">
+						<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted text-pretty">
 							Turns a client brief into a deterministic package — mission,
 							roster, conventions — then renders, freezes, gates and delivers
 							it. Nothing ships past a gate it did not pass.
