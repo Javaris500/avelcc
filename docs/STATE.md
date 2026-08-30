@@ -17,8 +17,9 @@ Backend rebuild in progress on the v2 stack. Export engine's deterministic core 
 | Thing | Count |
 |---|---|
 | Core entities — target (`DATA-CONTRACTS-V2.md`) | **16** + SkillSource (supporting catalog) |
-| Core entities — built in `schema.ts` | **11 of 16** + SkillSource + 2 join tables (`agent_template_skills` · `roster_entry_skills`) — Client · Engagement · AgentTemplate · Skill · Mission · Playbook · RosterEntry · RosterPreset · RepoPolicy · Connection · Export. Absent: KnowledgeEntry · Finding · Intake · ActivityLog · User |
-| Tests | **168** — all passing on this workstation (Windows · node 24 · pnpm); two harness defects fixed 2026-08-29, see *Verification* |
+| Core entities — built in `schema.ts` | **12 of 16** + SkillSource + 2 join tables (`agent_template_skills` · `roster_entry_skills`) — Client · Engagement · AgentTemplate · Skill · Mission · Playbook · RosterEntry · RosterPreset · RepoPolicy · Connection · Export. Absent: KnowledgeEntry · Finding · Intake · ActivityLog · User |
+| Tests | **359** — all passing on this workstation (Windows · node 24 · pnpm) |
+| Tables in Neon | **20** — 12 core entities · SkillSource · 2 join tables · **5 telemetry** (see below) |
 | Build agents — as authored (v1) | **18** (frontend 6 · backend 7 · quality 5) |
 | Build agents — target (`ROSTER-V2.md`) | **14** (phase A 2 · B 5 · C 3 · D 4) |
 | Orchestrator | **1** (Axis — the human, in V1) |
@@ -34,18 +35,34 @@ Honest external framing: *18 build agents + 1 human orchestrator + a support app
 
 | # | Module | State |
 |---|---|---|
-| 1 | Schema & validation (Zod) | 🟡 steps 0–3 built (11 of the 16 target entities, + joins); **step 3 completed 2026-08-29** — `RepoPolicy`, then `Connection` and `Export`; step 4 (KnowledgeEntry · ActivityLog · User) absent; `Finding` and `Intake` absent; pgvector not enabled |
-| 2 | Persistence (Drizzle + migrations) | 🟡 migrations `0000`–`0010` applied to Neon (`0008` mission `status` default + nullable `cut`; `0009` Connection · Export; `0010` their `updated_at` triggers); runtime db client built (`modules/db/client.ts` — neon-http on the pooled `DATABASE_URL`, server-only). Entity coverage is the remaining gap, not the connection |
+| 1 | Schema & validation (Zod) | 🟡 12 of the 16 target entities + joins; **step 3 completed 2026-08-29** — `RepoPolicy`, then `Connection` and `Export`; step 4 (KnowledgeEntry · ActivityLog · User) absent; `Finding` and `Intake` absent; pgvector not enabled |
+| 2 | Persistence (Drizzle + migrations) | 🟡 migrations `0000`–`0015` applied to Neon (`0008` mission `status` default + nullable `cut`; `0009` Connection · Export; `0010` their `updated_at` triggers); runtime db client built (`modules/db/client.ts` — neon-http on the pooled `DATABASE_URL`, server-only). Entity coverage is the remaining gap, not the connection |
 | 3 | Auth & context | ✅ built (portable, unchanged) |
 | 4 | Contract layer (`src/contract/`) | 🟡 `mission · roster · playbook · export` built + shared envelope/pagination/errors; four error vocabularies (`ERROR_CODES` · `VIOLATION_CODES` · `AUTH_CODES` · `CRUD_CODES`) kept deliberately separate; 7 entity groups still unspecced (see `contract/index.ts`) |
-| 5 | API layer (server route handlers) | 🟡 mission `list`/`get`/`create` and export `preview`/`create`/`get` built and exercised against Neon, success and every declared failure path; `auth` and `preflight.blast-radius` alongside them. `PATCH` absent **by choice** (see Gaps); every other entity has no route. Pattern is TanStack Start `createFileRoute().server.handlers`, not a ts-rest server adapter |
-| 6 | Service layer | 🟡 `mission/service.ts` (`listMissions` · `getMission` · `createMission`) and `export/service.ts` (`previewExport` · `createExport` · `getExport`, with the lifecycle machine and the four guards). No other entity has a service |
+| 5 | API layer (server route handlers) | 🟡 six route groups served — mission · export · roster · client · engagement · playbook. Mission `list`/`get`/`create`, export `preview`/`create`/`get`/`archive`, `missions/:id/roster`, and client/engagement CRUD, all exercised against Neon, success and every declared failure path; `auth` and `preflight.blast-radius` alongside them. `PATCH` absent **by choice** (see Gaps); every other entity has no route. Pattern is TanStack Start `createFileRoute().server.handlers`, not a ts-rest server adapter |
+| 6 | Service layer | 🟡 `mission/service.ts` (+ `getMissionRoster`), `export/service.ts`, `export/assemble.ts` (Neon → RenderMission), `export/verify/gates.ts`. Older text: `export/service.ts` (`previewExport` · `createExport` · `getExport`, with the lifecycle machine and the four guards). No other entity has a service |
 | 7 | Roster & loadout | 🟡 contract shape only (`contract/roster.ts`); no service |
 | 8 | Export engine — deterministic core | ✅ `render` byte-for-byte 20/20 on the golden fixture (D5 resolved 2026-08-29) · `blast` radius · `git` blob-sha · locale/determinism proven |
 | 9 | Export targets (zip · PR · push) | 🟡 all three built. **`zip` delivers for real** — driven over HTTP against Neon, archive hash matching the pinned fixture digest. `github_pr`/`github_push` are built and unit-tested but **cannot execute**: they need a Connection row and nothing can create one. GitHub fixtures are `[constructed]` from documented schemas, never `[recorded]` — recording a write means performing one |
 | 10 | GitHub gateway (real) | 🟡 `readTree`/`parseTree` built + tested against real trees; served read-only via the preflight route |
 | 11 | Webhook + zip route | ⬜ not started |
 | 12 | Cross-cutting (ActivityLog, AppError) | 🟡 error taxonomy built; ActivityLog has no table yet |
+
+### The telemetry layer — new 2026-08-29
+
+Five tables that are **not core entities** and deliberately not counted as such: core entities model the domain, these model the process that produced it. `dispatches` · `completions` · `finding_dispositions` · `blockers` · `cost_entries`, alongside `findings`, which IS canonical and was the 12th.
+
+**Append-only, enforced by the database.** A `refuse_mutation()` trigger refuses UPDATE and DELETE on all six. Closure is a new row referencing the old one, never a flipped cell — the reasoning is the corpus's own: *"a flipped cell makes a blocker that stalled an agent for two hours indistinguishable from one resolved in a minute."* `DATA-CONTRACTS-V2:399` is satisfied by a **stronger** mechanism rather than excepted: a table with no delete path always resolves what an export referenced, with no `deleted_at` for a reader to interpret.
+
+None of them carries `updated_at` or `deleted_at`, asserted by a test — a timestamp on a table nothing may update is a contradiction, and a soft delete is an UPDATE the trigger would refuse anyway.
+
+**They are empty.** The `.team-5` corpus parses to 58 rows and the loader is being written.
+
+### The fixture is no longer the only thing that renders
+
+`export/assemble.ts` builds a `RenderMission` from Neon. Mission 002 renders **12 real files** — `MISSION.md` naming CounselOS and its slice, `roster/transactions/identity.md` and `roster/nemi/identity.md` carrying the actual agent files, `roster.json` from the real mounts. Mission 001 renders 10 and no agents, which is correct: it dispatched nobody.
+
+**Nine `RenderMission` fields still have no column**, and the assembler makes them REQUIRED INPUTS rather than defaulting them. An assembler that filled them with `[]` would compile, run, and deliver a brief claiming the work ships nothing and is done when no commands pass. The type carries the gap.
 
 **Carried forward from v1:** auth, the GitHub gateway interface, the error taxonomy. Everything schema- or API-shaped is being redone against ts-rest and Neon.
 
