@@ -37,7 +37,8 @@
 /clients/:id                       🖥   client detail, engagements, spend
 /clients/:id/engagements/new       🖥   new engagement
 
-/intake/:id                        📱   Canon's proposal — review and approve
+/clients/:id/requests/:requestId   🖥   request review — what was asked, what we
+                                       derived and its evidence, what approving creates
 
 /missions                          📱   list
 /missions/new                      📱   capture — offline
@@ -79,7 +80,7 @@
 
 | Gap | Needed by | Severity |
 |---|---|---|
-| **No `client`, `engagement`, or `intake` route groups.** Three new entities with no procedures. | `/clients/*`, `/intake/:id` | **blocking** |
+| **`client` and `intake` route groups exist; `engagement` does not.** `/clients/*` is built. Intake is NOT a top-level route group: it is nested under clients as `/clients/:id/requests/:requestId`, per the ruling that intake is a verb in a list of nouns and a request is born out of a client relationship. An engagement has no route of its own and is a section anchor on the client page. | `/clients/*`, `/clients/:id/requests/:requestId` | **partial** |
 | **No `preset` route group.** RosterPreset is an entity with `preset.list/get/create/update/apply`, and `Playbook.default_preset_id` FKs to it. The contract has no file for it. | `/presets`, `/presets/:id`, and the loadout screen's "apply preset" | **blocking** |
 | **No `skillSource` procedures.** The catalog is populated in-app; something must write it. | `/catalog/sources` | blocking for that screen |
 | `export.preview` | pre-flight | specced in `BLAST-RADIUS.md`, not yet in the contract |
@@ -165,7 +166,19 @@ That single step explains the entire roster model without a slide.
 
 **Step 5 should be conspicuously unhelpful.** A repository with no policy row is treated as no-direct-push, so the empty state is the safe state. Do not nudge toward creating policies. Enabling direct push to a default branch is a deliberate confirmation with a warning, never a toggle.
 
-### `/intake/:id` — Canon's proposal 📱
+### `/clients/:id/requests/:requestId` — request review 🖥
+
+**The operator-facing word is "Request".** `intake` is the internal name: the
+table, the contract and the service all use it, and nothing an operator reads
+does. This path used to be `/intake/:id`, which was the only place the two
+vocabularies met — a path is operator-facing and it was carrying the internal
+name. It no longer does, and nothing else should.
+
+**Desktop only, and the glyph changed with the address.** `/intake/:id` was
+phone-allowed. This inherits `/clients`'s construction boundary, so the phone
+case is now a refusal rather than an approval surface between meetings. That is
+a real loss against the original intent and it is a consequence of the move,
+recorded here rather than left to be discovered.
 
 The approval surface. Canon has produced a structured brief and a list of open questions; nothing is executable until the operator approves.
 
@@ -175,7 +188,7 @@ The approval surface. Canon has produced a structured brief and a list of open q
 
 **On approval:** materializes a Mission. The Intake row is retained as provenance.
 
-**Phone-allowed** because reviewing and approving is exactly the shape of work that happens between meetings. Initiation stays on desktop.
+~~**Phone-allowed** because reviewing and approving is exactly the shape of work that happens between meetings. Initiation stays on desktop.~~ Superseded: see the boundary note above.
 
 ### `/catalog/agents`, `/catalog/skills` 🖥
 
