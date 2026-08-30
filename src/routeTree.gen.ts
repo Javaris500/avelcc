@@ -25,6 +25,7 @@ import { Route as ApiMissionsRouteImport } from './routes/api/missions'
 import { Route as AppCatalogAgentsRouteImport } from './routes/_app/catalog.agents'
 import { Route as AppCatalogSkillsRouteImport } from './routes/_app/catalog.skills'
 import { Route as AppCatalogSourcesRouteImport } from './routes/_app/catalog.sources'
+import { Route as AppClientsIndexRouteImport } from './routes/_app/clients.index'
 import { Route as AppMissionsIndexRouteImport } from './routes/_app/missions.index'
 import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings.account'
 import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings.connections'
@@ -37,10 +38,13 @@ import { Route as ApiExportsIdRouteImport } from './routes/api/exports.$id'
 import { Route as ApiExportsPreviewRouteImport } from './routes/api/exports.preview'
 import { Route as ApiMissionsIdRouteImport } from './routes/api/missions.$id'
 import { Route as ApiPreflightBlastRadiusRouteImport } from './routes/api/preflight.blast-radius'
+import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients.$clientId.index'
 import { Route as AppMissionsMissionIdIndexRouteImport } from './routes/_app/missions.$missionId.index'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github.callback'
+import { Route as ApiClientsIdDetailRouteImport } from './routes/api/clients.$id.detail'
 import { Route as ApiExportsIdArchiveRouteImport } from './routes/api/exports.$id.archive'
 import { Route as ApiMissionsIdRosterRouteImport } from './routes/api/missions.$id.roster'
+import { Route as AppClientsClientIdRequestsRequestIdRouteImport } from './routes/_app/clients.$clientId.requests.$requestId'
 import { Route as AppMissionsMissionIdExportsNewRouteImport } from './routes/_app/missions.$missionId.exports.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -122,6 +126,11 @@ const AppCatalogSourcesRoute = AppCatalogSourcesRouteImport.update({
   path: '/catalog/sources',
   getParentRoute: () => AppRoute,
 } as any)
+const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppClientsRoute,
+} as any)
 const AppMissionsIndexRoute = AppMissionsIndexRouteImport.update({
   id: '/missions/',
   path: '/missions/',
@@ -182,6 +191,11 @@ const ApiPreflightBlastRadiusRoute = ApiPreflightBlastRadiusRouteImport.update({
   path: '/api/preflight/blast-radius',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppClientsClientIdIndexRoute = AppClientsClientIdIndexRouteImport.update({
+  id: '/$clientId/',
+  path: '/$clientId/',
+  getParentRoute: () => AppClientsRoute,
+} as any)
 const AppMissionsMissionIdIndexRoute =
   AppMissionsMissionIdIndexRouteImport.update({
     id: '/missions/$missionId/',
@@ -193,6 +207,11 @@ const ApiAuthGithubCallbackRoute = ApiAuthGithubCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGithubRoute,
 } as any)
+const ApiClientsIdDetailRoute = ApiClientsIdDetailRouteImport.update({
+  id: '/detail',
+  path: '/detail',
+  getParentRoute: () => ApiClientsIdRoute,
+} as any)
 const ApiExportsIdArchiveRoute = ApiExportsIdArchiveRouteImport.update({
   id: '/archive',
   path: '/archive',
@@ -203,6 +222,12 @@ const ApiMissionsIdRosterRoute = ApiMissionsIdRosterRouteImport.update({
   path: '/roster',
   getParentRoute: () => ApiMissionsIdRoute,
 } as any)
+const AppClientsClientIdRequestsRequestIdRoute =
+  AppClientsClientIdRequestsRequestIdRouteImport.update({
+    id: '/$clientId/requests/$requestId',
+    path: '/$clientId/requests/$requestId',
+    getParentRoute: () => AppClientsRoute,
+  } as any)
 const AppMissionsMissionIdExportsNewRoute =
   AppMissionsMissionIdExportsNewRouteImport.update({
     id: '/missions/$missionId/exports/new',
@@ -214,7 +239,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
-  '/clients': typeof AppClientsRoute
+  '/clients': typeof AppClientsRouteWithChildren
   '/intake': typeof AppIntakeRoute
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
@@ -230,25 +255,28 @@ export interface FileRoutesByFullPath {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/clients/$id': typeof ApiClientsIdRouteWithChildren
   '/api/connections/$id': typeof ApiConnectionsIdRoute
   '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
+  '/clients/': typeof AppClientsIndexRoute
   '/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/api/missions/$id/roster': typeof ApiMissionsIdRosterRoute
+  '/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/missions/$missionId/': typeof AppMissionsMissionIdIndexRoute
+  '/clients/$clientId/requests/$requestId': typeof AppClientsClientIdRequestsRequestIdRoute
   '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/activity': typeof AppActivityRoute
-  '/clients': typeof AppClientsRoute
   '/intake': typeof AppIntakeRoute
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
@@ -264,18 +292,22 @@ export interface FileRoutesByTo {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/clients/$id': typeof ApiClientsIdRouteWithChildren
   '/api/connections/$id': typeof ApiConnectionsIdRoute
   '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
+  '/clients': typeof AppClientsIndexRoute
   '/missions': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/api/missions/$id/roster': typeof ApiMissionsIdRosterRoute
+  '/clients/$clientId': typeof AppClientsClientIdIndexRoute
   '/missions/$missionId': typeof AppMissionsMissionIdIndexRoute
+  '/clients/$clientId/requests/$requestId': typeof AppClientsClientIdRequestsRequestIdRoute
   '/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRoutesById {
@@ -284,7 +316,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/activity': typeof AppActivityRoute
-  '/_app/clients': typeof AppClientsRoute
+  '/_app/clients': typeof AppClientsRouteWithChildren
   '/_app/intake': typeof AppIntakeRoute
   '/_app/playbooks': typeof AppPlaybooksRoute
   '/_app/presets': typeof AppPresetsRoute
@@ -300,18 +332,22 @@ export interface FileRoutesById {
   '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
-  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/clients/$id': typeof ApiClientsIdRouteWithChildren
   '/api/connections/$id': typeof ApiConnectionsIdRoute
   '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
+  '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/missions/': typeof AppMissionsIndexRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
   '/api/missions/$id/roster': typeof ApiMissionsIdRosterRoute
+  '/_app/clients/$clientId/': typeof AppClientsClientIdIndexRoute
   '/_app/missions/$missionId/': typeof AppMissionsMissionIdIndexRoute
+  '/_app/clients/$clientId/requests/$requestId': typeof AppClientsClientIdRequestsRequestIdRoute
   '/_app/missions/$missionId/exports/new': typeof AppMissionsMissionIdExportsNewRoute
 }
 export interface FileRouteTypes {
@@ -343,18 +379,21 @@ export interface FileRouteTypes {
     | '/api/exports/preview'
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
+    | '/clients/'
     | '/missions/'
     | '/api/auth/github/callback'
+    | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
     | '/api/missions/$id/roster'
+    | '/clients/$clientId/'
     | '/missions/$missionId/'
+    | '/clients/$clientId/requests/$requestId'
     | '/missions/$missionId/exports/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/activity'
-    | '/clients'
     | '/intake'
     | '/playbooks'
     | '/presets'
@@ -377,11 +416,15 @@ export interface FileRouteTypes {
     | '/api/exports/preview'
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
+    | '/clients'
     | '/missions'
     | '/api/auth/github/callback'
+    | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
     | '/api/missions/$id/roster'
+    | '/clients/$clientId'
     | '/missions/$missionId'
+    | '/clients/$clientId/requests/$requestId'
     | '/missions/$missionId/exports/new'
   id:
     | '__root__'
@@ -412,11 +455,15 @@ export interface FileRouteTypes {
     | '/api/exports/preview'
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
+    | '/_app/clients/'
     | '/_app/missions/'
     | '/api/auth/github/callback'
+    | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
     | '/api/missions/$id/roster'
+    | '/_app/clients/$clientId/'
     | '/_app/missions/$missionId/'
+    | '/_app/clients/$clientId/requests/$requestId'
     | '/_app/missions/$missionId/exports/new'
   fileRoutesById: FileRoutesById
 }
@@ -547,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogSourcesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/clients/': {
+      id: '/_app/clients/'
+      path: '/'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppClientsRoute
+    }
     '/_app/missions/': {
       id: '/_app/missions/'
       path: '/missions'
@@ -631,6 +685,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPreflightBlastRadiusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/clients/$clientId/': {
+      id: '/_app/clients/$clientId/'
+      path: '/$clientId'
+      fullPath: '/clients/$clientId/'
+      preLoaderRoute: typeof AppClientsClientIdIndexRouteImport
+      parentRoute: typeof AppClientsRoute
+    }
     '/_app/missions/$missionId/': {
       id: '/_app/missions/$missionId/'
       path: '/missions/$missionId'
@@ -644,6 +705,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/github/callback'
       preLoaderRoute: typeof ApiAuthGithubCallbackRouteImport
       parentRoute: typeof ApiAuthGithubRoute
+    }
+    '/api/clients/$id/detail': {
+      id: '/api/clients/$id/detail'
+      path: '/detail'
+      fullPath: '/api/clients/$id/detail'
+      preLoaderRoute: typeof ApiClientsIdDetailRouteImport
+      parentRoute: typeof ApiClientsIdRoute
     }
     '/api/exports/$id/archive': {
       id: '/api/exports/$id/archive'
@@ -659,6 +727,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMissionsIdRosterRouteImport
       parentRoute: typeof ApiMissionsIdRoute
     }
+    '/_app/clients/$clientId/requests/$requestId': {
+      id: '/_app/clients/$clientId/requests/$requestId'
+      path: '/$clientId/requests/$requestId'
+      fullPath: '/clients/$clientId/requests/$requestId'
+      preLoaderRoute: typeof AppClientsClientIdRequestsRequestIdRouteImport
+      parentRoute: typeof AppClientsRoute
+    }
     '/_app/missions/$missionId/exports/new': {
       id: '/_app/missions/$missionId/exports/new'
       path: '/missions/$missionId/exports/new'
@@ -669,9 +744,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppClientsRouteChildren {
+  AppClientsIndexRoute: typeof AppClientsIndexRoute
+  AppClientsClientIdIndexRoute: typeof AppClientsClientIdIndexRoute
+  AppClientsClientIdRequestsRequestIdRoute: typeof AppClientsClientIdRequestsRequestIdRoute
+}
+
+const AppClientsRouteChildren: AppClientsRouteChildren = {
+  AppClientsIndexRoute: AppClientsIndexRoute,
+  AppClientsClientIdIndexRoute: AppClientsClientIdIndexRoute,
+  AppClientsClientIdRequestsRequestIdRoute:
+    AppClientsClientIdRequestsRequestIdRoute,
+}
+
+const AppClientsRouteWithChildren = AppClientsRoute._addFileChildren(
+  AppClientsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppActivityRoute: typeof AppActivityRoute
-  AppClientsRoute: typeof AppClientsRoute
+  AppClientsRoute: typeof AppClientsRouteWithChildren
   AppIntakeRoute: typeof AppIntakeRoute
   AppPlaybooksRoute: typeof AppPlaybooksRoute
   AppPresetsRoute: typeof AppPresetsRoute
@@ -688,7 +780,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppActivityRoute: AppActivityRoute,
-  AppClientsRoute: AppClientsRoute,
+  AppClientsRoute: AppClientsRouteWithChildren,
   AppIntakeRoute: AppIntakeRoute,
   AppPlaybooksRoute: AppPlaybooksRoute,
   AppPresetsRoute: AppPresetsRoute,
@@ -705,12 +797,24 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ApiClientsIdRouteChildren {
+  ApiClientsIdDetailRoute: typeof ApiClientsIdDetailRoute
+}
+
+const ApiClientsIdRouteChildren: ApiClientsIdRouteChildren = {
+  ApiClientsIdDetailRoute: ApiClientsIdDetailRoute,
+}
+
+const ApiClientsIdRouteWithChildren = ApiClientsIdRoute._addFileChildren(
+  ApiClientsIdRouteChildren,
+)
+
 interface ApiClientsRouteChildren {
-  ApiClientsIdRoute: typeof ApiClientsIdRoute
+  ApiClientsIdRoute: typeof ApiClientsIdRouteWithChildren
 }
 
 const ApiClientsRouteChildren: ApiClientsRouteChildren = {
-  ApiClientsIdRoute: ApiClientsIdRoute,
+  ApiClientsIdRoute: ApiClientsIdRouteWithChildren,
 }
 
 const ApiClientsRouteWithChildren = ApiClientsRoute._addFileChildren(
