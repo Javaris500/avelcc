@@ -103,12 +103,24 @@ export function ChatHome() {
 			<StatusStrip />
 
 			{/*
-			  One measure for the conversation and the composer. UI-PLAN polish
-			  item 5: `main` has no max-width, so on a wide display a response
-			  runs past 1300px. The strip above stays full-bleed because it is a
-			  band, not prose.
+			  ONE MEASURE for the conversation and the composer, and it owns the
+			  measure alone. UI-PLAN polish item 5: `main` has no max-width, so on
+			  a wide display a response runs past 1300px. The strip above stays
+			  full-bleed because it is a band, not prose.
+
+			  52ch, AND THE NUMBER IS MEASURED RATHER THAN CHOSEN. This was 72ch,
+			  which I had reported as roughly 540px from an estimate of `ch`. Driven
+			  in a browser it was 636px carrying 101 characters per line, against a
+			  readable band of 45 to 75. The estimate was wrong and the operator
+			  calling it wide was right.
+
+			  `ch` is the width of "0", and it resolves against THIS element at the
+			  14px base, so 1ch here is 8.83px. A message renders at 13px where
+			  average prose runs 6.32px per character. 52ch is 459px is 73
+			  characters, which is the top of the band with the composer's controls
+			  still comfortable inside it.
 			*/}
-			<div className="mx-auto flex w-full max-w-[72ch] min-h-0 flex-1 flex-col gap-4">
+			<div className="mx-auto flex w-full max-w-[52ch] min-h-0 flex-1 flex-col gap-4">
 				<Conversation
 					empty={
 						<ConversationEmpty>

@@ -48,6 +48,22 @@ const TONE_CLASS: Record<MetricTone, string> = {
 /** An em dash reads as "no value", where 0 reads as "measured, and none". */
 const UNKNOWN = "—";
 
+/**
+ * THE UNKNOWN VALUE SITS IN A WELL, and that is the whole of the fix.
+ *
+ * A bare em dash in the same slot a number will occupy is honest and reads as
+ * a screen that failed to load, which is the one thing an operator cannot tell
+ * apart from a screen that is broken. It is the same problem a designed
+ * "not built" state has: being correct is not the same as looking deliberate.
+ *
+ * `app-recessed` is the well surface in both themes, and it is the only step
+ * that separates downward from `app-bg` in light, where everything above the
+ * panel is white. So the slot reads as a place a value goes, empty on purpose,
+ * rather than as text that did not arrive.
+ */
+const UNKNOWN_SLOT =
+	"rounded-xs bg-app-recessed px-1.5 text-text-subtle tabular-nums";
+
 export function MetricStat({
 	metric,
 	className,
@@ -60,8 +76,10 @@ export function MetricStat({
 		<>
 			<span
 				className={cn(
-					"font-display text-lg font-semibold tabular-nums",
-					known ? TONE_CLASS[metric.tone ?? "neutral"] : "text-text-subtle",
+					"font-display text-lg font-semibold",
+					known
+						? cn("tabular-nums", TONE_CLASS[metric.tone ?? "neutral"])
+						: UNKNOWN_SLOT,
 				)}
 				data-testid={`metric-${metric.key}-value`}
 			>

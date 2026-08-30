@@ -99,3 +99,29 @@ export function shouldSendOnKey(event: {
 	if (event.nativeEvent?.isComposing) return false;
 	return true;
 }
+
+/**
+ * What a screen reader is told when the request state changes.
+ *
+ * Pressing send swaps the button under the operator: the glyph crossfades, the
+ * accessible name goes from Send to Stop, and someone who cannot see it gets
+ * silence. The control they just pressed became a different control and nothing
+ * said so. Raised by avel-a8, and it is the same class as the blocked reason —
+ * a state that is real and reaches sighted users only.
+ *
+ * Empty string for `ready`, so the region does not announce on every return to
+ * rest. A live region that speaks when nothing has happened trains people to
+ * ignore it.
+ */
+export function statusAnnouncement(status: ChatStatus): string {
+	switch (status) {
+		case "submitted":
+			return "Sent. Waiting for a reply.";
+		case "streaming":
+			return "Replying. Press stop to cancel.";
+		case "error":
+			return "That did not get an answer.";
+		case "ready":
+			return "";
+	}
+}

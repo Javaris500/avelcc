@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sendControlFor, shouldSendOnKey } from "#/modules/chat/send-control";
+import {
+	sendControlFor,
+	shouldSendOnKey,
+	statusAnnouncement,
+} from "#/modules/chat/send-control";
 import type { ChatStatus } from "#/modules/chat/types";
 
 const ALL: ChatStatus[] = ["submitted", "streaming", "ready", "error"];
@@ -95,5 +99,25 @@ describe("shouldSendOnKey", () => {
 				nativeEvent: { isComposing: true },
 			}),
 		).toBe(false);
+	});
+});
+
+describe("statusAnnouncement", () => {
+	it("says nothing at rest, so the region does not speak on every return", () => {
+		expect(statusAnnouncement("ready")).toBe("");
+	});
+
+	it("announces every state that is not rest", () => {
+		for (const status of ["submitted", "streaming", "error"] as const) {
+			expect(statusAnnouncement(status).length).toBeGreaterThan(0);
+		}
+	});
+
+	/**
+	 * The button changes under the operator when a stream starts. Someone who
+	 * cannot see the glyph crossfade has to be told the cancel exists.
+	 */
+	it("names the escape hatch while streaming", () => {
+		expect(statusAnnouncement("streaming").toLowerCase()).toContain("stop");
 	});
 });

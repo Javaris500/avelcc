@@ -48,9 +48,12 @@ const PILL =
 export function ModePill({
 	mode,
 	onChange,
+	className,
 }: {
 	mode: ChatModeId;
 	onChange: (mode: ChatModeId) => void;
+	/** Cross-axis alignment is the caller's, since only it knows the row. */
+	className?: string;
 }) {
 	const current = modeById(mode);
 	const Icon = ICON[current.id];
@@ -59,7 +62,7 @@ export function ModePill({
 		<DropdownMenu>
 			<DropdownMenuTrigger
 				aria-label={`Agent mode: ${current.label}`}
-				className={cn(PILL, "group")}
+				className={cn(PILL, "group", className)}
 				data-mode={current.id}
 				data-testid="chat-mode-pill"
 			>

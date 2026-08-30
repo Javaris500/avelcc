@@ -57,8 +57,11 @@ export function Message({ message }: { message: UIMessage }) {
 				className={cn(
 					"flex flex-col gap-3",
 					isUser
-						? "max-w-[52ch] rounded-md border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-2"
-						: "w-full max-w-[72ch]",
+						? "max-w-[46ch] rounded-md border border-[var(--elevation-border-rest)] bg-app-panel px-3 py-2"
+						: // No cap of its own. The home column owns the measure now, and
+							// a second cap wider than the column is a rule that can never
+							// fire — code that reads as though it works.
+							"w-full",
 				)}
 			>
 				{message.parts.map((part, index) => (

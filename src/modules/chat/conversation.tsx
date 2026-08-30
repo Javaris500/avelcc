@@ -80,7 +80,16 @@ export function Conversation({
 			ref={scroller}
 		>
 			{messages.length === 0 ? (
-				empty
+				// CENTRED, and this is the difference between the screen looking
+				// finished and looking like it failed to load. Top-aligned, the
+				// empty state sat against the strip with roughly 360px of nothing
+				// between it and the composer at the floor. Measured in a browser,
+				// which is the first time anyone has driven this screen.
+				//
+				// The scroller keeps its own height rather than the content
+				// deciding it, so the composer stays where it is and only the
+				// empty state moves.
+				<div className="flex h-full flex-col justify-center">{empty}</div>
 			) : (
 				<div className="flex flex-col gap-6 pb-4">
 					{messages.map((message) => (
