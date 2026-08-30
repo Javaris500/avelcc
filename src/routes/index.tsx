@@ -171,7 +171,13 @@ function FrontDoor({
 					))}
 				</div>
 
-				<p className="border-t border-[var(--elevation-border-rest)] pt-4 text-sm leading-relaxed text-text-subtle">
+				{/*
+				  No rule above this. The front door is outside the shell, so the
+				  operator's no-rules ruling does not strictly reach it, but the
+				  reason does: the column's own gap already separates the footer
+				  from the list, and the line was doing nothing the gap was not.
+				*/}
+				<p className="text-sm leading-relaxed text-text-subtle">
 					Not signed in. Missions and pre-flight are behind the session gate —
 					it refuses rather than redirecting, which is deliberate.
 				</p>

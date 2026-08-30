@@ -139,7 +139,12 @@ function ReasoningPart({ text }: { text: string }) {
 				/>
 				Thinking
 			</summary>
-			<p className="mt-1 border-l border-[var(--elevation-border-rest)] pl-3 text-xs leading-relaxed whitespace-pre-wrap text-text-subtle">
+			{/*
+			  Indent and tone, no left rule. The quote bar is a rule like any
+			  other, and this one would have repeated down a long conversation
+			  once per reasoning block.
+			*/}
+			<p className="mt-1 pl-5 text-xs leading-relaxed whitespace-pre-wrap text-text-subtle">
 				{text}
 			</p>
 		</details>

@@ -53,8 +53,13 @@ export function StatusStrip({
 	const allUnknown = metrics.every((m) => m.value === null);
 
 	return (
+		// NO RULE UNDER THIS. It had a `border-b`, which was the obvious way to
+		// mark a band and is exactly what the operator ruled out: panes separate
+		// by tone and gap. The gap below is set by the home layout, and the tone
+		// separates on its own, since the strip sits on `app-bg` while every
+		// message below it is a card on `app-panel`.
 		<div
-			className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-2 pb-3"
+			className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2"
 			data-testid="chat-status-strip"
 		>
 			<MetricRow>

@@ -64,7 +64,10 @@ export function ChatHome() {
 		// container and already has a resolved height, so filling it exactly
 		// keeps the composer at the bottom of the pane instead of at the bottom
 		// of the conversation.
-		<div className="flex h-full flex-col gap-4" data-testid="chat-home">
+		// gap-6 rather than gap-4, and it is load-bearing. The strip used to
+		// carry a `border-b`; with the rule gone the gap is the whole of what
+		// separates chrome from conversation.
+		<div className="flex h-full flex-col gap-6" data-testid="chat-home">
 			<StatusStrip />
 
 			{/*
