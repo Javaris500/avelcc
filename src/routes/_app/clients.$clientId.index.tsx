@@ -10,11 +10,11 @@ import {
 } from "#/modules/client/ui/scaffold";
 import { SECTIONS } from "#/modules/client/ui/sections";
 import {
-	blockedTone,
 	CLIENT_STATUS_TONE,
 	CONNECTION_STATUS_TONE,
 	DELIVERY_STATUS_TONE,
 	ENGAGEMENT_STATUS_TONE,
+	missionBlockedTone,
 } from "#/modules/client/ui/status";
 import { usePageHeader } from "#/modules/shell/use-page-header";
 import { StatusBadge, Tag } from "#/ui/badge";
@@ -617,7 +617,7 @@ function Sections({
 									</p>
 								) : (
 									<p
-										className="max-w-[68ch] text-sm leading-relaxed whitespace-pre-wrap text-text-muted"
+										className="max-w-[52ch] text-sm leading-relaxed whitespace-pre-wrap text-text-muted"
 										data-testid="client-notes"
 									>
 										{client.notesMd}
@@ -751,7 +751,7 @@ function Sections({
 												<StatusBadge
 													className="sm:ml-auto"
 													data-testid="mission-blocked"
-													tone={blockedTone(m.openBlockers)}
+													tone={missionBlockedTone(m.openBlockers)}
 												>
 													{m.openBlockers}{" "}
 													{m.openBlockers === 1 ? "blocker" : "blockers"}
