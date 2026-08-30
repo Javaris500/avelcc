@@ -96,7 +96,7 @@ function Row({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 			className={cn(
 				ROW,
 				ROW_WIDTH(collapsed),
-				"interactive text-text",
+				"group interactive relative text-text",
 				"aria-[current=page]:bg-app-raised aria-[current=page]:text-text",
 			)}
 			data-built="true"
@@ -113,6 +113,44 @@ function Row({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 					{item.badge}
 				</span>
 			) : null}
+			{/*
+			  THE UNDERGLOW. The active item is lit from below rather than filled,
+			  which is the one piece of personality the shell has. Two layers: a
+			  hairline of accent along the bottom edge, brightest at the centre and
+			  falling to nothing at both ends, and a soft bloom under it.
+
+			  IT BREATHES. The operator asked for glow and pulse explicitly, so the
+			  bloom pulses slowly rather than sitting still. It stays quiet enough
+			  not to compete with the live dot: the dot is a hard blink reporting
+			  that something is RUNNING, this is a slow swell reporting only where
+			  you are. Different rhythms, different jobs.
+
+			  Every animated layer carries motion-reduce:animate-none, and the
+			  hairline never animates — so with motion reduced the active item is
+			  still unmistakably lit, just still.
+
+			  Colour comes from --color-accent, never a literal, so it follows the
+			  theme and survives check-tokens.
+			*/}
+			<span
+				aria-hidden="true"
+				className={cn(
+					"pointer-events-none absolute inset-x-0 bottom-0 opacity-0",
+					"transition-opacity duration-[var(--duration-state)] ease-[var(--ease-avel)]",
+					"group-aria-[current=page]:opacity-100 motion-reduce:transition-none",
+					// A hover pre-light, so the glow reads as a property of the row
+					// rather than a decoration that only exists when selected.
+					"group-hover:opacity-40",
+				)}
+				data-testid="nav-underglow"
+			>
+				{/* The hairline. Static, and the part that survives reduced motion. */}
+				<span className="absolute inset-x-2 bottom-0 h-px bg-[linear-gradient(to_right,transparent,var(--color-accent),transparent)]" />
+				{/* The bloom, breathing. */}
+				<span className="absolute inset-x-4 bottom-0 h-2 animate-pulse rounded-full bg-accent opacity-50 blur-md motion-reduce:animate-none" />
+				{/* A wider, dimmer wash that bleeds past the row edges. */}
+				<span className="-bottom-1 absolute inset-x-8 h-3 rounded-full bg-accent opacity-25 blur-lg motion-reduce:animate-none" />
+			</span>
 		</Link>
 	);
 }

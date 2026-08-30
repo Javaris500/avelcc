@@ -162,15 +162,30 @@ export function Sidebar({
 			data-collapsed={collapsed}
 			data-testid="sidebar"
 		>
-			{/* Brand */}
+			{/* Brand. A block rather than a lockup: mark, name, and one true
+			    second line. The reference puts a version string here; ours says
+			    what the product IS, which is the only thing available that is not
+			    already on screen four lines down in the workspace switcher. A
+			    subtitle that is decoration is the same failure as a dropdown that
+			    does nothing. */}
 			<div
 				className={cn(
-					"flex items-center gap-2 pt-1 pb-3.5",
+					"flex items-center gap-2.5 pt-1 pb-3.5",
 					collapsed ? "justify-center" : "px-1.5",
 				)}
 			>
 				<BrandMark />
-				{collapsed ? null : <Wordmark />}
+				{collapsed ? null : (
+					<span className="flex min-w-0 flex-col leading-none">
+						<Wordmark />
+						<span
+							className="pt-1 text-micro text-text-subtle"
+							data-testid="brand-subtitle"
+						>
+							Command Center
+						</span>
+					</span>
+				)}
 			</div>
 
 			{/* Workspace switcher */}
@@ -279,12 +294,20 @@ export function Sidebar({
 				</LabelWhenCollapsed>
 			)}
 
-			{/* Nav slot. The hairline appears once the list is scrolled, so a
-			    cut-off list looks cut off rather than complete. */}
+			{/* Nav slot.
+			    THE RULE IS GONE AND A FADE DOES ITS JOB. A `border-t` appeared here
+			    once the list was scrolled, which is an internal divider and falls
+			    under the operator's no-rules ruling. The signal it carried is real
+			    and worth keeping: a cut-off list should look cut off rather than
+			    complete. So the content now fades into the background at the bottom
+			    edge instead, which says the same thing without drawing a line.
+
+			    The mask is unconditional. With a short list the fade lands on empty
+			    space and shows nothing, so there is no state to track. */}
 			<div
 				className={cn(
-					"app-scroll w-full min-h-0 flex-1 overflow-y-auto border-t border-transparent transition-colors duration-[var(--duration-micro)]",
-					navScrolled && "border-[var(--elevation-border-rest)]",
+					"app-scroll w-full min-h-0 flex-1 overflow-y-auto",
+					"[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]",
 				)}
 				data-nav-groups={(navGroups ?? NAV).length}
 				data-scrolled={navScrolled}
@@ -297,7 +320,9 @@ export function Sidebar({
 			{/* Footer: the operator's own controls. */}
 			<div
 				className={cn(
-					"mt-auto flex w-full flex-col gap-1 border-t border-[var(--elevation-border-rest)] pt-3",
+					// No rule. The gap above and the muted control tone separate the
+					// footer from the nav, per the operator's ruling.
+					"mt-auto flex w-full flex-col gap-1 pt-4",
 					collapsed && "items-center",
 				)}
 				data-testid="sidebar-footer"
