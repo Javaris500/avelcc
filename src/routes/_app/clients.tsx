@@ -132,6 +132,24 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 ];
 
 /**
+ * THE SWITCHER'S COLUMNS. Two, not seven.
+ *
+ * With a client selected the pane stops being a table and becomes a way to
+ * change which client you are looking at. Seven columns in the width that
+ * leaves clipped the last one at the pane edge — the operator saw "BLOCKE"
+ * with nowhere for the rest to go.
+ *
+ * Account answers "which one is this" and Blocked answers "which one needs me",
+ * which is the whole job of a switcher. The other five are browsing columns and
+ * they live at `/clients`, where the table has the full width and is genuinely
+ * a table.
+ */
+const COMPACT_COLUMNS: { key: SortKey; label: string }[] = [
+	{ key: "name", label: "Account" },
+	{ key: "openBlockers", label: "Blocked" },
+];
+
+/**
  * ONE DEFINITION FOR EVERY CELL, so the hover band is unbroken across the row.
  *
  * The hover was on the `<tr>` with `interactive rounded-sm`, and a `<tr>` is
@@ -289,7 +307,13 @@ function ClientsLayout() {
 		 * because the detail is where the nine sections live and is the pane that
 		 * benefits from width.
 		 */
-		<div className="flex h-full flex-col gap-4 p-6 lg:flex-row">
+		/*
+		 * NO PADDING HERE. The shell's `main` is already `p-6`, so this added a
+		 * second 24px on every side and pushed the panes 48px off the frame. The
+		 * gap between the two panes is this row's job; the margin around them is
+		 * the shell's.
+		 */
+		<div className="flex h-full flex-col gap-4 lg:flex-row">
 			<section
 				aria-label="Clients"
 				/*
@@ -300,10 +324,18 @@ function ClientsLayout() {
 				 * reach the one decision they came for. On a phone the selected child
 				 * IS the screen.
 				 */
+				/*
+				 * 18rem WHEN SELECTED, was 26rem. At the old width the seven-column
+				 * table clipped its last column and the pane still ran ~90% empty
+				 * below a single row, while the detail pane — nine sections, a metric
+				 * row, a definition list and prose — was squeezed to about 570px and
+				 * wrapped its prose at roughly 55 characters. The width was being
+				 * spent on the pane that had least to say.
+				 */
 				className={
 					selectedId === undefined
 						? "flex min-w-0 flex-1 flex-col gap-3"
-						: "flex shrink-0 flex-col gap-3 max-lg:hidden lg:w-[26rem]"
+						: "flex shrink-0 flex-col gap-3 max-lg:hidden lg:w-72"
 				}
 				data-testid="clients-pane"
 			>
@@ -323,7 +355,13 @@ function ClientsLayout() {
 					 * tooltip is worse than visible text, and it beats a button that
 					 * looks live.
 					 */}
-					<div className="flex items-center gap-2 sm:ml-auto">
+					{/*
+					 * LEFT-ALIGNED. This row carried `sm:ml-auto` with nothing on its
+					 * left, so two buttons floated in the middle of the pane, aligned
+					 * to neither its edge nor the filter row directly beneath them.
+					 * `ml-auto` pushes against a sibling, and there was no sibling.
+					 */}
+					<div className="flex items-center gap-2">
 						<Button
 							data-testid="clients-new"
 							disabled
@@ -434,7 +472,10 @@ function ClientsLayout() {
 								>
 									<thead>
 										<tr>
-											{COLUMNS.map((col) => (
+											{(selectedId === undefined
+												? COLUMNS
+												: COMPACT_COLUMNS
+											).map((col) => (
 												<HeaderCell
 													active={sortKey === col.key}
 													dir={sortDir}
@@ -475,36 +516,50 @@ function ClientsLayout() {
 															{client.name}
 														</Link>
 													</td>
-													<td
-														className={cn(CELL, "text-micro text-text-subtle")}
-													>
-														{/*
-														 * An em dash, not blank. Blank reads as a
-														 * rendering fault; the dash says the field is
-														 * empty on purpose.
-														 */}
-														{client.primaryContact ?? "—"}
-													</td>
-													<td className={CELL}>
-														<StatusBadge
-															data-testid="client-status"
-															tone={CLIENT_STATUS_TONE[client.status]}
-														>
-															{client.status}
-														</StatusBadge>
-													</td>
-													<td
-														className={cn(CELL, "text-micro tabular-nums")}
-														data-testid="client-requests"
-													>
-														<Count n={client.openRequests} />
-													</td>
-													<td
-														className={cn(CELL, "text-micro tabular-nums")}
-														data-testid="client-missions"
-													>
-														<Count n={client.activeMissions} />
-													</td>
+													{/*
+													 * THE FIVE BROWSING CELLS, hidden together with their
+													 * headers when the pane is a switcher. A `<td>` left
+													 * behind here would shift every remaining cell one
+													 * column left of its heading, which is a table that
+													 * reads as data rather than as broken.
+													 */}
+													{selectedId !== undefined ? null : (
+														<>
+															<td
+																className={cn(
+																	CELL,
+																	"text-micro text-text-subtle",
+																)}
+															>
+																{/*
+																 * An em dash, not blank. Blank reads as a
+																 * rendering fault; the dash says the field is
+																 * empty on purpose.
+																 */}
+																{client.primaryContact ?? "—"}
+															</td>
+															<td className={CELL}>
+																<StatusBadge
+																	data-testid="client-status"
+																	tone={CLIENT_STATUS_TONE[client.status]}
+																>
+																	{client.status}
+																</StatusBadge>
+															</td>
+															<td
+																className={cn(CELL, "text-micro tabular-nums")}
+																data-testid="client-requests"
+															>
+																<Count n={client.openRequests} />
+															</td>
+															<td
+																className={cn(CELL, "text-micro tabular-nums")}
+																data-testid="client-missions"
+															>
+																<Count n={client.activeMissions} />
+															</td>
+														</>
+													)}
 													{/*
 													 * THE COLUMN THE RULING ASKED FOR. A client with
 													 * blocked work has to look different before it is
@@ -526,16 +581,21 @@ function ClientsLayout() {
 															<Count n={0} />
 														)}
 													</td>
-													<td
-														className={cn(CELL, "text-micro text-text-subtle")}
-														data-testid="client-last-activity"
-													>
-														{client.lastActivityAt
-															? new Date(
-																	client.lastActivityAt,
-																).toLocaleDateString()
-															: "—"}
-													</td>
+													{selectedId !== undefined ? null : (
+														<td
+															className={cn(
+																CELL,
+																"text-micro text-text-subtle",
+															)}
+															data-testid="client-last-activity"
+														>
+															{client.lastActivityAt
+																? new Date(
+																		client.lastActivityAt,
+																	).toLocaleDateString()
+																: "—"}
+														</td>
+													)}
 												</tr>
 											);
 										})}

@@ -363,61 +363,76 @@ function ClientDetail() {
 							 * Module actions — New request and Share — sit here, left of the
 							 * shell's core actions.
 							 */}
-							<div className="flex flex-wrap items-center gap-3">
+							<div className="flex flex-wrap items-start gap-3">
 								{/*
-								 * NO TITLE HERE. The route claims the header above, which
-								 * now carries the client's name as the page's only h1 — so
-								 * printing it again would be the duplicate this page had
-								 * before, moved rather than removed. The status stays,
-								 * because the header's subtitle carries it as a word and the
-								 * chip carries it as a tone.
+								 * NO TITLE AND NO STATUS CHIP HERE. The route claims the
+								 * header above, which carries the client's name as the page's
+								 * only h1, so printing it again would be the duplicate this
+								 * page had before, moved rather than removed.
+								 *
+								 * The chip went for a different reason: status was rendering
+								 * THREE TIMES on one screen — as a word in the header
+								 * subtitle, as this chip, and as "Status / active" in the
+								 * definition list below. The chip was the only one carrying
+								 * tone and the only one with no label, so it sat alone on a
+								 * line of its own with the actions pushed to the far right.
+								 * The definition-list entry now carries the tone instead, so
+								 * one instance has both the label and the colour and the
+								 * orphan line is gone.
 								 */}
-								<StatusBadge
-									data-testid="client-status"
-									tone={CLIENT_STATUS_TONE[c.status]}
-								>
-									{c.status}
-								</StatusBadge>
-								<div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-									<Button
-										data-testid="client-new-request"
-										disabled
-										title={requestReason}
-										variant="primary"
-									>
-										New request
-									</Button>
+								{/*
+								 * THE ACTIONS AND THEIR REASON ARE ONE COLUMN. The reason
+								 * used to be a sibling of this whole header row, so it
+								 * rendered full-width at the very top of the panel, above
+								 * the section rail and nowhere near the button it describes.
+								 * Printing it rather than hiding it in a tooltip was right;
+								 * where "there" turned out to be was not.
+								 */}
+								<div className="flex flex-col items-end gap-1.5 sm:ml-auto">
+									<div className="flex flex-wrap items-center gap-2">
+										<Button
+											data-testid="client-new-request"
+											disabled
+											title={requestReason}
+											variant="primary"
+										>
+											New request
+										</Button>
+										{/*
+										 * SHARE IS DISABLED AND WILL STAY THAT WAY FOR A WHILE.
+										 * This product is explicitly single-operator — UI-PLAN
+										 * section 12: "No sharing, no permissions, no collaboration
+										 * affordances" — so there is nobody to share with and no
+										 * permission model to share under. Rendered because the
+										 * ruling names it a module action; disabled because nothing
+										 * behind it exists.
+										 */}
+										<Button
+											data-testid="client-share"
+											disabled
+											title="Sharing is not built. AVEL is single-operator today, so there is nobody to share with yet."
+											variant="secondary"
+										>
+											Share
+										</Button>
+									</div>
 									{/*
-									 * SHARE IS DISABLED AND WILL STAY THAT WAY FOR A WHILE.
-									 * This product is explicitly single-operator — UI-PLAN
-									 * section 12: "No sharing, no permissions, no collaboration
-									 * affordances" — so there is nobody to share with and no
-									 * permission model to share under. Rendered because the
-									 * ruling names it a module action; disabled because nothing
-									 * behind it exists.
+									 * The reason the primary is disabled, in full. It is on the
+									 * button's `title` too, but a tooltip is not an answer on its
+									 * own — this is the one control on the page an operator will
+									 * actually try to press. The text still varies with the
+									 * engagement count: none, several, and not-yet-loaded are
+									 * three different sentences, and collapsing them would make
+									 * the button honest-looking rather than honest.
 									 */}
-									<Button
-										data-testid="client-share"
-										disabled
-										title="Sharing is not built. AVEL is single-operator today, so there is nobody to share with yet."
-										variant="secondary"
+									<p
+										className="max-w-sm text-right text-micro text-text-subtle"
+										data-testid="client-new-request-reason"
 									>
-										Share
-									</Button>
+										{requestReason}
+									</p>
 								</div>
 							</div>
-							{/*
-							 * The reason the primary is disabled, in full. It is on the
-							 * button's `title` too, but a tooltip is not an answer on its
-							 * own — this is the one control on the page an operator will
-							 * actually try to press.
-							 */}
-							<p
-								className="text-sm text-text-subtle"
-								data-testid="client-new-request-reason"
-							>
-								{requestReason}
-							</p>
 
 							{/*
 							 * The rail is sticky and the page scrolls past it. On a narrow
@@ -536,7 +551,17 @@ function Sections({
 											label: "Primary contact",
 											value: client.primaryContact,
 										},
-										{ label: "Status", value: client.status },
+										{
+											label: "Status",
+											value: (
+												<StatusBadge
+													data-testid="client-status"
+													tone={CLIENT_STATUS_TONE[client.status]}
+												>
+													{client.status}
+												</StatusBadge>
+											),
+										},
 										{
 											label: "Added",
 											value: formatDate(client.createdAt),
