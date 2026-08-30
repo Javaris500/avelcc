@@ -137,8 +137,40 @@ export function Shell({
 					>
 						{compact ? null : sidebar}
 
+						{/*
+						  THE SEAM, IN TWO PARTS, AND NEITHER IS A RULE.
+						
+						  1. A TONAL STEP. The sidebar stays at app-bg and the content
+						     column steps to app-panel. This is what the sidebar's own
+						     comment already CLAIMED — "it separates by TONE and GAP: it
+						     sits at app-bg while content sits in app-panel cards" — and
+						     it was not true: both were app-bg, so on any route without
+						     cards, the chat home included, there was nothing between
+						     them at all. Measured: dark 1a1d23 to 20242d is L* 10.7 to
+						     14.2, light e8eaee to ffffff is 92.7 to 100. Present in
+						     both, and stronger in light, which is the reverse of how a
+						     tonal step usually fails.
+						
+						  2. A HAIRLINE THAT NEVER TERMINATES. One pixel at the join,
+						     transparent at both ends and holding through the middle, so
+						     it has no endpoints to read as a drawn divider. It is the
+						     nav item and composer underglow technique turned vertical —
+						     the shell gets one more instance of its single piece of
+						     personality rather than a second visual language.
+						
+						  NEUTRAL RATHER THAN ACCENT, deliberately. The proposal was the
+						  accent gradient, and UI-PLAN section 9 is why it is not: one
+						  accent focal point per screen, and the active nav item holds
+						  it. A permanent accent seam beside it would be two. Swapping
+						  `--elevation-border-raised` for `--color-accent` below is the
+						  whole change if that ruling moves.
+						*/}
 						<div
-							className="flex min-w-0 flex-col overflow-hidden"
+							className={cn(
+								"relative flex min-w-0 flex-col overflow-hidden bg-app-panel",
+								"before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-px",
+								"before:bg-[linear-gradient(to_bottom,transparent,var(--elevation-border-raised)_18%,var(--elevation-border-raised)_82%,transparent)]",
+							)}
 							data-testid="main-pane"
 						>
 							{/* Restored. The crop it was removed for was never this component: the
