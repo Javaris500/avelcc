@@ -200,10 +200,23 @@ export function wallToSeconds(v: string | undefined): number | undefined {
 	return undefined;
 }
 
-/** `$60.27` / `**unlogged**` -> a decimal string, or undefined. */
+/**
+ * `$60.27` / `$1,639.00` / `**unlogged**` -> a decimal string, or undefined.
+ *
+ * COMMAS ARE STRIPPED FIRST, exactly as `tokens()` does. Without that the regex
+ * stops at the separator and "$1,639.00" parses as "1" — a silently plausible
+ * number three orders of magnitude wrong. Two number parsers in one file with
+ * different ideas about thousands separators is how that happens, so both now
+ * share the same rule.
+ *
+ * It matters more here than almost anywhere: cost_entries is append-only and
+ * guarded by refuse_mutation(), so a wrong figure has no UPDATE path and can
+ * only be corrected by a second row that says the first was wrong.
+ */
 export function usd(v: string | undefined): string | undefined {
 	if (!v) return undefined;
-	const m = v.replace(/\*/g, "").match(/\$?\s*([0-9]+(?:\.[0-9]+)?)/);
+	const cleaned = v.replace(/\*/g, "").replace(/,/g, "");
+	const m = cleaned.match(/\$?\s*([0-9]+(?:\.[0-9]+)?)/);
 	return m ? (m[1] as string) : undefined;
 }
 

@@ -139,8 +139,18 @@ export function buildPlan(missions: {
 			gateMeasurements: (() => {
 				const g = str(h, "playwright_gate");
 				if (!g) return null;
-				if (g === "not_run")
-					return [{ gate: "playwright", state: null, source: null }];
+				// A GATE THAT DID NOT RUN HAS NO MEASUREMENT, so it contributes no
+				// entry. Writing `{ state: null, source: null }` would persist a shape
+				// that satisfies neither branch of GateResult — that union exists so a
+				// verdict cannot be recorded without saying how it was reached, and
+				// jsonb would have accepted the violation silently. evaluateGates
+				// already yields `pending` with no source for a gate it has no
+				// measurement for, which is the correct reading of `not_run`.
+				//
+				// `[]` rather than null here is deliberate: the field was present and
+				// said the gate did not run, which is different from a completion that
+				// recorded nothing about gates at all.
+				if (g === "not_run") return [];
 				return [
 					{
 						gate: "playwright",
@@ -282,10 +292,20 @@ export function buildPlan(missions: {
 		const actorRef = row[3] as string;
 		const isOperator = actorRef.startsWith("operator");
 		const missionLabel = row[2] as string;
+		// FAIL, NOT FALL THROUGH. The previous shape sent any unmapped label —
+		// a blank cell, an em dash, a future mission 003 — to slice1 by default,
+		// which is the same "put a wrong value somewhere permanent" the split
+		// assertion below refuses. An unknown mission is not a slice-1 mission.
+		const missionPrefix = MISSION_BY_LABEL[missionLabel];
+		if (!missionPrefix) {
+			throw new Error(
+				`COST-LOG row ${label}: mission ${JSON.stringify(missionLabel)} is not ` +
+					`in the known set ${JSON.stringify(Object.keys(MISSION_BY_LABEL))}. ` +
+					"Refusing to guess which mission it belongs to.",
+			);
+		}
 		const missionId =
-			MISSION_BY_LABEL[missionLabel] === "338a6e9d"
-				? missions.slice0
-				: missions.slice1;
+			missionPrefix === "338a6e9d" ? missions.slice0 : missions.slice1;
 		const dispatchRef =
 			(row[4] as string) === "—" ? undefined : (row[4] as string);
 		const split = isOperator
