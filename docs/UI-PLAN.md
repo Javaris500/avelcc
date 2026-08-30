@@ -853,6 +853,22 @@ a conversation is the most familiar entry point there is. `[hypothesis]`
 Every other nav item is a noun you browse. Chat is where you start when you do
 not yet know which noun you want.
 
+### `/` is two pages sharing one file, and that is a trap
+
+Signed in, `/` renders `<Shell><ChatHome /></Shell>`. Signed out, it renders
+`<FrontDoor />`. It is the only route in the app where two entirely different
+pages share one URL and one file, **and the signed-out one is the one that reads
+as "the home page" when you open the source.** `[built]`
+
+The failure mode is silent in the worst way: you edit the wrong half, it
+typechecks, the tests pass, and the operator sees nothing change. Thirteen real
+polish changes landed on `FrontDoor` and were invisible to a signed-in operator.
+Two sessions have now walked into this split from opposite directions — the same
+file also nearly lost the front door's own `<h1>` when the duplicate-title fix
+over-generalised.
+
+Anyone editing "the home page" states which half first.
+
 ### Why chat alone is not enough
 
 A pure conversation hides the system's state behind having to ask for it. If a
@@ -1096,6 +1112,15 @@ state.
    sessions reinvented it independently, which is why it is a rule rather than a
    note. Raised by avel-fa.
 
+   **Its hazard, found by rendering:** a screen that correctly says "not built"
+   can still be anonymous. The catalog screens put the `PageHeader` inside the
+   four-state boundary, reasoning that the subtitle carries counts and a count is
+   unknowable until the read resolves. That was right about the counts and wrong
+   about the header, so every catalog page rendered as one grey sentence with no
+   title, on a shell whose header does not carry the page name yet either. **A
+   screen's title and definition are static facts and render in every state.**
+   Only the counts wait. `[built]`
+
 ---
 
 ## 13 · Suggested order
@@ -1116,6 +1141,25 @@ state.
 | 12 | Chat UI: composer, AI Elements, `InlineEntityCard`, status strip | The mode pill in section 10 is what makes step 10's read-only cut legible. |
 | 13 | **Catalog procedures** | Missing from this table entirely rather than deferred. The Library group is five nav items and four have no endpoints: skills, agent templates, skill sources, presets. Those screens are built and render "not built" until these exist. Preset is the hard one — the only entity in `DATA-CONTRACTS-V2` with no field block at all. Raised by avel-fa. |
 | 14 | Remaining shell polish, items 4 to 9 | Command palette, content width, scroll affordance, pending states, frame height, header wrap. |
+
+### One-commit rules need a mechanism, not a promise
+
+Step 9 requires the nav change and the route deletion to land together. It did
+not hold, and nobody disagreed with it. The deletion was `git rm`'d and held
+STAGED waiting on a blocking fix, and a broad `git add` in another session swept
+it into an unrelated commit — **in a shared tree the index is shared**, so
+"I will hold this staged" is unholdable by construction. `HEAD` then carried a
+nav entry pointing at a route that did not exist, which is verbatim the state the
+one-commit rule exists to prevent. `[built]`
+
+`CLAUDE.md` names this exactly: `[attestation]` marks anything enforced by a
+claim rather than a mechanism, and it is this project's recurring failure mode.
+The rule was an attestation. So is every other cross-session sequencing promise
+in this document.
+
+The cheap discipline: stage by path, and read `git status --short` for entries
+you did not create before committing. The same root cause produced the
+`routeTree.gen.ts` merge blocks. Raised by avel-c2.
 
 Steps 1 to 6 are shell work and touch no data. Step 7 is a schema change and
 belongs to whoever owns the schema. Soft-delete and append-only conventions
