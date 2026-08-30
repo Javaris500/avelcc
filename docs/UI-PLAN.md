@@ -342,6 +342,23 @@ and an auto-scrolling conversation is a lot of motion.
 
 ### 3. Resolve the focus ring and give it an offset
 
+**Two of these are fixed. The third is the last unsourced colour in the system.**
+Fixing the offset also surfaced two defects that no amount of reading found, both
+in the same five-line block, both caught only by driving a browser:
+
+- **It was unlayered.** Tailwind utilities live in `@layer utilities`, and an
+  unlayered style beats a layered one regardless of specificity. `outline-none`
+  lost, and so did `focus-visible:outline-none`. Any component wanting a ring
+  instead of an outline had to reach for `!important`. Now in `@layer base`.
+- **It set `border-radius`, which is the element's shape rather than the
+  outline's.** `--radius-xs` is 4px, `--radius-full` is 999px, and thirteen files
+  use `rounded-full`. Every pill in the app collapsed from 999px to 4px the
+  moment it took focus. The line was also unnecessary: browsers already follow
+  the element's own radius when drawing an outline. Found by avel-bb, and it had
+  survived a previous edit to the same block three lines away — a rule that
+  restyles the element it decorates is not what a reader looks for under a
+  heading that says FOCUS. `[built]`
+
 Three problems in one token. `[built]`
 
 - `tokens.css:56` declares `--color-focus-ring: #0092ca` and marks it
@@ -946,9 +963,14 @@ cheapest answer to "where was I" on a Monday morning. `[hypothesis]`
 
 - **The dot-grid content background.** It competes with data-dense tables and
   the blast-radius diff, which are the screens that matter most.
-- **Two glows at once.** The reference lights the active nav item and the
-  composer. One accent focal point per screen. If the composer glows, the nav
-  does not.
+- **Two AMBIENT glows at once.** The reference lights the active nav item and the
+  composer at rest. One accent focal point per screen.
+
+  **A focus glow is not a second focal point.** It exists only while the operator
+  is in the control and vanishes when they leave, so it is feedback rather than
+  decoration — and on home, where the active nav item IS Home, both being lit
+  while the composer has focus is the operator's own doing. The rule governs
+  what competes at rest. Distinction raised by avel-bb.
 
 ### Implementation notes
 
