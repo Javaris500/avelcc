@@ -56,6 +56,41 @@ test("a desktop is allowed a construction route", async ({ page }) => {
 	await expect(page.getByTestId("clients-pane")).toBeVisible();
 });
 
+/**
+ * A CAPTURE ROUTE NESTED UNDER A CONSTRUCTION LAYOUT.
+ *
+ * This shape did not exist until request review moved inside clients, and it is
+ * the one the guard is most likely to regress on silently. `useRouteDevice`
+ * walks the matches BACKWARDS and takes the first route that declares a device,
+ * so nesting inherits nothing and a child overrides its parent. Nothing in the
+ * type system says so; it is four lines of loop.
+ *
+ * It has already gone wrong once. The review route was given
+ * `device: "construction"` by copying the routes either side of it, which meant
+ * a phone was refused a screen whose own refusal copy reads "Reviewing and
+ * approving still works on a phone" — the product contradicting itself inside
+ * one sentence.
+ *
+ * The second assertion is the structural half. Because this route is
+ * phone-allowed, the `/clients` LAYOUT renders on a phone too, and it carries
+ * the clients table. Without hiding it the operator would scroll past every
+ * client to reach the one decision they opened. On a phone the selected child
+ * IS the screen.
+ *
+ * The id does not need to resolve. The guard and the layout decide before any
+ * data does, which is what is under test.
+ */
+test("a phone is allowed a capture route nested under a construction layout", async ({
+	page,
+}) => {
+	await page.setViewportSize(PHONE);
+	await page.goto(
+		"/clients/00000000-0000-4000-8000-000000000000/requests/00000000-0000-4000-8000-000000000001",
+	);
+	await expect(page.getByTestId("desktop-required")).toHaveCount(0);
+	await expect(page.getByTestId("clients-pane")).toBeHidden();
+});
+
 test("the refusal explains itself and offers a way forward", async ({
 	page,
 }) => {

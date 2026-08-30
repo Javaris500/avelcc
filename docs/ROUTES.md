@@ -37,7 +37,7 @@
 /clients/:id                       🖥   client detail, engagements, spend
 /clients/:id/engagements/new       🖥   new engagement
 
-/clients/:id/requests/:requestId   🖥   request review — what was asked, what we
+/clients/:id/requests/:requestId   📱   request review — what was asked, what we
                                        derived and its evidence, what approving creates
 
 /missions                          📱   list
@@ -166,7 +166,7 @@ That single step explains the entire roster model without a slide.
 
 **Step 5 should be conspicuously unhelpful.** A repository with no policy row is treated as no-direct-push, so the empty state is the safe state. Do not nudge toward creating policies. Enabling direct push to a default branch is a deliberate confirmation with a warning, never a toggle.
 
-### `/clients/:id/requests/:requestId` — request review 🖥
+### `/clients/:id/requests/:requestId` — request review 📱
 
 **The operator-facing word is "Request".** `intake` is the internal name: the
 table, the contract and the service all use it, and nothing an operator reads
@@ -174,11 +174,24 @@ does. This path used to be `/intake/:id`, which was the only place the two
 vocabularies met — a path is operator-facing and it was carrying the internal
 name. It no longer does, and nothing else should.
 
-**Desktop only, and the glyph changed with the address.** `/intake/:id` was
-phone-allowed. This inherits `/clients`'s construction boundary, so the phone
-case is now a refusal rather than an approval surface between meetings. That is
-a real loss against the original intent and it is a consequence of the move,
-recorded here rather than left to be discovered.
+**Still phone-allowed, and nesting had nothing to do with it.** An earlier
+version of this section said the route inherited `/clients`'s desktop-only
+boundary. It does not. `device-guard.tsx:32` walks the matches BACKWARDS and
+takes the first route that declares a device, so the deepest declaration wins and
+a child overrides its parent. Nesting inherits nothing.
+
+The capability loss was real for a few hours and came from a copy-paste: the
+route was given `device: "construction"` from the routes either side of it. The
+proof it was wrong was already written into the product — the guard's own refusal
+screen says *"Reviewing and approving still works on a phone"*, so a phone
+reaching this route was shown a screen telling it that the thing it was trying to
+do works on a phone.
+
+`DAY-ONE-FRONTEND` draws the line where this needs it: approving a gated export
+from mobile is fine, initiating an irreversible one is not. Approving a request
+is the first. Found and fixed by avel-c2, and covered by a test for the shape
+that did not exist before this move — a capture route nested under a construction
+layout.
 
 The approval surface. Canon has produced a structured brief and a list of open questions; nothing is executable until the operator approves.
 
@@ -188,7 +201,9 @@ The approval surface. Canon has produced a structured brief and a list of open q
 
 **On approval:** materializes a Mission. The Intake row is retained as provenance.
 
-~~**Phone-allowed** because reviewing and approving is exactly the shape of work that happens between meetings. Initiation stays on desktop.~~ Superseded: see the boundary note above.
+**Phone-allowed** because reviewing and approving is exactly the shape of work that happens between meetings. Initiation stays on desktop.
+
+Because this route is phone-allowed, the `/clients` layout renders on a phone as well, and it carries the clients table. The table pane is hidden below `lg` when a client is selected: on a phone the selected child IS the screen, rather than something reached by scrolling past every client.
 
 ### `/catalog/agents`, `/catalog/skills` 🖥
 
