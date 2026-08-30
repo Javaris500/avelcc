@@ -109,7 +109,27 @@ export function Pill({
 	);
 }
 
-/** A tag is square-cornered and monospaced: slugs, paths, refs, hashes. */
+/**
+ * A tag is square-cornered and monospaced: slugs, paths, refs, hashes.
+ *
+ * ITS FILL IS DERIVED FROM THE TEXT COLOUR, NOT FROM A SURFACE TOKEN, and that
+ * is the only way one value is right in both themes.
+ *
+ * It was `bg-muted`, which resolves to app-recessed — the WELL tone, tuned for
+ * inputs and code blocks that sit BELOW the page. A chip sits ON a panel, and
+ * in dark that put it at L* 8.2 against a panel at 16.6: 8.4 L* below its own
+ * surface, reading as a black hole rather than a label. Measured on the
+ * missions list, rgb(22,24,29) on rgb(36,41,53).
+ *
+ * The token could not simply be changed: `bg-muted` also backs `input.tsx` and
+ * the catalog's `<pre>` blocks, which genuinely ARE wells and want that tone.
+ * One token, two jobs.
+ *
+ * `color-mix` with `--color-text` solves it without a new token. Text is light
+ * in dark and dark in light, so a 10% mix lifts on a dark panel and darkens on
+ * a white one — the elevation rule this app already follows, falling out of the
+ * theme rather than being restated per theme.
+ */
 export function Tag({
 	className,
 	children,
@@ -118,7 +138,8 @@ export function Tag({
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center rounded-xs bg-muted px-1.5 py-0.5",
+				"inline-flex items-center rounded-xs px-1.5 py-0.5",
+				"bg-[color-mix(in_oklab,var(--color-text)_10%,transparent)]",
 				"font-mono text-micro text-muted-foreground",
 				className,
 			)}

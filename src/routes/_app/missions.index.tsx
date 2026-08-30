@@ -215,6 +215,11 @@ function Missions() {
 	 * load. It is a count rather than a sentence, which is the split between
 	 * `subtitle` and `definition`.
 	 */
+	// Whichever mission is actually first. Undefined until the query lands,
+	// and the link is not rendered until then: a link to nothing is worse
+	// than no link, which is what the fabricated id had been all along.
+	const firstMissionId = query.data?.data[0]?.id;
+
 	usePageHeader({
 		title: "Missions",
 		subtitle: query.isSuccess ? `${query.data.meta.total} missions` : undefined,
@@ -224,17 +229,27 @@ function Missions() {
 		<div className="px-6 py-5">
 			{/* The only other built route today. Linked so it is reachable rather
 			    than needing the URL typed. */}
-			<p className="pt-1 pb-3 text-sm text-text-muted">
-				The pre-flight screen is partly built:{" "}
-				<Link
-					className="text-accent-text hover:text-accent-hover"
-					data-testid="link-preflight"
-					params={{ missionId: "01J8Z4K2QW3E5R7T9Y1V3J5P7A" }}
-					to="/missions/$missionId/exports/new"
-				>
-					gates, from the golden fixture
-				</Link>
-			</p>
+			{/*
+			  THE ID HERE WAS A FABRICATION AND THE LINK 404'd.
+			  `01J8Z4K2QW3E5R7T9Y1V3J5P7A` is a ULID copied from the golden
+			  fixture; `missions.id` is a uuid, so it matched no row. The same
+			  literal was on the front door and was removed there for the same
+			  reason. It now points at whichever mission is actually first in
+			  this list — a real row, on a page that is holding the rows.
+			*/}
+			{firstMissionId ? (
+				<p className="pt-1 pb-3 text-sm text-text-muted">
+					The pre-flight screen is partly built:{" "}
+					<Link
+						className="text-accent-text hover:text-accent-hover"
+						data-testid="link-preflight"
+						params={{ missionId: firstMissionId }}
+						to="/missions/$missionId/exports/new"
+					>
+						gates, from the golden fixture
+					</Link>
+				</p>
+			) : null}
 
 			<Surface
 				empty={
