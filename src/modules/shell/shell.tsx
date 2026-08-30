@@ -158,18 +158,27 @@ export function Shell({
 						     the shell gets one more instance of its single piece of
 						     personality rather than a second visual language.
 						
-						  NEUTRAL RATHER THAN ACCENT, deliberately. The proposal was the
-						  accent gradient, and UI-PLAN section 9 is why it is not: one
-						  accent focal point per screen, and the active nav item holds
-						  it. A permanent accent seam beside it would be two. Swapping
-						  `--elevation-border-raised` for `--color-accent` below is the
-						  whole change if that ruling moves.
+						  NEUTRAL RATHER THAN ACCENT, and now actually so. This comment
+						  claimed neutral while the gradient below read
+						  `var(--color-accent)` — a load-bearing comment asserting the
+						  opposite of its own code, which is the third instance of that
+						  shape found today. The reasoning it states was right and was
+						  never applied: UI-PLAN section 9 allows one accent focal point
+						  per screen, the active nav item holds it, and a permanent
+						  accent seam beside it is a second.
+
+						  `--color-border-strong` rather than `--color-border`, because
+						  the operator asked for the divider to be IMPROVED and the
+						  weaker token is nearly invisible against a panel that just got
+						  deeper: measured 1.91:1 dark and 1.24:1 light, against 2.67:1
+						  and 1.47:1 for strong. Opacity goes to full for the same
+						  reason — a neutral seam has none of accent's help.
 						*/}
 						<div
 							className={cn(
 								"relative flex min-w-0 flex-col overflow-hidden",
 								"before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-px",
-								"before:bg-[linear-gradient(to_bottom,transparent,var(--color-accent)_18%,var(--color-accent)_82%,transparent)] before:opacity-60",
+								"before:bg-[linear-gradient(to_bottom,transparent,var(--color-border-strong)_18%,var(--color-border-strong)_82%,transparent)]",
 							)}
 							data-testid="main-pane"
 						>

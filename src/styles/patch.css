@@ -165,9 +165,12 @@
      dark that is neither too light nor too dark, and dropping app-bg to buy
      the same separation would also have collided with app-recessed, which
      the sidebar's own search input sits on. */
-  --color-app-panel:    #242935;   /* L* 16.4 · cards, mission panels, content */
-  --color-app-raised:   #2b313d;   /* L* 19.6 · hover, active row, controls */
-  --color-app-float:    #343b49;   /* L* 23.4 · popover, dropdown, modal    */
+  /* CORRECTION 8, operator ruling: a touch deeper. The content surface sat at
+     L* 16.4 and read light against the mat. Climb mat -> float is 11.3, so the
+     compression is unchanged; only the middle moved down. */
+  --color-app-panel:    #1f2430;   /* L* 14.2 · cards, panels, AND the content */
+  --color-app-raised:   #262c38;   /* L* 17.9 · hover, active row, controls */
+  --color-app-float:    #2e3542;   /* L* 22.0 · popover, dropdown, modal    */
 
 
   /* ── 7 · SKELETON + DENSITY ─────────────────────────────────────────────
@@ -528,5 +531,5 @@ body {
    did not, so text-subtle on float fell to 3.79:1. It was ALREADY under AA at
    4.34:1 before that change, which no one had measured. Now 4.52:1, and every
    text/surface pair in dark clears 4.5:1. */
-.app { --color-text-subtle: #929aa5; }
+.app { --color-text-subtle: #969ea9; }
 .app.light { --color-text-subtle: #6e7681; }
