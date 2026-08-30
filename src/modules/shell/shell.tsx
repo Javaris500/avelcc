@@ -1,10 +1,8 @@
-import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { NavGroup } from "#/contract/ui/nav";
 import type { Session } from "#/modules/auth/session";
 import { NavDrawer } from "#/modules/shell/nav-drawer";
 import { Sidebar } from "#/modules/shell/sidebar";
-import { TopBar } from "#/modules/shell/topbar";
 import { useCollapsed } from "#/modules/shell/use-collapsed";
 import { COMPACT_QUERY, useMediaQuery } from "#/modules/shell/use-media-query";
 import { PageHeaderProvider } from "#/modules/shell/use-page-header";
@@ -39,13 +37,18 @@ import { cn } from "#/utils/cn";
 export function Shell({
 	session,
 	onSignOut,
-	breadcrumb,
 	navGroups,
 	children,
 }: {
 	session: Session;
 	onSignOut: () => void;
-	breadcrumb: string;
+	/**
+	 * ACCEPTED AND NOT RENDERED. The shell header that displayed it was
+	 * removed on the operator's instruction, and every caller still passes
+	 * this. Kept in the type so none of them break, and kept rather than
+	 * deleted so restoring the header does not mean editing every route.
+	 */
+	breadcrumb?: string;
 	/** Forwarded to the nav slot. Owned by session 3, not by the frame. */
 	navGroups?: NavGroup[];
 	children: ReactNode;
@@ -53,7 +56,6 @@ export function Shell({
 	const { theme, toggle: toggleTheme } = useTheme();
 	const { collapsed, toggle: toggleCollapsed } = useCollapsed();
 	const compact = useMediaQuery(COMPACT_QUERY);
-	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const navTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -118,13 +120,22 @@ export function Shell({
 							className="flex min-w-0 flex-col overflow-hidden"
 							data-testid="main-pane"
 						>
-							<TopBar
-								breadcrumb={breadcrumb}
-								navGroups={navGroups ?? []}
-								navTriggerRef={navTriggerRef}
-								onOpenNav={compact ? () => setDrawerOpen(true) : undefined}
-								pathname={pathname}
-							/>
+							{/*
+							  THE SHELL HEADER IS REMOVED, on the operator's instruction, after
+							  three attempts to stop it clipping.
+							
+							  Two real defects were found and fixed on the way here: this header
+							  had no `shrink-0`, so it was the only thing in its column that
+							  could give; and the sidebar had FOUR children with the same
+							  problem, which is what cut the brand mark in half. Both fixes are
+							  in and both are correct. The crop outlived them, so the control
+							  comes out rather than taking a fourth attempt at it.
+							
+							  WHAT LEAVES WITH IT: the page title, the breadcrumb and the run
+							  pill. `usePageHeader` and `PageHeader` are untouched and still
+							  exported, so routes that claim a title still claim one — nothing
+							  renders it. Restoring the header is restoring these seven lines.
+							*/}
 							<main
 								className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
 								data-testid="main"
