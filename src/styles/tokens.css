@@ -166,6 +166,17 @@
      patch.css, which cost us every border in light mode. */
   --color-accent-surface:       var(--color-app-raised);
 
+  /* THE NAME LIES, AND IT IS LOAD-BEARING. `background` is shadcn's COMPONENT
+     ground, not the desktop — it maps to app-PANEL, the card surface, in both
+     themes. So `bg-background` on a page container paints a card tone, and
+     every card nested inside then lands on its own colour with the layering
+     gone. It fails by looking almost right.
+     For a page or container ground reach for `bg-app-bg`, or leave it
+     transparent and let the window supply it. The mapping is correct and is
+     deliberately not being repointed: every shadcn-derived component already
+     consumes it, and redefining a shared alias under them is the failure
+     CLAUDE.md rule 2 describes. Reported by avel-bb after it bit the chat
+     scroller. */
   --color-background:           var(--color-app-panel);
   --color-foreground:           var(--color-text);
   --color-primary:              var(--color-accent);
@@ -245,6 +256,17 @@
   /* shadcn aliases, re-resolved against the light palette. See the note
      above: a var() alias declared only on :root freezes at dark. */
   --color-accent-surface:       var(--color-app-raised);
+  /* THE NAME LIES, AND IT IS LOAD-BEARING. `background` is shadcn's COMPONENT
+     ground, not the desktop — it maps to app-PANEL, the card surface, in both
+     themes. So `bg-background` on a page container paints a card tone, and
+     every card nested inside then lands on its own colour with the layering
+     gone. It fails by looking almost right.
+     For a page or container ground reach for `bg-app-bg`, or leave it
+     transparent and let the window supply it. The mapping is correct and is
+     deliberately not being repointed: every shadcn-derived component already
+     consumes it, and redefining a shared alias under them is the failure
+     CLAUDE.md rule 2 describes. Reported by avel-bb after it bit the chat
+     scroller. */
   --color-background:           var(--color-app-panel);
   --color-foreground:           var(--color-text);
   --color-primary:              var(--color-accent);
