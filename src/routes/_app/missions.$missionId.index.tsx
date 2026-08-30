@@ -455,6 +455,20 @@ function MissionOverview() {
 		retry: false,
 	});
 
+	/**
+	 * The heading is the mission's NAME once there is one to show.
+	 *
+	 * Read from the query rather than from inside <Surface>, because the heading
+	 * has to exist while the body is still a skeleton and while the body is an
+	 * error — a title that appears late shifts the page under the reader, and one
+	 * that vanishes on failure leaves them unsure what failed. So it says
+	 * "Mission" until the answer arrives and the real name after, and an untitled
+	 * mission says so rather than falling back to the generic word.
+	 */
+	const heading = query.isSuccess
+		? (query.data.data.title ?? "Unnamed mission")
+		: "Mission";
+
 	return (
 		<div className="flex max-w-[72ch] flex-col gap-4 px-6 py-5">
 			<div className="flex flex-col gap-1">
@@ -462,7 +476,7 @@ function MissionOverview() {
 					className="font-display text-title font-semibold"
 					data-testid="page-title"
 				>
-					Mission
+					{heading}
 				</h1>
 				<p className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
 					<Link

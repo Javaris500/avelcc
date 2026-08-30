@@ -133,16 +133,32 @@ function MissionRowView({ mission }: { mission: MissionRow }) {
 				to="/missions/$missionId"
 			>
 				<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-					<span
-						className="font-display text-sm font-semibold text-text"
-						data-testid="mission-client"
-					>
-						{mission.clientName}
-					</span>
-					<span className="text-sm text-text-muted" data-testid="mission-type">
-						{mission.type}
-					</span>
-					<Tag data-testid="mission-sprint">sprint {mission.sprintN}</Tag>
+					{/*
+					 * THE TITLE IS THE ROW'S IDENTITY, and everything else demotes to
+					 * context beneath it. Before this the row led with the client, and
+					 * three missions for one client rendered as three near-identical
+					 * lines: two were literally "CounselOS full-build sprint 1 draft" and
+					 * could not be told apart at all.
+					 *
+					 * A null title reads as UNNAMED and is deliberately not bold. Blank
+					 * would look like a rendering fault, and setting it in the same weight
+					 * as a real name would make the absence of one look deliberate.
+					 */}
+					{mission.title === null ? (
+						<span
+							className="font-display text-sm text-text-subtle"
+							data-testid="mission-title"
+						>
+							Unnamed mission
+						</span>
+					) : (
+						<span
+							className="font-display text-sm font-semibold text-text"
+							data-testid="mission-title"
+						>
+							{mission.title}
+						</span>
+					)}
 					{/* Right-aligned as a column on desktop. On a phone the row wraps, and
 				    an auto margin there strands the status alone on its own line, so it
 				    flows inline with the rest instead. */}
@@ -154,7 +170,17 @@ function MissionRowView({ mission }: { mission: MissionRow }) {
 			    than filled from somewhere else. ROUTES.md: ship the column when the
 			    aggregate join exists, and never substitute updatedAt, which is
 			    row-edit time and not audited activity. */}
-				<div className="flex flex-wrap gap-x-4 text-micro text-text-subtle">
+				{/*
+				 * The client stays on the row even though two of the three seeded titles
+				 * already begin with it. ROUTES.md puts the client in this row, a title
+				 * is not obliged to name one, and the third row proves it — "Export path
+				 * test fixture" says nothing about whose it is. Stripping a duplicated
+				 * word would be the screen editing the data to look tidier.
+				 */}
+				<div className="flex flex-wrap gap-x-3 gap-y-1 text-micro text-text-subtle">
+					<span data-testid="mission-client">{mission.clientName}</span>
+					<span data-testid="mission-type">{mission.type}</span>
+					<span data-testid="mission-sprint">sprint {mission.sprintN}</span>
 					<span data-testid="mission-activity">
 						last activity {mission.lastActivity ?? "—"}
 					</span>
