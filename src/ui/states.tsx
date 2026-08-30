@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "#/ui/button";
+import { Heading } from "#/ui/heading";
 import { cn } from "#/utils/cn";
 
 /**
@@ -23,7 +24,15 @@ export function EmptyState({
 			className={cn("flex flex-col items-start gap-2 px-6 py-14", className)}
 			data-testid="empty-state"
 		>
-			<p className="font-display text-lg font-semibold text-text">{title}</p>
+			{/* A REAL HEADING, not a paragraph that looks like one. This was a
+			    <p> with heading type, so a screen reader met the page title and
+			    then no structure beneath it. The level comes from the tree — see
+			    ui/heading.tsx — because this component renders at page level,
+			    inside a section and inside a conversation turn, which are three
+			    different correct answers. */}
+			<Heading className="font-display text-lg font-semibold text-text">
+				{title}
+			</Heading>
 			<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
 				{body}
 			</p>
@@ -75,7 +84,10 @@ export function ErrorState({
 			>
 				{code}
 			</span>
-			<p className="font-display text-lg font-semibold text-text">{title}</p>
+			{/* A real heading, level from the tree. See EmptyState above. */}
+			<Heading className="font-display text-lg font-semibold text-text">
+				{title}
+			</Heading>
 			<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
 				{body}
 			</p>
