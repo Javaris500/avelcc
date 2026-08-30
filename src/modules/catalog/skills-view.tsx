@@ -20,10 +20,10 @@ import {
 	EmptyState,
 	FilterChips,
 	MetricStat,
-	PageHeader,
 	type RowTone,
 	SectionCard,
 } from "#/modules/catalog/ui";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { Tag } from "#/ui/badge";
 
 /**
@@ -51,36 +51,65 @@ import { Tag } from "#/ui/badge";
 type StateFilter = "all" | "live" | "revoked";
 type TypeFilter = "all" | "knowledge" | "capability";
 
+/**
+ * The header's one orienting line. Totals only.
+ *
+ * It does NOT repeat the risk numbers below it. The MetricStat row carries
+ * "revoked but still attached" with the sentence explaining why zero is the
+ * healthy value, and a bare count of it up here would be the same number
+ * twice with the meaning stripped off one of them.
+ */
+function summarise(skills: SkillRow[]): string {
+	const revoked = skills.filter(isRevoked).length;
+	const sources = new Set(skills.map((s) => s.sourceId)).size;
+	return `${plural(skills.length, "skill", "skills")} · ${revoked} revoked · from ${plural(sources, "source", "sources")}`;
+}
+
 export function SkillsCatalog() {
+	/*
+	 * THE SHELL RENDERS THE TITLE, not this screen.
+	 *
+	 * It printed its own <h1> until avel-71 moved the title into the shell
+	 * header, and then every catalog page had TWO h1s reading the same word.
+	 * Measured on the running app, not inferred: /catalog/sources was worse
+	 * than a duplicate, carrying "Sources" from the nav-derived fallback and
+	 * "Skill sources" from here, which is two names for one page.
+	 *
+	 * Claimed unconditionally, outside the four-state boundary, for the reason
+	 * the in-content header was moved out in the first place: a screen with no
+	 * endpoint behind it must still say what it is. `definition` is a separate
+	 * slot from `subtitle` so the plain sentence naming the jargon is not
+	 * competing with counts. The counts stay on the MetricStat row, which is
+	 * inside the boundary because a count is not knowable until the read
+	 * resolves.
+	 */
 	const query = useSkills();
+
+	/*
+	 * ONE CLAIM, ONE LATE FIELD. `subtitle` is a string and sits in the hook's
+	 * dependency array, so it updates on its own when the read resolves. The
+	 * earlier version of the hook read it from a ref and kept it out of the
+	 * deps, which meant a subtitle arriving after its title was written and
+	 * never read again; that is why this screen carried no counts at all for a
+	 * while. avel-71 fixed the hook, so the workaround is gone rather than
+	 * papered over.
+	 *
+	 * `undefined` until the read resolves, deliberately. A header printing a
+	 * count above a screen that says "not built" would be asserting a number
+	 * nothing measured.
+	 */
+	const skills = query.data?.data;
+	usePageHeader({
+		title: "Skills",
+		definition: TERM.skill,
+		subtitle: skills === undefined ? undefined : summarise(skills),
+	});
 	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
 	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
-			{/*
-			 * OUTSIDE THE FOUR-STATE BOUNDARY, and the first draft had it inside.
-			 *
-			 * The reasoning for inside was that the subtitle carries counts and a
-			 * count is not knowable until the read resolves. It was right about the
-			 * counts and wrong about the header. Driving the real page settled it:
-			 * with no endpoint behind this screen the whole page rendered as one
-			 * grey sentence and nothing else, no title, on a shell whose own header
-			 * does not carry the page name yet either. An operator would not know
-			 * what they were looking at.
-			 *
-			 * So the two halves split along the line UI-PLAN section 2 already
-			 * draws. Title and definition are static facts about the screen and
-			 * render always. The counts were the only part that had to wait, and
-			 * they are on the MetricStat row below, where they were already, which
-			 * makes the subtitle duplication this removes.
-			 */}
-			<PageHeader
-				data-testid="skills-header"
-				definition={TERM.skill}
-				title="Skills"
-			/>
 			<CatalogSurface
 				data-testid="skills"
 				empty={
@@ -140,7 +169,6 @@ function SkillsCatalogBody({
 		(sum, s) => sum + danglingAttachments(s),
 		0,
 	);
-	const sources = new Set(skills.map((s) => s.sourceId)).size;
 
 	const shown = useMemo(() => {
 		return skills.filter((skill) => {
@@ -167,12 +195,6 @@ function SkillsCatalogBody({
 			)}
 
 			<div className="flex flex-wrap gap-3">
-				<MetricStat
-					data-testid="skills-metric-sources"
-					hint="Distinct sources across the loaded skills."
-					label="Sources"
-					value={sources}
-				/>
 				<MetricStat
 					data-testid="skills-metric-live"
 					hint="Available to attach to an agent."

@@ -15,10 +15,10 @@ import {
 	DefinitionList,
 	EmptyState,
 	MetricStat,
-	PageHeader,
 	type RowTone,
 	SectionCard,
 } from "#/modules/catalog/ui";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 
 /**
  * WHERE SKILLS CAME FROM.
@@ -36,18 +36,26 @@ import {
  * does not exist.
  */
 
+/** Totals only. The revoked-skill count stays on the MetricStat row. */
+function summarise(sources: SkillSourceRow[]): string {
+	const liveSkills = sources.reduce((sum, s) => sum + s.liveSkillCount, 0);
+	return `${plural(sources.length, "source", "sources")} · ${plural(liveSkills, "live skill", "live skills")}`;
+}
+
 export function SkillSourceCatalog() {
 	const query = useSkillSources();
+
+	// The shell renders the title. See the note in skills-view.tsx.
+	const sources = query.data?.data;
+	usePageHeader({
+		title: "Skill sources",
+		definition: TERM.source,
+		subtitle: sources === undefined ? undefined : summarise(sources),
+	});
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
-			{/* Outside the four-state boundary. See the note in skills-view.tsx. */}
-			<PageHeader
-				data-testid="sources-header"
-				definition={TERM.source}
-				title="Skill sources"
-			/>
 			<CatalogSurface
 				data-testid="sources"
 				empty={
@@ -99,24 +107,15 @@ function SourcesBody({
 
 	return (
 		<>
-			<PageHeader
-				data-testid="sources-header"
-				definition={TERM.source}
-				subtitle={
-					<>
-						<span>{plural(live.length, "live source", "live sources")}</span>
-						<span>
-							{plural(liveSkills, "skill imported", "skills imported")}
-						</span>
-						{sources.length === total ? null : (
-							<span>
-								{sources.length} of {total} loaded
-							</span>
-						)}
-					</>
-				}
-				title="Skill sources"
-			/>
+			{sources.length === total ? null : (
+				<p
+					className="text-micro text-text-subtle"
+					data-testid="sources-partial"
+				>
+					{sources.length} of {total} loaded. The rest are on a page this screen
+					does not fetch yet, so every count below is of what is loaded.
+				</p>
+			)}
 
 			<div className="flex flex-wrap gap-3">
 				<MetricStat

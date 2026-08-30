@@ -9,12 +9,18 @@ import { cn } from "#/utils/cn";
  * THE SHARED VOCABULARY, HELD IN ONE FILE UNTIL IT HAS A REAL HOME.
  *
  * UI-PLAN section 2 lists eleven components the shell needs and records that
- * none of them exist. `src/ui/` holds ten primitives today, verified by listing
- * it: badge, button, dialog, dropdown-menu, input, page-empty, skeleton,
- * states, surface, tooltip. `PageHeader`, `SectionCard`, `DefinitionList`,
- * `StatusChip`, `DataTable` and `MetricStat` are not among them. `[built]`
+ * none of them exist. `src/ui/` holds twelve files today, verified by listing
+ * it: badge, button, dialog, dropdown-menu, heading, input, page-empty,
+ * page-header, skeleton, states, surface, tooltip. `SectionCard`,
+ * `DefinitionList`, `StatusChip`, `DataTable` and `MetricStat` are still not
+ * among them. `[built]`
  *
- * avel-71 owns `src/ui/` and is building those six. This session may not write
+ * PAGEHEADER HAS LANDED AND IS GONE FROM HERE. It is not imported directly:
+ * the header sits above `main` in the tree, so a route claims it through
+ * `usePageHeader` and the shell renders it. Each view calls that hook and this
+ * file no longer has a header component at all. One down, five to go.
+ *
+ * avel-71 owns `src/ui/` and is building the rest. This session may not write
  * there. The instruction that came with this work is the important one: "DO NOT
  * INVENT PARALLEL COMPONENTS. Four sessions each building their own card is the
  * specific outcome this split exists to prevent."
@@ -23,7 +29,9 @@ import { cn } from "#/utils/cn";
  *
  *   1. ONE FILE. Nothing in `src/modules/catalog/` styles a card, a table or a
  *      chip itself. Everything imports from here. When the real primitives
- *      land, this file becomes six re-export lines and one commit closes it.
+ *      land, this file becomes a handful of re-export lines and one commit
+ *      closes it. PageHeader proved the shape: adopting the real one touched
+ *      this file and three call sites, and nothing else.
  *   2. NOTHING NEW IS INVENTED. Where `src/ui/` already has the thing, this
  *      wraps it rather than reimplementing it. `StatusChip` is `StatusBadge`
  *      with a domain mapping. `EmptyState` is re-exported untouched.
@@ -31,13 +39,13 @@ import { cn } from "#/utils/cn";
  *      need. Where they differ from what avel-71 builds, avel-71 wins and this
  *      module adapts.
  *
- * WHAT IS BEING ASKED FOR, beyond the six names, and why:
- *   - `PageHeader` needs a `definition` slot SEPARATE from `subtitle`. Section
- *     2 gives the subtitle to "counts, status, last activity". Section 12 rule
- *     5 gives the header the one plain sentence that names the jargon. Those
- *     are two different lines with two different jobs, and collapsing them
- *     loses the counts or loses the explanation.
- *   - `SectionCard` needs the same `definition` slot for the same reason.
+ * WHAT IS BEING ASKED FOR, beyond the names, and why:
+ *   - `SectionCard` needs a `definition` slot SEPARATE from its title and any
+ *     count. Section 2 gives a subtitle to "counts, status, last activity";
+ *     section 12 rule 5 gives the header the one plain sentence that names the
+ *     jargon. Two lines, two jobs, and collapsing them loses one of them.
+ *     `usePageHeader` already carries both slots under these names, so this is
+ *     the same request one level down rather than a new one.
  *   - `DataTable` needs a per-row tone. A revoked row that looks like a live
  *     row is the defect this catalog was asked to fix, and it cannot be fixed
  *     from inside a cell.
@@ -51,75 +59,6 @@ import { cn } from "#/utils/cn";
 /* ── re-exported untouched ───────────────────────────────────────────────── */
 
 export { EmptyState };
-
-/* ── PageHeader ──────────────────────────────────────────────────────────── */
-
-export type PageHeaderProps = {
-	title: string;
-	/**
-	 * The one plain sentence that names the jargon on the screen. Section 12
-	 * rule 5. Rendered above the counts because an operator who does not know
-	 * what a skill is cannot read a count of them.
-	 */
-	definition?: string;
-	/** Counts, status, last activity. Section 2's subtitle slot. */
-	subtitle?: ReactNode;
-	/** Exactly one, per section 2. Empty is a valid state. */
-	action?: ReactNode;
-	"data-testid": string;
-};
-
-/**
- * IN-CONTENT FOR NOW, AND THAT IS TEMPORARY.
- *
- * Section 2 rules that the `h1` moves into the shell header, and that "moving
- * the h1 into the header is what stops the strip reading as a divider". That
- * needs `ActionSlot`, which does not exist, and `src/modules/shell/` which this
- * session may not write. Rendering the title in the content is what every other
- * route does today, so this is consistent rather than novel, and it is one
- * import to move when the slot lands.
- */
-export function PageHeader({
-	title,
-	definition,
-	subtitle,
-	action,
-	"data-testid": testId,
-}: PageHeaderProps) {
-	return (
-		<header
-			className="flex flex-wrap items-start gap-x-6 gap-y-3 pb-5"
-			data-testid={testId}
-		>
-			<div className="min-w-0 flex-1">
-				<h1
-					className="font-display text-lg font-semibold text-text"
-					data-testid={`${testId}-title`}
-				>
-					{title}
-				</h1>
-				{definition ? (
-					<p
-						className="max-w-[68ch] pt-1.5 text-sm leading-relaxed text-text-muted"
-						data-testid={`${testId}-definition`}
-					>
-						{definition}
-					</p>
-				) : null}
-				{subtitle ? (
-					<div
-						className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-micro text-text-subtle"
-						data-testid={`${testId}-subtitle`}
-					>
-						{subtitle}
-					</div>
-				) : null}
-			</div>
-			{/* No reserved space when there is no action. Section 2 is explicit. */}
-			{action ? <div className="shrink-0">{action}</div> : null}
-		</header>
-	);
-}
 
 /* ── SectionCard ─────────────────────────────────────────────────────────── */
 

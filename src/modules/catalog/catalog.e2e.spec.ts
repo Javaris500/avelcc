@@ -10,14 +10,18 @@ import { expect, test } from "@playwright/test";
  * the real page. A screen whose route is wired to nothing looks identical to a
  * working one in vitest.
  *
- * WHAT IT PINS. Two things, and the second is the whole point of the module.
+ * WHAT IT PINS. Three things, and the third is the whole point of the module.
  *
  *   1. The title and the definition render in EVERY state. The first draft put
  *      the header inside the four-state boundary, so with no endpoint behind
  *      the screen the whole page was one grey sentence and no title. This test
  *      is what stops that coming back.
  *
- *   2. Not-built is not empty and not an error. UI-PLAN rule 7: "An empty state
+ *   2. There is exactly ONE h1. Both of the above have now been true and wrong
+ *      at the same time: the screen printed a correct title while the shell
+ *      printed its own, and every page named itself twice.
+ *
+ *   3. Not-built is not empty and not an error. UI-PLAN rule 7: "An empty state
  *      means there is nothing here yet; a missing endpoint means this does not
  *      work yet." Those render differently on purpose, and the assertion that
  *      the OTHER two are absent is what makes this a test rather than a
@@ -60,16 +64,55 @@ for (const screen of SCREENS) {
 			await page.goto(screen.path);
 		});
 
-		test("names itself, whatever the read did", async ({ page }) => {
-			const header = page.getByTestId(`${screen.id}-header`);
-			await expect(header.getByTestId(`${screen.id}-header-title`)).toHaveText(
+		test("names itself once, whatever the read did", async ({ page }) => {
+			// The SHELL's header now, claimed via usePageHeader. This assertion
+			// used to target the screen's own in-content header.
+			await expect(page.getByTestId("page-header-title")).toHaveText(
 				screen.title,
 			);
 			// Section 12 rule 5. The one plain sentence naming the jargon is on the
 			// header, not in a glossary, and it is not conditional on data.
-			await expect(
-				header.getByTestId(`${screen.id}-header-definition`),
-			).toContainText(screen.definition);
+			await expect(page.getByTestId("page-definition")).toContainText(
+				screen.definition,
+			);
+		});
+
+		/**
+		 * THE COUNTS ARE A LATE FIELD, and this pins the half of that which can
+		 * actually be observed today.
+		 *
+		 * `usePageHeader` is called once, unconditionally, with `subtitle`
+		 * undefined until the read resolves. So while no endpoint answers, the
+		 * header carries a title and a definition and NO counts. A header
+		 * printing "0 skills" above a screen that says "not built" would be
+		 * asserting a number nothing measured, which is rule 7 leaking into the
+		 * shell.
+		 *
+		 * The other half — that the subtitle appears when the read resolves —
+		 * cannot be tested until an endpoint exists. Said plainly rather than
+		 * asserted weakly.
+		 */
+		test("prints no counts while it has nothing to count", async ({ page }) => {
+			await expect(page.getByTestId("page-header-title")).toBeVisible();
+			await expect(page.getByTestId("page-subtitle")).toHaveCount(0);
+		});
+
+		/**
+		 * THE REGRESSION THAT PROMPTED THE MOVE, pinned so it cannot come back.
+		 *
+		 * When the title moved into the shell header, routes still printed their
+		 * own, and every page rendered its name as two h1s. On /catalog/sources it
+		 * was worse than duplication: the shell's nav-derived fallback said
+		 * "Sources" and the screen said "Skill sources", two names for one page.
+		 *
+		 * Counting h1s rather than asserting one testid is the point. A second
+		 * heading from anywhere — this module, the shell, a primitive that grows
+		 * one — fails this, which a testid-scoped assertion would not.
+		 */
+		test("has exactly one h1, and it is the page's name", async ({ page }) => {
+			await expect(page.getByTestId("page-header-title")).toBeVisible();
+			await expect(page.locator("h1")).toHaveCount(1);
+			await expect(page.locator("h1")).toHaveText(screen.title);
 		});
 
 		test("renders exactly one of the four states", async ({ page }) => {
@@ -80,11 +123,22 @@ for (const screen of SCREENS) {
 				"surface-success",
 			];
 			/*
-			 * POLLED, not counted once. `_app` is `ssr: false`, so the first paint
-			 * has no Surface in it at all and a bare count() does not retry — the
-			 * first version of this test read 0 and failed against a screen that
-			 * was working. Found by running it.
+			 * WAIT FOR THE VIEW TO MOUNT FIRST, then poll.
+			 *
+			 * `_app` is `ssr: false`, so the first paint has no Surface in it at all
+			 * and a bare count() does not retry — the first version of this test
+			 * read 0 against a screen that was working.
+			 *
+			 * Polling alone was still not enough, and that took a second run to see.
+			 * expect.poll's default window is 5s, which races the dev server's
+			 * on-demand compile of these modules: the failure moved between screens
+			 * run to run and always read 0, never 2. So it was measuring compile
+			 * time, not the component. Awaiting the claimed title first is the same
+			 * auto-waiting the other tests here get for free from toBeVisible, and
+			 * it makes this assertion about the four states rather than about how
+			 * warm Vite is.
 			 */
+			await expect(page.getByTestId("page-header-title")).toBeVisible();
 			await expect
 				.poll(async () => {
 					const present = await Promise.all(
@@ -136,7 +190,7 @@ for (const screen of SCREENS) {
 				if (message.type() === "error") errors.push(message.text());
 			});
 			await page.reload();
-			await expect(page.getByTestId(`${screen.id}-header`)).toBeVisible();
+			await expect(page.getByTestId("page-header-title")).toBeVisible();
 			/*
 			 * THE BROWSER'S OWN 404 LINE IS FILTERED, and the first version of this
 			 * test did not filter it and asserted an empty array. The comment

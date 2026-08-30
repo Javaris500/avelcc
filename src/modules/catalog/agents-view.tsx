@@ -27,11 +27,11 @@ import {
 	EmptyState,
 	FilterChips,
 	MetricStat,
-	PageHeader,
 	PathList,
 	type RowTone,
 	SectionCard,
 } from "#/modules/catalog/ui";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { Tag } from "#/ui/badge";
 
 /**
@@ -60,8 +60,25 @@ type RuntimeFilter = "all" | AgentRuntime;
 type KindFilter = "all" | "horizontal" | "feature";
 type StateFilter = "all" | "live" | "revoked";
 
+/**
+ * Totals only, and the runtime split rather than two separate counts.
+ * "9 templates · 2 not run by a model" leaves the operator subtracting.
+ */
+function summarise(templates: AgentTemplateRow[]): string {
+	const nonModel = templates.filter((t) => t.runtime !== "model").length;
+	return `${plural(templates.length, "template", "templates")} · ${templates.length - nonModel} run by a model, ${nonModel} by a person or script`;
+}
+
 export function AgentTemplateCatalog() {
 	const query = useAgentTemplates();
+
+	// The shell renders the title. See the note in skills-view.tsx.
+	const templates = query.data?.data;
+	usePageHeader({
+		title: "Agent templates",
+		definition: TERM.agentTemplate,
+		subtitle: templates === undefined ? undefined : summarise(templates),
+	});
 	const [runtimeFilter, setRuntimeFilter] = useState<RuntimeFilter>("all");
 	const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
@@ -69,14 +86,6 @@ export function AgentTemplateCatalog() {
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
-			{/* Outside the four-state boundary. See the note in skills-view.tsx:
-			    the title and the definition are static facts about the screen and
-			    a page with no endpoint behind it must still say what it is. */}
-			<PageHeader
-				data-testid="agents-header"
-				definition={TERM.agentTemplate}
-				title="Agent templates"
-			/>
 			<CatalogSurface
 				data-testid="agents"
 				empty={
