@@ -735,7 +735,8 @@ export const exports = pgTable(
 			gate: string;
 			rationale: string;
 			overriddenBy: string;
-			overriddenAt?: string;
+			/** Required as of the 2026-08-29 ruling. See contract/export.ts. */
+			overriddenAt: string;
 		}>(),
 		/**
 		 * This export re-ran a past mission's frozen inputs against a different

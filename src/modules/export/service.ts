@@ -1,8 +1,8 @@
 import { and, eq, isNull } from "drizzle-orm";
 
-import type { ErrorCode } from "#/contract/shared/errors";
+import type { CrudCode, ErrorCode } from "#/contract/shared/errors";
 import type { Db } from "#/modules/db/client";
-import { connections, exports, missions } from "#/modules/db/schema";
+import { connections, exports, missions, playbooks } from "#/modules/db/schema";
 import type { RemoteTree, Violation } from "#/modules/export/blast/types";
 import { checkDeliverable } from "#/modules/export/delivery/guards";
 import {
@@ -18,6 +18,11 @@ import type {
 } from "#/modules/export/delivery/types";
 import { GatewayError } from "#/modules/export/gateway/types";
 import { packageSha256, sha256Hex } from "#/modules/export/render/manifest";
+import {
+	evaluateGates,
+	type GateOverride,
+	type Verification,
+} from "#/modules/export/verify/gates";
 
 /**
  * Export orchestration: the state machine between a mission and a delivery.
@@ -70,7 +75,20 @@ export type ExportDeps = {
 /* ── results ─────────────────────────────────────────────────────────────── */
 
 export type ExportFailure = {
-	code: ErrorCode;
+	/**
+	 * BOTH VOCABULARIES, declared rather than cast through.
+	 *
+	 * This module genuinely emits two: the export codes for everything about a
+	 * repository or a package, and CRUD_CODES' PRECONDITION_FAILED for a blocked
+	 * gate, which ERROR_CODES cannot express. Typing this as ErrorCode alone and
+	 * casting at the one call site would have hidden a real property of the
+	 * module behind an `as unknown as`, which is the shape of lie this codebase
+	 * keeps finding in its own comments.
+	 *
+	 * The route maps whichever arrives; a screen switching on the code can tell
+	 * them apart because the two sets are disjoint by design.
+	 */
+	code: ErrorCode | CrudCode;
 	detail: string;
 	/** The status the contract declares for this code on this route. */
 	status: 403 | 404 | 409 | 422 | 502;
@@ -189,6 +207,7 @@ type Prepared = {
 	baseCommitSha: string | null;
 	violations: Violation[];
 	radius: Record<string, unknown> | null;
+	verification: Verification & { computedAt: string };
 };
 
 /**
@@ -210,6 +229,7 @@ async function prepare(
 	/** Already resolved and parsed by the caller. null only for a zip. */
 	repo: { owner: string; repo: string } | null,
 	ref: string,
+	override: GateOverride | null,
 ): Promise<Prepared> {
 	const { db } = deps;
 
@@ -230,7 +250,32 @@ async function prepare(
 	 */
 	const packageHash = packageHashOf(files);
 
-	current = await advance(db, current, "verifying");
+	/**
+	 * VERIFYING NOW VERIFIES SOMETHING. It previously walked this status and did
+	 * nothing at all: `verification` was never written, no gate was ever
+	 * evaluated, and `gate_override` existed in the contract for gates that did
+	 * not exist. A status that looks like a mechanism and is not one is this
+	 * project's stated failure mode, appearing inside the product.
+	 *
+	 * What it CANNOT do is measure. Nothing runs tests or coverage here, so
+	 * every declared gate comes back `pending` with no source — which is the
+	 * honest output. `evaluateGates` refuses to default an unmeasured gate to
+	 * `pass`, so this reports the truth that almost nothing has been checked
+	 * rather than manufacturing a clean bill.
+	 */
+	const [playbook] = await db
+		.select({ gates: playbooks.gates })
+		.from(playbooks)
+		.where(eq(playbooks.missionType, mission.type))
+		.limit(1);
+
+	const verification = {
+		// The clock is the caller's, never the pure function's.
+		computedAt: new Date().toISOString(),
+		...evaluateGates(playbook?.gates ?? [], [], override),
+	};
+
+	current = await advance(db, current, "verifying", { verification });
 
 	let baseCommitSha: string | null = null;
 	let violations: Violation[] = [];
@@ -282,6 +327,7 @@ async function prepare(
 		baseCommitSha,
 		violations,
 		radius,
+		verification,
 	};
 }
 
@@ -336,6 +382,30 @@ function resolveRepo(
 		};
 	}
 	return { ok: true, repo: parsed };
+}
+
+/**
+ * A blocked gate, answered in the CRUD vocabulary — the same deliberate
+ * deviation `http.ts` documents for a malformed body, and the fifth instance of
+ * one root gap.
+ *
+ * ERROR_CODES has nothing meaning "a mandatory gate did not pass". The nearest
+ * export code is BLAST_RADIUS_VIOLATION, which renders as "delivery would write
+ * outside the permitted paths" — telling an operator their package is dangerous
+ * because a test did not run is worse than a vocabulary mismatch. CRUD_CODES'
+ * PRECONDITION_FAILED is documented as "a hard precondition the request did not
+ * meet", which is exactly what this is.
+ */
+function gateBlocked(blocking: readonly string[]): ExportResult {
+	return {
+		ok: false,
+		failure: {
+			code: "PRECONDITION_FAILED",
+			status: 422,
+			detail: `${blocking.length} mandatory gate(s) did not pass and were not overridden: ${blocking.join(", ")}. Nothing was delivered.`,
+			details: { blocking: [...blocking] },
+		},
+	};
 }
 
 /**
@@ -610,6 +680,9 @@ export async function previewExport(
 			mission,
 			resolved.repo,
 			input.ref ?? "main",
+			// A preview evaluates gates but is never handed an override: there is
+			// nothing to unblock, because a preview delivers nothing.
+			null,
 		);
 		row = await advance(db, prepared.row, "previewed");
 		return { ok: true, export: row };
@@ -633,6 +706,8 @@ export type CreateInput = {
 	repoUrl?: string;
 	/** Ignored when a preview is linked: that preview's ref wins. See below. */
 	ref?: string;
+	/** Clears ONE blocking gate. Never clears a blast-radius violation. */
+	gateOverride?: GateOverride;
 	message?: string;
 };
 
@@ -785,7 +860,14 @@ export async function createExport(
 		 * exists to prevent.
 		 */
 		const ref = refForDelivery(previewRef, input.ref);
-		const prepared = await prepare(deps, row, mission, resolved.repo, ref);
+		const prepared = await prepare(
+			deps,
+			row,
+			mission,
+			resolved.repo,
+			ref,
+			input.gateOverride ?? null,
+		);
 		row = prepared.row;
 
 		const verdict = checkDeliverable({
@@ -801,6 +883,27 @@ export async function createExport(
 			await markFailed(db, row);
 			const { code, detail } = verdict.failure;
 			return fail(code, code === "PREVIEW_STALE" ? 409 : 422, detail);
+		}
+
+		/**
+		 * A MANDATORY GATE THAT DID NOT PASS STOPS THE DELIVERY.
+		 *
+		 * Distinct from a blast-radius violation, and the distinction is the one
+		 * BLAST-RADIUS.md draws: gates concern work quality and an operator may
+		 * accept the risk in writing; violations concern writing where you were
+		 * not permitted and are never overridable. `evaluateGates` has already
+		 * applied any override, so anything still in `blocking` is a mandatory
+		 * gate nobody accepted.
+		 *
+		 * Today this blocks almost everything, because nothing measures a gate
+		 * and an unmeasured mandatory gate is `pending`, not `pass`. That is the
+		 * correct behaviour for a system with no test runner wired in, and it is
+		 * why `playbooks.gates` defaults to an empty array — a playbook that
+		 * declares no gates blocks nothing.
+		 */
+		if (prepared.verification.blocking.length > 0) {
+			await markFailed(db, row);
+			return gateBlocked(prepared.verification.blocking);
 		}
 
 		row = await advance(db, row, "delivering");

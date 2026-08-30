@@ -74,11 +74,26 @@ export const blastRadius = z.object({
 	}),
 });
 
+/**
+ * RULED 2026-08-29: this shape wins over DATA-CONTRACTS-V2:281's
+ * `{ gate, justification, overridden_by, overridden_at }`.
+ *
+ * The two had been contradicting each other since Export was built. This is
+ * the side that ships and that three consumers already import, so the doc is
+ * the stale half. jsonb on the column, so reconciling cost no migration.
+ *
+ * `overriddenAt` is taken FROM the doc and made REQUIRED rather than optional,
+ * which is the one thing that side had right. An override is a person
+ * accepting a risk in writing; an acceptance nobody can date cannot be audited
+ * afterwards, which defeats the point of recording it at all.
+ */
 export const gateOverride = z.object({
 	gate: z.string(),
 	/** Renders into the delivery and is visible to the client. Not optional. */
 	rationale: z.string().min(1),
 	overriddenBy: z.string(),
+	/** ISO 8601. Required: an undated acceptance is not an audit record. */
+	overriddenAt: z.string().datetime(),
 });
 
 export const exportSchema = z.object({
