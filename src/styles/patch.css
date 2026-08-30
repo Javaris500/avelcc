@@ -379,10 +379,35 @@ body {
 /* ══════════════════════════════════════════════════════════════════════════
    FOCUS — now on the radius scale rather than a hardcoded 2px
    ══════════════════════════════════════════════════════════════════════════ */
-*:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
+/* LAYERED, AND NO LONGER RESHAPING THE ELEMENT.
+
+   Two defects, both invisible without a browser, both found by avel-bb driving
+   the composer.
+
+   1. THIS RULE WAS UNLAYERED. Tailwind utilities live in `@layer utilities`, and
+      an unlayered style beats a layered one REGARDLESS OF SPECIFICITY. So
+      `outline-none` lost, and so did `focus-visible:outline-none` — the
+      specificity fix was tried first and measured still losing. Any component
+      wanting a ring instead of an outline had to reach for `!important`.
+      Inside `@layer base` a utility wins normally.
+
+   2. IT SET `border-radius`, WHICH IS THE ELEMENT'S SHAPE, NOT THE OUTLINE'S.
+      --radius-xs is 4px, --radius-full is 999px, and 13 files use
+      `rounded-full`. Every pill in the app — composer, mode pill, suggestions,
+      the live pill, badges, avatars — collapsed from 999px to 4px the moment it
+      took focus. A shape snap on focus, app-wide.
+
+      The line was also unnecessary. Browsers already follow the element's own
+      border-radius when drawing an outline, so it overrode a shape to solve a
+      problem the platform had already solved.
+
+   `outline-offset` stays: a ring with no offset lands on the border of a
+   bordered control and reads as a colour change rather than a ring. */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 

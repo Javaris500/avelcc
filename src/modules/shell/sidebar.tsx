@@ -94,7 +94,6 @@ export function Sidebar({
 }) {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [query, setQuery] = useState("");
-	const [navScrolled, setNavScrolled] = useState(false);
 
 	const inputRef = useRef<HTMLInputElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
@@ -317,9 +316,7 @@ export function Sidebar({
 					"[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]",
 				)}
 				data-nav-groups={(navGroups ?? NAV).length}
-				data-scrolled={navScrolled}
 				data-testid="nav-slot"
-				onScroll={(e) => setNavScrolled(e.currentTarget.scrollTop > 0)}
 			>
 				<NavTree collapsed={collapsed} groups={navGroups ?? NAV} />
 			</div>
