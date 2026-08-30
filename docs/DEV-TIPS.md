@@ -133,7 +133,27 @@ Make it a required field on the dispatch itself. A dispatch without an opened co
 
 Reconstructing spend afterward is not possible. There is no log to go back to.
 
-## 10. Two habits worth starting today
+## 10. Split a column change across two migrations
+
+`drizzle-kit generate` asks whether a dropped column and an added one are a rename. That prompt needs a TTY, and an agent session does not have one:
+
+```
+Error: Interactive prompts require a TTY terminal
+  at promptColumnsConflicts
+```
+
+**It only asks when it sees a drop and an add on the same table in one diff.** Split them and each side is unambiguous, so nothing prompts:
+
+1. add the new column while the old one still exists — a pure ADD
+2. drop the old one — a pure DROP
+
+Two migrations, no terminal. Verified against `roster_entries.waves text[]` becoming `wave text`.
+
+**`--custom` is not the workaround, and it fails quietly.** It writes an empty stub *and copies the previous snapshot* — so the SQL you hand-write fixes the database while drizzle's own metadata still asserts the old shape. Every later `generate` then re-diffs the same change and builds on a false baseline. Applying an empty stub is worse still: the journal records the migration as shipped, and the real change needs a new number under one that already claims to have done it.
+
+**Read the generated SQL either way.** A schema-versus-database check catches drift, but a rename would produce the right column name and pass it. Choosing "create column" rather than "rename column" is not something a test can verify for you.
+
+## 11. Two habits worth starting today
 
 **Write the measurement before the feature.** Even a spreadsheet: mission · agents used · time to ship · defects found post-delivery · tokens spent. Ten rows beats any amount of architecture for telling you what to build next.
 
