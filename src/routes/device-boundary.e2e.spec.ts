@@ -33,7 +33,27 @@ test("a desktop is allowed a construction route", async ({ page }) => {
 	await page.setViewportSize(DESKTOP);
 	await page.goto("/clients");
 	await expect(page.getByTestId("desktop-required")).toHaveCount(0);
-	await expect(page.getByTestId("page-empty")).toBeVisible();
+	/**
+	 * ASSERTS THE ROUTE'S OWN CONTENT, and that is the whole fix.
+	 *
+	 * This line read `page-empty` until `/clients` grew a table. `page-empty` was
+	 * never evidence that a construction route rendered on a desktop — it was
+	 * evidence that this particular route happened to be UNBUILT. It passed for
+	 * reasons that had nothing to do with the device boundary, and went red the
+	 * moment the route got content, which is backwards for a guard.
+	 *
+	 * That is the second instance of the defect this file's own header was
+	 * written about: a check that cannot distinguish two states is not a check.
+	 * `clients-pane` renders only when the construction route got through the
+	 * guard, so it fails if the guard wrongly fires and cannot pass by accident.
+	 *
+	 * `a phone is allowed a capture route` above still asserts `page-empty`
+	 * against `/activity`, which IS still a placeholder. Same latent defect, not
+	 * yet fired. It needs the same treatment the day that route gets content.
+	 *
+	 * Traced by avel-c2.
+	 */
+	await expect(page.getByTestId("clients-pane")).toBeVisible();
 });
 
 test("the refusal explains itself and offers a way forward", async ({
