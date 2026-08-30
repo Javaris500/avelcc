@@ -136,12 +136,52 @@ export function BlastRadius({ data }: { data: BlastRadiusView }) {
 					<span className="font-mono text-xs tracking-wider text-gate-block uppercase">
 						violations
 					</span>
+					{/*
+					 * THE PATH IS THE POINT AND IT WAS NOT RENDERED. The row showed the
+					 * code and the detail, so which FILE broke the rule appeared only
+					 * when the detail sentence happened to quote it. PATH_TRAVERSAL's
+					 * does, which is why this survived; PROTECTED_PATH and
+					 * OWNERSHIP_VIOLATION need not, and an operator would have been told
+					 * a rule was broken with no way to learn by what — on the screen
+					 * whose entire job is saying what delivery would do. The value was
+					 * already in hand: the key had been built from it all along.
+					 *
+					 * The path sits beside the code rather than under the detail,
+					 * because "which rule, which file" is one question and the answer
+					 * should be one line. The detail is the sentence explaining it and
+					 * stays muted beneath.
+					 *
+					 * FLAT, NOT GROUPED BY CODE, deliberately. Violations legitimately
+					 * arrive in bulk — one bad prefix can put a dozen paths under a
+					 * single code — and grouping would read as "this rule was broken"
+					 * rather than "these files broke it". This is an audit surface, so a
+					 * row stays one violation: self-contained, quotable on its own, and
+					 * never collapsing two findings into one line.
+					 */}
 					<ul className="flex flex-col gap-2 pt-2">
 						{violations.map((v) => (
 							<li className="flex flex-col gap-0.5" key={`${v.code}:${v.path}`}>
-								<StatusBadge data-testid={`violation-${v.code}`} tone="block">
-									{v.code}
-								</StatusBadge>
+								<div className="flex flex-wrap items-baseline gap-2">
+									{/*
+									 * The testid carries the PATH as well as the code. Keyed on
+									 * the code alone, twenty violations sharing PATH_TRAVERSAL
+									 * produced twenty identical testids — which does not fail a
+									 * getByTestId, it quietly matches the first of twenty. That
+									 * is a check that answers a narrower question than the claim
+									 * it supports, which is the failure this project keeps
+									 * meeting. The key already composed both; the testid now
+									 * matches it.
+									 */}
+									<StatusBadge
+										data-testid={`violation-${v.code}-${v.path}`}
+										tone="block"
+									>
+										{v.code}
+									</StatusBadge>
+									<span className="font-mono text-xs break-all text-text">
+										{v.path}
+									</span>
+								</div>
 								<span className="text-xs leading-relaxed text-text-muted">
 									{v.detail}
 								</span>
