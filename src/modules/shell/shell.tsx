@@ -1,8 +1,10 @@
+import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { NavGroup } from "#/contract/ui/nav";
 import type { Session } from "#/modules/auth/session";
 import { NavDrawer } from "#/modules/shell/nav-drawer";
 import { Sidebar } from "#/modules/shell/sidebar";
+import { TopBar } from "#/modules/shell/topbar";
 import { useCollapsed } from "#/modules/shell/use-collapsed";
 import { COMPACT_QUERY, useMediaQuery } from "#/modules/shell/use-media-query";
 import { PageHeaderProvider } from "#/modules/shell/use-page-header";
@@ -37,18 +39,13 @@ import { cn } from "#/utils/cn";
 export function Shell({
 	session,
 	onSignOut,
+	breadcrumb,
 	navGroups,
 	children,
 }: {
 	session: Session;
 	onSignOut: () => void;
-	/**
-	 * ACCEPTED AND NOT RENDERED. The shell header that displayed it was
-	 * removed on the operator's instruction, and every caller still passes
-	 * this. Kept in the type so none of them break, and kept rather than
-	 * deleted so restoring the header does not mean editing every route.
-	 */
-	breadcrumb?: string;
+	breadcrumb: string;
 	/** Forwarded to the nav slot. Owned by session 3, not by the frame. */
 	navGroups?: NavGroup[];
 	children: ReactNode;
@@ -56,6 +53,7 @@ export function Shell({
 	const { theme, toggle: toggleTheme } = useTheme();
 	const { collapsed, toggle: toggleCollapsed } = useCollapsed();
 	const compact = useMediaQuery(COMPACT_QUERY);
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const navTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -107,11 +105,34 @@ export function Shell({
 				    max-md:grid-cols-1 was here and a mutation proved it changed
 				    nothing, so it is gone rather than reading as though it works. */}
 					<div
+						// `grid-rows-[minmax(0,1fr)]` IS THE FIX FOR THE CROP, and it is
+						// the root the other two fixes sat above.
+						//
+						// This grid has a fixed height and no declared rows, so its
+						// implicit row was sized `auto` — max-content. At 1440x900 the
+						// content is 778px against an 848px window and nothing shows.
+						// Below roughly 830px of viewport the row stayed 778px inside a
+						// 648px box: the sidebar and the main pane kept their full
+						// height, ran 131px past the bottom, and `overflow-hidden` cut
+						// them. Measured, not reasoned: at 700px the window was
+						// 26..674 while both children were 27..805.
+						//
+						// `minmax(0, 1fr)` makes the row exactly the container's height
+						// and — the half that matters — gives it a MIN of 0, so the
+						// children finally have a definite size to shrink within. Their
+						// `min-h-0 flex-1` scroll areas then do what they were always
+						// written to do.
+						//
+						// THE TWO EARLIER FIXES WERE REAL AND ARE KEPT: the topbar and
+						// the four sidebar blocks needed `shrink-0` regardless. They
+						// could not help here, because a child cannot shrink into a row
+						// that was never bounded.
+						//
 						// The border here STAYS. "No rules throughout the shell" means
 						// internal dividers; this is the window's edge against the mat,
 						// and without it the rounded corners have nothing to describe
 						// them against. Every rule BETWEEN panes is gone.
-						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
+						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
 						data-testid="app-window"
 					>
 						{compact ? null : sidebar}
@@ -120,22 +141,16 @@ export function Shell({
 							className="flex min-w-0 flex-col overflow-hidden"
 							data-testid="main-pane"
 						>
-							{/*
-							  THE SHELL HEADER IS REMOVED, on the operator's instruction, after
-							  three attempts to stop it clipping.
-							
-							  Two real defects were found and fixed on the way here: this header
-							  had no `shrink-0`, so it was the only thing in its column that
-							  could give; and the sidebar had FOUR children with the same
-							  problem, which is what cut the brand mark in half. Both fixes are
-							  in and both are correct. The crop outlived them, so the control
-							  comes out rather than taking a fourth attempt at it.
-							
-							  WHAT LEAVES WITH IT: the page title, the breadcrumb and the run
-							  pill. `usePageHeader` and `PageHeader` are untouched and still
-							  exported, so routes that claim a title still claim one — nothing
-							  renders it. Restoring the header is restoring these seven lines.
-							*/}
+							{/* Restored. The crop it was removed for was never this component: the
+							    app-window's implicit grid row was auto-sized, so no child had a
+							    bounded height to shrink into. See the note on the window above. */}
+							<TopBar
+								breadcrumb={breadcrumb}
+								navGroups={navGroups ?? []}
+								navTriggerRef={navTriggerRef}
+								onOpenNav={compact ? () => setDrawerOpen(true) : undefined}
+								pathname={pathname}
+							/>
 							<main
 								className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
 								data-testid="main"
