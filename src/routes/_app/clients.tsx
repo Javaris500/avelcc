@@ -239,20 +239,29 @@ function ClientsLayout() {
 		<div className="flex h-full flex-col gap-4 p-6 lg:flex-row">
 			<section
 				aria-label="Clients"
+				/*
+				 * HIDDEN ON A NARROW SCREEN WHEN SOMETHING IS SELECTED. The request
+				 * review nested under here is phone-allowed, so this layout does
+				 * render on a phone — and stacking the whole clients table above the
+				 * thing the operator opened would mean scrolling past every client to
+				 * reach the one decision they came for. On a phone the selected child
+				 * IS the screen.
+				 */
 				className={
 					selectedId === undefined
 						? "flex min-w-0 flex-1 flex-col gap-3"
-						: "flex shrink-0 flex-col gap-3 lg:w-[26rem]"
+						: "flex shrink-0 flex-col gap-3 max-lg:hidden lg:w-[26rem]"
 				}
 				data-testid="clients-pane"
 			>
+				{/*
+				 * NO HEADING HERE. The shell header owns the document's only h1 and
+				 * already renders "Clients", so a second one was a literal duplicate
+				 * — two <h1>Clients</h1> in one document and two `page-title`
+				 * testids, which is a selector that silently matches the wrong one.
+				 * The pane is named by its `aria-label`, so nothing is lost.
+				 */}
 				<div className="flex flex-wrap items-center gap-2">
-					<h1
-						className="font-display text-title font-semibold"
-						data-testid="page-title"
-					>
-						Clients
-					</h1>
 					{/*
 					 * MODULE ACTIONS, which sit left of the shell's core actions. Both
 					 * are disabled by STATE with the reason in the tooltip rather than

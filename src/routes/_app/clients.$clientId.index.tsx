@@ -17,6 +17,7 @@ import {
 	DELIVERY_STATUS_TONE,
 	ENGAGEMENT_STATUS_TONE,
 } from "#/modules/client/ui/status";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { StatusBadge, Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -243,6 +244,46 @@ function ClientDetail() {
 		retry: false,
 	});
 
+	/**
+	 * THE ROUTE CLAIMS THE HEADER, so the shell renders "Clients > CounselOS"
+	 * rather than a nav-derived "Clients". This is what makes the breadcrumb earn
+	 * its line — until the title differed from its parent the breadcrumb
+	 * suppressed itself, because repeating one word twice is not a trail.
+	 *
+	 * Called HERE, at the top level, and not inside the `Surface` render prop
+	 * below. That prop is a function React calls conditionally, so a hook in it
+	 * would run on some renders and not others. `undefined` while loading is the
+	 * honest value and the header shows nothing rather than a placeholder name.
+	 */
+	const c = client.data?.data;
+	const d = detail.data?.data;
+
+	usePageHeader({
+		title: c?.name,
+		/*
+		 * Section 2: "One line of orienting context. Counts, status, last
+		 * activity." Built only from what has actually loaded — a subtitle
+		 * asserting "0 engagements" while the detail read is still in flight
+		 * would be wrong for the length of the request and right afterwards,
+		 * which is the worst kind of wrong to debug.
+		 */
+		subtitle:
+			c === undefined
+				? undefined
+				: d === undefined
+					? c.status
+					: [
+							c.status,
+							`${d.engagements.length} ${d.engagements.length === 1 ? "engagement" : "engagements"}`,
+							`${d.openRequests} open ${d.openRequests === 1 ? "request" : "requests"}`,
+							...(d.metrics && d.metrics.blockedMissions > 0
+								? [
+										`${d.metrics.blockedMissions} blocked ${d.metrics.blockedMissions === 1 ? "mission" : "missions"}`,
+									]
+								: []),
+						].join(" · "),
+	});
+
 	return (
 		<div className="flex flex-col gap-4 px-6 py-5">
 			<Surface
@@ -323,12 +364,14 @@ function ClientDetail() {
 							 * shell's core actions.
 							 */}
 							<div className="flex flex-wrap items-center gap-3">
-								<h1
-									className="font-display text-title font-semibold"
-									data-testid="page-title"
-								>
-									{c.name}
-								</h1>
+								{/*
+								 * NO TITLE HERE. The route claims the header above, which
+								 * now carries the client's name as the page's only h1 — so
+								 * printing it again would be the duplicate this page had
+								 * before, moved rather than removed. The status stays,
+								 * because the header's subtitle carries it as a word and the
+								 * chip carries it as a tone.
+								 */}
 								<StatusBadge
 									data-testid="client-status"
 									tone={CLIENT_STATUS_TONE[c.status]}
@@ -403,6 +446,13 @@ function ClientDetail() {
 									/>
 								)}
 
+								{/*
+								 * No extra `HeadingLevel` here. The shell header owns the h1
+								 * and the panel prints no title of its own, so the section
+								 * headings are already the first level beneath it. Wrapping
+								 * would push all nine a level deeper than the structure they
+								 * actually have.
+								 */}
 								<div className="flex min-w-0 flex-1 flex-col gap-4">
 									<Sections client={c} detail={detail} />
 								</div>

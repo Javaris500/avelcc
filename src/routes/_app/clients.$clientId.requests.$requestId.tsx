@@ -6,6 +6,7 @@ import { intakePreview, intakeSchema } from "#/contract/intake";
 import { success } from "#/contract/shared/envelope";
 import { SectionShell } from "#/modules/client/ui/scaffold";
 import { REQUEST_STATUS_TONE } from "#/modules/client/ui/status";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { StatusBadge, Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -42,7 +43,32 @@ import { Surface } from "#/ui/surface";
 export const Route = createFileRoute(
 	"/_app/clients/$clientId/requests/$requestId",
 )({
-	staticData: { device: "construction" as const },
+	/**
+	 * CAPTURE, NOT CONSTRUCTION, and this is a correction rather than a choice.
+	 *
+	 * I declared `construction` here by copying the pattern from the routes
+	 * either side of it, and that quietly took a capability away: `/intake/:id`
+	 * was phone-allowed, and ROUTES.md's reasoning was that "reviewing and
+	 * approving is exactly the shape of work that happens between meetings".
+	 *
+	 * The device guard's OWN refusal screen says "Reviewing and approving still
+	 * works on a phone." So a phone reaching this route was shown a screen
+	 * telling it that the thing it was trying to do works on a phone. The
+	 * product contradicted itself in one sentence.
+	 *
+	 * DAY-ONE-FRONTEND draws the line in the right place and this falls on the
+	 * permitted side: "approving a gated export from mobile is fine. Initiating
+	 * an irreversible one is not." Approval here materialises a Mission, which
+	 * is a creation the operator has reviewed on a screen built to be reviewed —
+	 * not a delivery fired off from a pocket.
+	 *
+	 * `useRouteDevice` takes the DEEPEST route that declares a device, so this
+	 * overrides the construction boundary on the `/clients` layout above it. The
+	 * client detail page stays construction: nine sections and a rail is a
+	 * desktop screen, and nothing about it is a decision that has to be made
+	 * between meetings.
+	 */
+	staticData: { device: "capture" as const },
 	component: RequestReview,
 });
 
@@ -146,6 +172,30 @@ function RequestReview() {
 		retry: false,
 	});
 
+	/**
+	 * The route claims the header. Called at the top level rather than inside
+	 * the `Surface` render prop, which React calls conditionally.
+	 *
+	 * The title stays the plain word "Request" rather than an id. An operator
+	 * cannot recognise a uuid, and the thing they are deciding about is
+	 * described by the five regions below, not by its primary key. The status
+	 * carries the orienting fact instead.
+	 */
+	// Named apart from the `intake` inside the render prop below, which is the
+	// same row narrowed to non-null. Two bindings of one name in one component,
+	// one nullable and one not, is a bug waiting for whoever edits this next.
+	const loaded = request.data?.data;
+
+	usePageHeader({
+		title: "Request",
+		subtitle:
+			loaded === undefined
+				? undefined
+				: loaded.status === "approved" || loaded.status === "rejected"
+					? `${loaded.status} · no decision left to make`
+					: `${loaded.status} · awaiting your decision`,
+	});
+
 	return (
 		<div className="flex max-w-[80ch] flex-col gap-4 px-6 py-5">
 			<Surface
@@ -197,13 +247,12 @@ function RequestReview() {
 								>
 									Client
 								</Link>
+								{/*
+								 * NO h1 HERE. The shell header owns the document's only one
+								 * and this route claims it above, so printing "Request" again
+								 * would be a second h1 saying the same word.
+								 */}
 								<div className="flex flex-wrap items-center gap-3">
-									<h1
-										className="font-display text-title font-semibold"
-										data-testid="page-title"
-									>
-										Request
-									</h1>
 									<StatusBadge
 										data-testid="request-status"
 										tone={REQUEST_STATUS_TONE[intake.status]}

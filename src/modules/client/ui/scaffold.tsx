@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Heading, HeadingLevel } from "#/ui/heading";
 import { cn } from "#/utils/cn";
 import type { SectionBuildState } from "./sections";
 
@@ -80,12 +81,18 @@ export function SectionShell({
 				{n === null ? null : (
 					<span className="font-mono text-micro text-text-subtle">{n}</span>
 				)}
-				<h2
+				{/*
+				 * A REAL HEADING AT THE LEVEL THE TREE SAYS, not a hardcoded h2.
+				 * The shell header owns the document's only h1, so a section here
+				 * is an h2 — but this component is also the seam the nested states
+				 * hang off, and the body below wraps them a level deeper.
+				 */}
+				<Heading
 					className="font-display text-sm font-semibold tracking-wide uppercase"
 					id={`${id}-heading`}
 				>
 					{title}
-				</h2>
+				</Heading>
 				{/*
 				 * A count renders only when there IS one. Zero is a real count and
 				 * shows as 0; `undefined` means nobody counted, and printing 0 for
@@ -113,16 +120,26 @@ export function SectionShell({
 				{blurb}
 			</p>
 
-			{state === "not-built" ? (
-				<p
-					className="py-3 text-sm text-text-subtle"
-					data-testid={`client-section-${id}-not-built`}
-				>
-					Not built. {notBuiltReason}
-				</p>
-			) : (
-				<div className="py-3">{children}</div>
-			)}
+			{/*
+			 * THE BODY IS ONE LEVEL DEEPER THAN THE SECTION HEADING. Every empty
+			 * section renders an `EmptyState`, whose title is a real heading taking
+			 * its level from this context — without the wrapper it would emit the
+			 * same level as the section heading above it, so "No cost recorded"
+			 * would read as a SIBLING of "Cost" rather than as its content. On a
+			 * ten-section page that turns one outline into twenty flat peers.
+			 */}
+			<HeadingLevel>
+				{state === "not-built" ? (
+					<p
+						className="py-3 text-sm text-text-subtle"
+						data-testid={`client-section-${id}-not-built`}
+					>
+						Not built. {notBuiltReason}
+					</p>
+				) : (
+					<div className="py-3">{children}</div>
+				)}
+			</HeadingLevel>
 		</section>
 	);
 }
