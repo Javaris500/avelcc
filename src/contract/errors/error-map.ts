@@ -138,6 +138,19 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 	 * `none` because the useful destination is that specific export and this
 	 * table is static, so a link here would have to guess a route.
 	 */
+	/**
+	 * Loud, because reaching this means AVEL broke rather than the world did.
+	 * No retry: we do not know what failed, so we cannot say whether trying
+	 * again is safe. The body carries no detail by design — see the code's
+	 * comment — and gives the operator the one thing that makes the failure
+	 * findable in a log.
+	 */
+	INTERNAL_ERROR: {
+		title: "Something failed on our side.",
+		body: "This is a fault in AVEL rather than anything you did, and it was not something the system knows how to describe. Nothing was written. Quote the request id on this response when reporting it — that is what locates the failure in the server log.",
+		recovery: { kind: "none" },
+		severity: "loud",
+	},
 	IDEMPOTENCY_REPLAY: {
 		title: "This delivery already ran.",
 		body: "An export with this idempotency key was created earlier, so nothing was sent a second time. The original export's id is on this response — open it to see what happened rather than retrying.",

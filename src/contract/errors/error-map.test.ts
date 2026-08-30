@@ -17,13 +17,28 @@ describe("error map", () => {
 	});
 
 	it("carries BLAST-RADIUS's twelve, plus the two added since", () => {
-		expect(ERROR_CODES).toHaveLength(14);
+		expect(ERROR_CODES).toHaveLength(15);
 		// Named, not just counted: a count is satisfied by any two additions, and
 		// each of these exists for a reason worth asserting. IDEMPOTENCY_REPLAY
 		// was declared by the contract before the union could express it;
 		// GITHUB_REJECTED separates a refusal from an outage.
 		expect(ERROR_CODES).toContain("IDEMPOTENCY_REPLAY");
 		expect(ERROR_CODES).toContain("GITHUB_REJECTED");
+		expect(ERROR_CODES).toContain("INTERNAL_ERROR");
+	});
+
+	/**
+	 * The one code most likely to be handed a raw exception and asked to render
+	 * it. An exception message can carry a connection string, a column name, or
+	 * a row's contents, so this copy must stay generic and must never be widened
+	 * to "include the underlying error" for debuggability.
+	 */
+	it("never offers to show server text for an internal failure", () => {
+		const p = presentError("INTERNAL_ERROR");
+		expect(p.severity).toBe("loud");
+		expect(p.recovery.kind).toBe("none");
+		expect(p.body).toMatch(/request id/i);
+		expect(blocksDelivery("INTERNAL_ERROR")).toBe(true);
 	});
 
 	/**

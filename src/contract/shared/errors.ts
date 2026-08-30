@@ -68,6 +68,26 @@ export const ERROR_CODES = [
 	 * the operator's, which is why it presents as loud.
 	 */
 	"GITHUB_REJECTED",
+	/**
+	 * THE LAST RESORT, and the only code here that describes US rather than a
+	 * repository, a package or a delivery.
+	 *
+	 * Every other code names something specific that went wrong out in the
+	 * world. This one means a route threw and we do not know why. It exists
+	 * because there was no such code at all, so an unhandled failure escaped as
+	 * a framework 500 with `unhandled: true` and no envelope — nothing for a
+	 * screen to switch on, which is the one guarantee the error contract makes.
+	 * Two mission routes were doing exactly that.
+	 *
+	 * ITS COPY MUST NEVER CARRY SERVER TEXT. An exception message can hold a
+	 * connection string, a column name, a row's contents. This is the single
+	 * code most likely to be handed a raw error and asked to render it, so the
+	 * detail goes to the log and the operator gets a request id to quote. That
+	 * is what makes an allowlist the right default for rendering server
+	 * messages: a code added later shows curated copy until someone decides its
+	 * server text is fit to display, and this one never is.
+	 */
+	"INTERNAL_ERROR",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
