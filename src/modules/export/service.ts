@@ -583,7 +583,10 @@ async function loadMission(db: Db, id: string) {
 	const [m] = await db
 		.select()
 		.from(missions)
-		.where(and(eq(missions.id, id)))
+		// Without this a SOFT-DELETED MISSION CAN BE EXPORTED. Every other
+		// mission read filters; this one was written with `and()` wrapping a
+		// single predicate, which reads like a filter list and was not one.
+		.where(and(eq(missions.id, id), isNull(missions.deletedAt)))
 		.limit(1);
 	return m ?? null;
 }

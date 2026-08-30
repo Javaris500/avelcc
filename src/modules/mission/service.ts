@@ -73,9 +73,19 @@ export async function listMissions(
 		.innerJoin(clients, eq(engagements.clientId, clients.id))
 		// live() is explicit — Drizzle has no middleware, so a forgotten filter
 		// returns soft-deleted rows.
+		/**
+		 * THE JOINED TABLES NEED FILTERING TOO. This filtered missions and not
+		 * the client or engagement it joins, so a mission belonging to a
+		 * soft-deleted client stayed in the list. Worth knowing because this
+		 * query is the one other services were copied from — "I copied
+		 * listMissions, which happened to be right" was true of the mission
+		 * filter and not of the join.
+		 */
 		.where(
 			and(
 				isNull(missions.deletedAt),
+				isNull(engagements.deletedAt),
+				isNull(clients.deletedAt),
 				cursor ? lt(missions.createdAt, cursor) : undefined,
 			),
 		)
@@ -314,11 +324,23 @@ export async function getMissionRoster(
 			agentTemplates,
 			eq(rosterEntries.agentTemplateId, agentTemplates.id),
 		)
-		// No soft-delete filter: roster_entries has no deletedAt. Membership is
-		// carried by `active`, which is returned rather than filtered — an agent
-		// taken OFF a mission is part of that mission's record, and hiding it here
-		// would make the roster screen unable to show what changed.
-		.where(eq(rosterEntries.missionId, missionId));
+		// The TEMPLATE can be soft-deleted even though the entry cannot, and a
+		// deleted template must not render an agent onto the roster screen.
+		// Fixed in assemble.ts and missed here, which is why the check is a
+		// scanner rather than a habit.
+		// The TEMPLATE can be soft-deleted even though the entry cannot, and a
+		// deleted template must not render an agent onto the roster screen.
+		//
+		// No soft-delete filter on the ENTRY: roster_entries has no deletedAt.
+		// Membership is carried by `active`, which is returned rather than
+		// filtered — an agent taken OFF a mission is part of that mission's
+		// record, and hiding it would make the screen unable to show what changed.
+		.where(
+			and(
+				eq(rosterEntries.missionId, missionId),
+				isNull(agentTemplates.deletedAt),
+			),
+		);
 
 	return rows.map((r) => ({
 		entryId: r.entryId,

@@ -206,7 +206,14 @@ export async function assembleRenderMission(
 		.from(missions)
 		.innerJoin(engagements, eq(missions.engagementId, engagements.id))
 		.innerJoin(clients, eq(engagements.clientId, clients.id))
-		.where(and(eq(missions.id, missionId), isNull(missions.deletedAt)))
+		.where(
+			and(
+				eq(missions.id, missionId),
+				isNull(missions.deletedAt),
+				isNull(engagements.deletedAt),
+				isNull(clients.deletedAt),
+			),
+		)
 		.limit(1);
 
 	if (!row) return { ok: false, reason: `No mission with id ${missionId}.` };
