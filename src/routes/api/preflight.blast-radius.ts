@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -35,7 +35,26 @@ function walk(dir: string): string[] {
 function renderedFiles() {
 	return walk(FIXTURE).map((abs) => {
 		const bytes = new Uint8Array(readFileSync(abs));
-		return { path: relative(FIXTURE, abs), bytes, blobSha: gitBlobSha(bytes) };
+		/**
+		 * SEPARATORS NORMALISED HERE, and without it every file is a violation.
+		 *
+		 * `relative()` returns the platform's separator, so on Windows this
+		 * produced `conventions\layering.md`. `isNormalized` then correctly
+		 * refused it — BLAST-RADIUS requires POSIX separators and says "a path
+		 * that changes under normalization is itself a violation" — so all 20
+		 * files came back as PATH_TRAVERSAL and the pre-flight screen showed a
+		 * package that could never be delivered.
+		 *
+		 * The blast radius was RIGHT. A backslash path is not normalized, and
+		 * refusing it is the guard working. The defect was feeding it one.
+		 *
+		 * Invisible on Linux, where sep is already "/". Same class as the
+		 * `git hash-object` separator bug in the export tests, and
+		 * render.test.ts already does exactly this when loading the golden
+		 * package.
+		 */
+		const rel = relative(FIXTURE, abs).split(sep).join("/");
+		return { path: rel, bytes, blobSha: gitBlobSha(bytes) };
 	});
 }
 
