@@ -212,7 +212,36 @@ export function Sidebar({
 							// which this codebase already reverted once. Recessing it
 							// separates DOWNWARD, which is the one direction light still
 							// has, and it matches the search input directly below it.
-							"interactive group mb-2 flex shrink-0 items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-recessed py-2 text-left hover:border-[var(--elevation-border-raised)]",
+							"interactive group mb-2 flex shrink-0 items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] py-2 text-left",
+							// TRANSPARENT AT REST, RECESSING ON CONTACT.
+							//
+							// It was on app-recessed, which is the WELL tone — the same
+							// surface the search input below it uses. Sitting in a well
+							// made it read as a text field rather than a control, and it
+							// was the darkest object in the sidebar, so the eye went to it
+							// before the nav.
+							//
+							// Transparent at rest means it inherits whichever surface the
+							// sidebar is on and cannot collide with it — which is the whole
+							// of correction 5, solved by not having a fill rather than by
+							// picking a better one. Hover and open RECESS it: downward is
+							// the only direction light mode has, and it is the same move
+							// the stop button makes for the same reason.
+							// HOVER IS A BRAND TINT, OPEN IS A PRESS. Two states that mean
+							// different things should not paint the same.
+							//
+							// accent-soft is 12% accent, so it is TRANSLUCENT and composites
+							// against whatever is under it. That is why it is the right hover
+							// for this control specifically: every opaque fill available is
+							// wrong in one theme or the other — app-raised is #ffffff in light
+							// and vanishes on the white sidebar, app-recessed is heavy enough
+							// in dark to read as a press. A tint has no such problem in either.
+							//
+							// The token was declared and unused: --color-accent-soft in
+							// tokens.css, mirrored as --color-state-selected in patch.css, and
+							// no component had reached for either.
+							"hover:border-[var(--elevation-border-raised)] hover:bg-[var(--color-accent-soft)]",
+							"data-[state=open]:border-[var(--elevation-border-raised)] data-[state=open]:bg-app-recessed",
 							collapsed ? "justify-center px-2" : "px-2.5",
 						)}
 						data-testid="workspace-switcher"
@@ -236,7 +265,21 @@ export function Sidebar({
 						)}
 					</DropdownMenuTrigger>
 				</LabelWhenCollapsed>
-				<DropdownMenuContent align="start" data-testid="workspace-menu">
+				{/*
+				  MATCHES THE TRIGGER'S WIDTH. It was 177px under a 214px trigger —
+				  a menu narrower than the control it belongs to reads as a
+				  mispositioned popover rather than an extension of the button. The
+				  global `min-w-[7rem]` is a floor for small menus and was never
+				  meant to size this one. Radix publishes the trigger width as a
+				  custom property; using it means the two cannot drift when the
+				  sidebar width or the workspace name changes.
+				*/}
+				<DropdownMenuContent
+					align="start"
+					className="min-w-(--radix-dropdown-menu-trigger-width)"
+					data-testid="workspace-menu"
+					sideOffset={6}
+				>
 					<DropdownMenuLabel>Workspace</DropdownMenuLabel>
 					{/* One real workspace. CLIENTS is unbuilt, so there is no second
 					    one to offer and inventing it would be fabricated product data. */}
