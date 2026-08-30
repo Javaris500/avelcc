@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { NavGroup } from "#/contract/ui/nav";
 import type { Session } from "#/modules/auth/session";
@@ -6,6 +7,7 @@ import { Sidebar } from "#/modules/shell/sidebar";
 import { TopBar } from "#/modules/shell/topbar";
 import { useCollapsed } from "#/modules/shell/use-collapsed";
 import { COMPACT_QUERY, useMediaQuery } from "#/modules/shell/use-media-query";
+import { PageHeaderProvider } from "#/modules/shell/use-page-header";
 import { useTheme } from "#/modules/theme/use-theme";
 import { TooltipProvider } from "#/ui/tooltip";
 import { cn } from "#/utils/cn";
@@ -51,6 +53,7 @@ export function Shell({
 	const { theme, toggle: toggleTheme } = useTheme();
 	const { collapsed, toggle: toggleCollapsed } = useCollapsed();
 	const compact = useMediaQuery(COMPACT_QUERY);
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const navTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -75,63 +78,74 @@ export function Shell({
 
 	return (
 		<TooltipProvider delayDuration={300}>
-			<div
-				className={cn(
-					"app min-h-screen bg-app-bg p-(--frame-mat) text-text max-md:p-3",
-					theme === "light" && "light",
-				)}
-				data-testid="app-shell"
-				data-theme={theme}
-			>
-				{/* Twelve nav items sit before the content in tab order. Visually
-			    hidden until focused, then a real, visible target. */}
-				<a
-					className="sr-only rounded-sm bg-app-float px-3 py-2 text-sm text-text focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
-					data-testid="skip-to-content"
-					href="#main-content"
+			<PageHeaderProvider>
+				<div
+					className={cn(
+						"app min-h-screen bg-app-bg p-(--frame-mat) text-text max-md:p-3",
+						theme === "light" && "light",
+					)}
+					data-testid="app-shell"
+					data-theme={theme}
 				>
-					Skip to content
-				</a>
-				{/* One column below the breakpoint comes for free: the sidebar is not
+					{/* THIRTEEN nav items sit before the content in tab order. Visually
+			    hidden until focused, then a real, visible target.
+			    The count was wrong: nav.ts holds 16 `label:` fields, three of
+			    which are GROUP labels, leaving 13 destinations. It drops to 12
+			    when Intake goes, which is avel-c2's commit, not this one. */}
+					<a
+						className="sr-only rounded-sm bg-app-float px-3 py-2 text-sm text-text focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+						data-testid="skip-to-content"
+						href="#main-content"
+					>
+						Skip to content
+					</a>
+					{/* One column below the breakpoint comes for free: the sidebar is not
 				    rendered there, so the grid has a single child. An explicit
 				    max-md:grid-cols-1 was here and a mutation proved it changed
 				    nothing, so it is gone rather than reading as though it works. */}
-				<div
-					className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
-					data-testid="app-window"
-				>
-					{compact ? null : sidebar}
-
 					<div
-						className="flex min-w-0 flex-col overflow-hidden"
-						data-testid="main-pane"
+						// The border here STAYS. "No rules throughout the shell" means
+						// internal dividers; this is the window's edge against the mat,
+						// and without it the rounded corners have nothing to describe
+						// them against. Every rule BETWEEN panes is gone.
+						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
+						data-testid="app-window"
 					>
-						<TopBar
-							breadcrumb={breadcrumb}
-							navTriggerRef={navTriggerRef}
-							onOpenNav={compact ? () => setDrawerOpen(true) : undefined}
-						/>
-						<main
-							className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
-							data-testid="main"
-							id="main-content"
-							tabIndex={-1}
-						>
-							{children}
-						</main>
-					</div>
-				</div>
+						{compact ? null : sidebar}
 
-				{compact ? (
-					<NavDrawer
-						onOpenChange={setDrawerOpen}
-						open={drawerOpen}
-						returnFocusTo={navTriggerRef}
-					>
-						{sidebar}
-					</NavDrawer>
-				) : null}
-			</div>
+						<div
+							className="flex min-w-0 flex-col overflow-hidden"
+							data-testid="main-pane"
+						>
+							<TopBar
+								breadcrumb={breadcrumb}
+								navGroups={navGroups ?? []}
+								navTriggerRef={navTriggerRef}
+								onOpenNav={compact ? () => setDrawerOpen(true) : undefined}
+								pathname={pathname}
+							/>
+							<main
+								className="app-scroll min-h-0 flex-1 overflow-y-auto p-6"
+								data-testid="main"
+								id="main-content"
+								tabIndex={-1}
+							>
+								{children}
+							</main>
+						</div>
+					</div>
+
+					{compact ? (
+						<NavDrawer
+							onOpenChange={setDrawerOpen}
+							open={drawerOpen}
+							returnFocusTo={navTriggerRef}
+						>
+							{sidebar}
+						</NavDrawer>
+					) : null}
+				</div>
+			</PageHeaderProvider>
 		</TooltipProvider>
 	);
 }

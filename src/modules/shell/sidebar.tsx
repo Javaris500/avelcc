@@ -152,7 +152,11 @@ export function Sidebar({
 				// This ships WITH the token change rather than after it: in light,
 				// app-raised reverts to #ffffff, and a white control on a white
 				// sidebar is the exact bug correction 5 was written to fix.
-				"flex flex-col border-r border-[var(--elevation-border-rest)] bg-app-bg py-3.5 transition-[width] duration-[var(--duration-micro)]",
+				// NO RULE. The sidebar separates from the content by TONE and GAP:
+				// it sits at app-bg while content sits in app-panel cards. A
+				// hairline is what you reach for when two surfaces share a colour,
+				// and after the ramp they do not.
+				"flex flex-col bg-app-bg py-3.5 transition-[width] duration-[var(--duration-micro)]",
 				collapsed ? "w-16 items-center px-2" : "w-(--frame-sidebar) px-3",
 			)}
 			data-collapsed={collapsed}
