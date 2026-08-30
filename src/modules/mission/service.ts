@@ -1,7 +1,13 @@
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 
 import type { Db } from "#/modules/db/client";
-import { clients, engagements, missions } from "#/modules/db/schema";
+import {
+	agentTemplates,
+	clients,
+	engagements,
+	missions,
+	rosterEntries,
+} from "#/modules/db/schema";
 
 /**
  * Mission reads, and create.
@@ -27,6 +33,8 @@ import { clients, engagements, missions } from "#/modules/db/schema";
  */
 export type MissionListItem = {
 	id: string;
+	/** Null is unnamed, not missing. See the contract. */
+	title: string | null;
 	type: string;
 	sprintN: number;
 	status: string;
@@ -53,6 +61,7 @@ export async function listMissions(
 	const rows = await db
 		.select({
 			id: missions.id,
+			title: missions.title,
 			type: missions.type,
 			sprintN: missions.sprintN,
 			status: missions.status,
@@ -86,6 +95,7 @@ export async function listMissions(
 	return {
 		items: page.map((r) => ({
 			id: r.id,
+			title: r.title,
 			type: r.type,
 			sprintN: r.sprintN,
 			status: r.status,
@@ -102,6 +112,7 @@ export async function listMissions(
 export type MissionView = {
 	id: string;
 	engagementId: string;
+	title: string | null;
 	type: string;
 	brief: Record<string, unknown>;
 	sprintN: number;
@@ -129,6 +140,7 @@ export async function getMission(
 	return {
 		id: row.id,
 		engagementId: row.engagementId,
+		title: row.title,
 		type: row.type,
 		brief: row.brief,
 		sprintN: row.sprintN,
@@ -218,6 +230,9 @@ export async function createMission(
 		mission: {
 			id: row.id,
 			engagementId: row.engagementId,
+			// Never set at create: the create body does not accept one, so a new
+			// mission is unnamed until somebody names it.
+			title: row.title,
 			type: row.type,
 			brief: row.brief,
 			sprintN: row.sprintN,
@@ -232,4 +247,98 @@ export async function createMission(
 			updatedAt: row.updatedAt.toISOString(),
 		},
 	};
+}
+
+/* ── roster ──────────────────────────────────────────────────────────────── */
+
+/** One agent on a mission, with the template override already resolved. */
+export type RosterAgent = {
+	entryId: string;
+	agentTemplateId: string;
+	slug: string;
+	name: string;
+	kind: "horizontal" | "feature";
+	runtime: "model" | "human" | "code";
+	active: boolean;
+	wave: string | null;
+	monitorPriority: number | null;
+	effective: {
+		writablePaths: string[];
+		appendOnlyPaths: string[];
+		readonlyPaths: string[];
+	};
+	overridden: {
+		writablePaths: boolean;
+		appendOnlyPaths: boolean;
+		readonlyPaths: boolean;
+	};
+};
+
+/**
+ * The roster for one mission.
+ *
+ * THE OVERRIDE RULE IS RESOLVED HERE, once. Each path set on a roster entry is
+ * a nullable override of its template's: null inherits, `[]` means genuinely
+ * none. Letting every screen re-derive `entry.paths ?? template.paths` is how
+ * two surfaces end up disagreeing about what an agent is allowed to write —
+ * and this is a boundary, so a disagreement is not cosmetic.
+ *
+ * Both layers travel: `effective` is what applies, `overridden` says whether
+ * the mission changed it, so a UI can show an override as an override instead
+ * of silently presenting it as the template's own value.
+ */
+export async function getMissionRoster(
+	db: Db,
+	missionId: string,
+): Promise<RosterAgent[]> {
+	const rows = await db
+		.select({
+			entryId: rosterEntries.id,
+			templateId: agentTemplates.id,
+			slug: agentTemplates.slug,
+			name: agentTemplates.name,
+			kind: agentTemplates.kind,
+			runtime: agentTemplates.runtime,
+			active: rosterEntries.active,
+			wave: rosterEntries.wave,
+			monitorPriority: rosterEntries.monitorPriority,
+			tWritable: agentTemplates.writablePaths,
+			tAppend: agentTemplates.appendOnlyPaths,
+			tReadonly: agentTemplates.readonlyPaths,
+			eWritable: rosterEntries.writablePaths,
+			eAppend: rosterEntries.appendOnlyPaths,
+			eReadonly: rosterEntries.readonlyPaths,
+		})
+		.from(rosterEntries)
+		.innerJoin(
+			agentTemplates,
+			eq(rosterEntries.agentTemplateId, agentTemplates.id),
+		)
+		// No soft-delete filter: roster_entries has no deletedAt. Membership is
+		// carried by `active`, which is returned rather than filtered — an agent
+		// taken OFF a mission is part of that mission's record, and hiding it here
+		// would make the roster screen unable to show what changed.
+		.where(eq(rosterEntries.missionId, missionId));
+
+	return rows.map((r) => ({
+		entryId: r.entryId,
+		agentTemplateId: r.templateId,
+		slug: r.slug,
+		name: r.name,
+		kind: r.kind,
+		runtime: r.runtime,
+		active: r.active,
+		wave: r.wave,
+		monitorPriority: r.monitorPriority,
+		effective: {
+			writablePaths: r.eWritable ?? r.tWritable,
+			appendOnlyPaths: r.eAppend ?? r.tAppend,
+			readonlyPaths: r.eReadonly ?? r.tReadonly,
+		},
+		overridden: {
+			writablePaths: r.eWritable !== null,
+			appendOnlyPaths: r.eAppend !== null,
+			readonlyPaths: r.eReadonly !== null,
+		},
+	}));
 }

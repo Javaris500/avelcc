@@ -67,6 +67,22 @@ export const agentTeam = pgEnum("agent_team", [
  */
 export const skillType = pgEnum("skill_type", ["knowledge", "capability"]);
 
+/**
+ * WHAT EXECUTES AN AGENT, as distinct from `kind`, which describes the cut.
+ *
+ * A pgEnum, and the one place in this round where the vocabulary was GIVEN
+ * rather than chosen: `render/types.ts` declares `'model' | 'human' | 'code'`,
+ * and render.ts branches on it — a non-model agent loads no model context, so it
+ * renders neither identity.md nor depth.md. Code branching on the value is the
+ * doc's own enum test, and the values come from the renderer rather than from
+ * anyone's guess, which is the distinction that kept `pr_status` as text.
+ *
+ * GOLDEN-FIXTURE's MISSION.md says "Foundations for this mission is the
+ * operator", and ROSTER-V2:315 describes an agent that is "never a language
+ * model" — so `human` and `code` are both real states, not speculative ones.
+ */
+export const agentRuntime = pgEnum("agent_runtime", ["model", "human", "code"]);
+
 /* ── step 0 · the agency layer ──────────────────────────────────────────── */
 
 export const clients = pgTable("clients", {
@@ -149,7 +165,24 @@ export const agentTemplates = pgTable(
 		 * bypassed.
 		 */
 		engagementId: uuid("engagement_id").references(() => engagements.id),
-		team: agentTeam("team").notNull(),
+		/**
+		 * NULLABLE FOR A FEATURE AGENT, and that is the same distinction `kind`
+		 * already draws rather than a relaxation.
+		 *
+		 * `team` is a horizontal BAND — frontend, backend, qa, root. A horizontal
+		 * agent lives in exactly one of them because that is what it owns. A
+		 * feature agent owns one slice through EVERY layer: its schema, its
+		 * service, its routes, its screens. Asking which band it belongs to has no
+		 * answer, and NOT NULL forced one to be invented — CounselOS's seven
+		 * agents each own a feature end to end, and every one of them would have
+		 * had to claim a band it does not occupy.
+		 *
+		 * The CHECK below makes the two cases exclusive in the database rather
+		 * than by convention, and it is deliberately the mirror of
+		 * agent_templates_feature_requires_engagement: an engagement is required
+		 * exactly when a team is not.
+		 */
+		team: agentTeam("team"),
 		waveDefaults: text("wave_defaults").array().notNull().default([]),
 		identityMd: text("identity_md").notNull(),
 		depthMd: text("depth_md"),
@@ -157,15 +190,42 @@ export const agentTemplates = pgTable(
 		 * Glob patterns this agent may modify. Backs the file-ownership check at
 		 * render time: a file modified outside these globs is a gate failure.
 		 *
-		 * REPORTED, NOT INVENTED: the golden fixture's roster.json also carries
-		 * `append_only`, `readonly` and `runtime`, and NO entity in
-		 * DATA-CONTRACTS-V2 declares any of the three. GOLDEN-FIXTURE calls
-		 * append_only "the Mission 002 finding encoded" and the most important
-		 * thing in that file. They are absent here deliberately — adding columns
-		 * the contract does not define would be inventing a shape, which is the
-		 * one thing the contract rule forbids.
+		 * The note that used to sit here — that `append_only`, `readonly` and
+		 * `runtime` appear in the golden fixture and in no entity — is DISCHARGED.
+		 * All three are built below, on an operator ruling, after the renderer's
+		 * own types supplied the shapes that DATA-CONTRACTS-V2 never did.
 		 */
 		writablePaths: text("writable_paths").array().notNull().default([]),
+		/**
+		 * Paths this agent may APPEND to but never rewrite.
+		 *
+		 * GOLDEN-FIXTURE:221 calls this "the Mission 002 finding encoded": the
+		 * composition root belongs to no feature and every feature must register
+		 * in it, so omitting it means the first agent cannot load its own module.
+		 * `process/reports/` and the decision log are the same shape — every agent
+		 * is required to write there and none may rewrite another's entries.
+		 *
+		 * DEFAULT '{}', never NOT NULL without one. An agent with no append-only
+		 * grant is the safe state and needs no setup, which is RepoPolicy's
+		 * principle applied one table over.
+		 */
+		appendOnlyPaths: text("append_only_paths").array().notNull().default([]),
+		/**
+		 * Paths this agent may read but not write. The fixture uses `["**"]` for a
+		 * quality agent, so "everything" is a real value rather than an edge case.
+		 *
+		 * DECLARATIVE, NOT ENFORCED, the same caveat `skill_type='capability'`
+		 * carries: nothing restricts a read at runtime. It renders into the
+		 * package and backs the ownership check on writes; a UI implying the
+		 * filesystem enforces it would be the product lying about itself.
+		 */
+		readonlyPaths: text("readonly_paths").array().notNull().default([]),
+		/**
+		 * DEFAULT 'model' because every template that exists today is a model
+		 * agent, so the default is what the live rows already mean rather than a
+		 * value invented to make the column insertable.
+		 */
+		runtime: agentRuntime("runtime").notNull().default("model"),
 		...softDelete,
 		...timestamps,
 	},
@@ -193,6 +253,14 @@ export const agentTemplates = pgTable(
 		check(
 			"agent_templates_feature_requires_engagement",
 			sql`(${t.kind} = 'feature') = (${t.engagementId} IS NOT NULL)`,
+		),
+		// The mirror of the check above, and the pair is the whole rule: a
+		// horizontal agent has a band and no engagement, a feature agent has an
+		// engagement and no band. Equality rather than implication in both, so
+		// neither direction can be satisfied by leaving the column null.
+		check(
+			"agent_templates_horizontal_requires_team",
+			sql`(${t.kind} = 'horizontal') = (${t.team} IS NOT NULL)`,
 		),
 	],
 );
@@ -251,6 +319,20 @@ export const missions = pgTable(
 		 * playbook UP by this value rather than branching on it, which is the
 		 * doc's own enum-vs-catalogue test.
 		 */
+		/**
+		 * The mission's human name. MISSION.md's first line renders from it —
+		 * "# Mission: CounselOS Slice 1 — Transactions".
+		 *
+		 * NULLABLE, because five mission rows already exist without one and a
+		 * default would have to invent a title for each. An untitled mission is a
+		 * real state; a mission titled "Untitled" is a lie the schema told.
+		 *
+		 * Two consumers needed this independently and neither knew about the
+		 * other: RenderMission.title, and the mission list screen, where 001, 002
+		 * and a leftover test row are indistinguishable because all three render
+		 * as "CounselOS · full-build · sprint 1 · draft".
+		 */
+		title: text("title"),
 		type: text("type").notNull(),
 		/** Structured, shape owned by the mission type. */
 		brief: jsonb("brief")
@@ -419,7 +501,38 @@ export const rosterEntries = pgTable(
 			.references(() => agentTemplates.id),
 		/** Whether the agent is ON the mission. Not a delete. */
 		active: boolean("active").notNull().default(true),
-		waves: text("waves").array().notNull().default([]),
+		/**
+		 * SINGULAR, and that is the point rather than a simplification.
+		 *
+		 * ROSTER-V2:33 is the deciding line: "Phases are global. Foundations, then
+		 * builders, then verification, then quality. Team or feature is a label,
+		 * not a schedule. The v1 roster had frontend in wave 2 depending on an
+		 * artifact produced by backend in wave 3, which is the kind of
+		 * contradiction global phases prevent." Global sequential phases are the
+		 * FIX for a scheduling contradiction, and an agent spanning waves
+		 * reintroduces the ambiguity that fix removes.
+		 *
+		 * Every consumer is already singular: MISSION.md renders one Phase cell per
+		 * agent, roster.json emits `phase`, and the renderer's agent sort key is
+		 * `${phase} ${slug}` — an array would sort by its stringification. Nothing
+		 * consumes this as a set.
+		 *
+		 * The decisive one: were this genuinely a set, the renderer would have to
+		 * COLLAPSE it to fill one cell — first, lowest, comma-joined — and no
+		 * document specifies a collapse rule. Inventing one would put a made-up
+		 * rule on the path that produces a client-visible artifact.
+		 *
+		 * NULLABLE, not `NOT NULL DEFAULT 'A'`. An agent not yet assigned to a
+		 * phase is a real state, and a default would silently claim every
+		 * unassigned agent is a foundations agent. This is the one column in this
+		 * area where safe-by-absence argues AGAINST a default.
+		 *
+		 * `playbooks.waves_applicable` STAYS text[] AND THAT IS NOT AN
+		 * INCONSISTENCY TO TIDY. A playbook legitimately spans several waves; an
+		 * agent occupies one position in the sequence. Two different facts, two
+		 * different shapes. Do not harmonise them.
+		 */
+		wave: text("wave"),
 		/** wezterm pane priority. Nullable per the contract schema. */
 		monitorPriority: integer("monitor_priority"),
 		customizedMd: text("customized_md"),
@@ -429,6 +542,18 @@ export const rosterEntries = pgTable(
 		 * write nothing". An empty array is a real, different instruction.
 		 */
 		writablePaths: text("writable_paths").array(),
+		/**
+		 * The same override shape as `writablePaths` above, deliberately: nullable
+		 * means "inherit the template's", `{}` means "genuinely none".
+		 *
+		 * COLLAPSING THOSE TWO WOULD BE THE BUG. If null and `{}` meant the same
+		 * thing there would be no way to say "this agent, on this mission, may
+		 * append nowhere" — the instruction would silently read as "use whatever
+		 * the template grants", which is the opposite. That is the entire reason
+		 * the writable_paths precedent is shaped this way.
+		 */
+		appendOnlyPaths: text("append_only_paths").array(),
+		readonlyPaths: text("readonly_paths").array(),
 		...timestamps,
 	},
 	(t) => [
@@ -735,7 +860,8 @@ export const exports = pgTable(
 			gate: string;
 			rationale: string;
 			overriddenBy: string;
-			overriddenAt?: string;
+			/** Required as of the 2026-08-29 ruling. See contract/export.ts. */
+			overriddenAt: string;
 		}>(),
 		/**
 		 * This export re-ran a past mission's frozen inputs against a different

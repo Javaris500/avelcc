@@ -16,6 +16,19 @@ export const cutSource = z.enum(["derived", "overridden"]);
 export const missionSchema = z.object({
 	id: z.string().uuid(),
 	engagementId: z.string().uuid(),
+	/**
+	 * NULLABLE, and an unnamed mission is a real state rather than a gap.
+	 *
+	 * Two consumers needed this and neither knew about the other. The renderer
+	 * takes it as `RenderMission.title` — MISSION.md opens "# Mission: ..." with
+	 * it — and the mission list could not tell three CounselOS rows apart,
+	 * because client, type, sprint and status were identical on all of them and
+	 * the only distinguishing text was buried inside `brief`.
+	 *
+	 * No default. A default would have to invent a title for each existing row,
+	 * and a mission called "Untitled" is a lie the schema told.
+	 */
+	title: z.string().nullable(),
 	type: z.string(),
 	brief: z.record(z.string(), z.unknown()),
 	/**
@@ -64,6 +77,8 @@ export const missionSchema = z.object({
 export const missionListRow = missionSchema
 	.pick({
 		id: true,
+		/** The row's primary identifier. Null renders as unnamed, never blank. */
+		title: true,
 		type: true,
 		sprintN: true,
 		status: true,

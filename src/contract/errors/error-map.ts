@@ -4,11 +4,16 @@ import { type ErrorCode, isOverridable } from "#/contract/shared/errors";
  * One table: error.code -> message + recovery action.
  *
  * EXHAUSTIVE BY CONSTRUCTION. This is a Record keyed on the ErrorCode union,
- * so adding a thirteenth code fails the build here until it is given a screen.
+ * so ADDING ANY CODE fails the build here until it is given a screen.
  * DAY-ONE-FRONTEND: "a TypeScript never check so a new code fails the build."
  *
+ * No count is stated, deliberately — this file has already carried a stale one
+ * twice, which is exactly the failure the never-check exists to make impossible
+ * in the code and cannot prevent in a comment.
+ *
  * Copy is written for the operator who has to decide what to do next, not for
- * a log. Seeded from the "Screen shows" column of docs/BLAST-RADIUS.md.
+ * a log. Seeded from the "Screen shows" column of docs/BLAST-RADIUS.md, and
+ * extended past it as codes were added.
  */
 
 export type Recovery =
@@ -39,13 +44,21 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 	REPO_NO_ACCESS: {
 		title: "The connection cannot read this repository.",
 		body: "The credential in use does not carry the scope this repository needs. Check which connection is attached and what it was granted.",
-		recovery: { kind: "link", label: "Open connections", to: "/login" },
+		recovery: {
+			kind: "link",
+			label: "Open connections",
+			to: "/settings/connections",
+		},
 		severity: "blocking",
 	},
 	CONNECTION_REVOKED: {
 		title: "This connection has been revoked.",
 		body: "The engagement it belonged to was closed, so the credential no longer resolves. Nothing was sent.",
-		recovery: { kind: "link", label: "Open connections", to: "/login" },
+		recovery: {
+			kind: "link",
+			label: "Open connections",
+			to: "/settings/connections",
+		},
 		severity: "blocking",
 	},
 	POLICY_FORBIDS_TARGET: {
@@ -113,6 +126,44 @@ export const ERROR_MAP: Record<ErrorCode, ErrorPresentation> = {
 		body: "A rate limit, a timeout, or an outage on their side. Nothing was written and this is safe to retry.",
 		recovery: { kind: "retry", label: "Try again" },
 		severity: "recoverable",
+	},
+	/**
+	 * Loud, because reaching this almost always means AVEL sent a request GitHub
+	 * does not accept, and the recognisable 422s are already mapped to codes of
+	 * their own. Recovery is `none` and the copy says so: the defining property
+	 * of this code is that retrying cannot work.
+	 */
+	GITHUB_REJECTED: {
+		title: "GitHub refused this request.",
+		body: "The request reached GitHub intact and was rejected as something it will not accept, so sending it again produces the same answer. Nothing was written. This is very likely a fault in how the delivery was built rather than anything you did, and it needs filing.",
+		recovery: { kind: "none" },
+		severity: "loud",
+	},
+	/**
+	 * Deliberately NOT phrased as a failure, because nothing failed. The copy has
+	 * one job: stop the operator re-sending, and point them at the delivery that
+	 * already exists. Its id is in the envelope's `details`; the recovery is
+	 * `none` because the useful destination is that specific export and this
+	 * table is static, so a link here would have to guess a route.
+	 */
+	/**
+	 * Loud, because reaching this means AVEL broke rather than the world did.
+	 * No retry: we do not know what failed, so we cannot say whether trying
+	 * again is safe. The body carries no detail by design — see the code's
+	 * comment — and gives the operator the one thing that makes the failure
+	 * findable in a log.
+	 */
+	INTERNAL_ERROR: {
+		title: "Something failed on our side.",
+		body: "This is a fault in AVEL rather than anything you did, and it was not something the system knows how to describe. Nothing was written. Quote the request id on this response when reporting it — that is what locates the failure in the server log.",
+		recovery: { kind: "none" },
+		severity: "loud",
+	},
+	IDEMPOTENCY_REPLAY: {
+		title: "This delivery already ran.",
+		body: "An export with this idempotency key was created earlier, so nothing was sent a second time. The original export's id is on this response — open it to see what happened rather than retrying.",
+		recovery: { kind: "none" },
+		severity: "blocking",
 	},
 };
 

@@ -1,0 +1,14 @@
+{
+	"sha": "cd8274d15fa3ae2ab983129fb037999f264ba9a7",
+	"url": "https://api.github.com/repos/o/r/git/trees/cd8274d15fa3ae2ab983129fb037999f264ba9a7",
+	"tree": [
+		{
+			"path": ".avel/MISSION.md",
+			"mode": "100644",
+			"type": "blob",
+			"sha": "cf9b2a85b62bc2fd67c5ed43a1d0009df848ac8a",
+			"size": 20
+		}
+	],
+	"truncated": false
+}

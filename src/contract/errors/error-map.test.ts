@@ -16,8 +16,57 @@ describe("error map", () => {
 		expect(Object.keys(ERROR_MAP).sort()).toEqual([...ERROR_CODES].sort());
 	});
 
-	it("carries the twelve codes BLAST-RADIUS declares", () => {
-		expect(ERROR_CODES).toHaveLength(12);
+	it("carries BLAST-RADIUS's twelve, plus the two added since", () => {
+		expect(ERROR_CODES).toHaveLength(15);
+		// Named, not just counted: a count is satisfied by any two additions, and
+		// each of these exists for a reason worth asserting. IDEMPOTENCY_REPLAY
+		// was declared by the contract before the union could express it;
+		// GITHUB_REJECTED separates a refusal from an outage.
+		expect(ERROR_CODES).toContain("IDEMPOTENCY_REPLAY");
+		expect(ERROR_CODES).toContain("GITHUB_REJECTED");
+		expect(ERROR_CODES).toContain("INTERNAL_ERROR");
+	});
+
+	/**
+	 * The one code most likely to be handed a raw exception and asked to render
+	 * it. An exception message can carry a connection string, a column name, or
+	 * a row's contents, so this copy must stay generic and must never be widened
+	 * to "include the underlying error" for debuggability.
+	 */
+	it("never offers to show server text for an internal failure", () => {
+		const p = presentError("INTERNAL_ERROR");
+		expect(p.severity).toBe("loud");
+		expect(p.recovery.kind).toBe("none");
+		expect(p.body).toMatch(/request id/i);
+		expect(blocksDelivery("INTERNAL_ERROR")).toBe(true);
+	});
+
+	/**
+	 * The distinction this code exists for. EXTERNAL_GITHUB tells the operator
+	 * to retry; GITHUB_REJECTED must never do that, because the same request
+	 * will be refused identically. If these two ever offer the same recovery,
+	 * the second code has stopped earning its place.
+	 */
+	it("does not offer a retry for a request GitHub refused", () => {
+		expect(presentError("EXTERNAL_GITHUB").recovery.kind).toBe("retry");
+		expect(presentError("GITHUB_REJECTED").recovery.kind).toBe("none");
+		expect(presentError("GITHUB_REJECTED").body).toMatch(/same answer/i);
+		expect(blocksDelivery("GITHUB_REJECTED")).toBe(true);
+		expect(isOverridable("GITHUB_REJECTED")).toBe(false);
+	});
+
+	/**
+	 * A replay is not a failure and must not be dressed as one, but it must also
+	 * not leave the deliver button live — the delivery already happened, and an
+	 * override cannot make a completed write un-happen.
+	 */
+	it("treats a replay as un-overridable without calling it a failure", () => {
+		expect(isOverridable("IDEMPOTENCY_REPLAY")).toBe(false);
+		expect(blocksDelivery("IDEMPOTENCY_REPLAY")).toBe(true);
+		expect(presentError("IDEMPOTENCY_REPLAY").severity).not.toBe("loud");
+		expect(presentError("IDEMPOTENCY_REPLAY").body).not.toMatch(
+			/fail|error|wrong/i,
+		);
 	});
 
 	it("keeps the six violation codes as a separate union", () => {

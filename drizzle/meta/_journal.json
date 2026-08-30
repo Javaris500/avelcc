@@ -78,6 +78,27 @@
       "when": 1788031357153,
       "tag": "0010_updated_at_trigger_connection_export",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788052458202,
+      "tag": "0011_agent_runtime_and_path_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788055422724,
+      "tag": "0012_silky_menace",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788055661055,
+      "tag": "0013_mission_title_and_optional_team",
+      "breakpoints": true
     }
   ]
 }

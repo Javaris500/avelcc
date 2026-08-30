@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { presentError } from "#/contract/errors/error-map";
 import { ERROR_CODES, type ErrorCode } from "#/contract/shared/errors";
 import { FULL_BUILD_GATES } from "#/contract/shared/playbook";
@@ -7,6 +7,7 @@ import {
 	BlastRadius,
 	type BlastRadiusView,
 } from "#/modules/blast/blast-radius";
+import { presentScreenError } from "#/modules/errors/screenError";
 import { GateRow } from "#/modules/gate";
 import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
@@ -130,14 +131,52 @@ function PreFlight() {
 					empty={
 						<NotBuilt what="The tree read returned nothing to classify." />
 					}
-					error={({ error }) => {
+					error={({ error, retry }) => {
 						// Codes are the contract; messages change freely. Nothing here
 						// parses a message — the query throws the CODE.
 						const code = ERROR_CODES.includes(error.message as ErrorCode)
 							? (error.message as ErrorCode)
 							: "EXTERNAL_GITHUB";
-						const p = presentError(code);
-						return <ErrorState body={p.body} code={code} title={p.title} />;
+						// The fallback is unreachable here — `code` is coerced into
+						// ERROR_CODES above, so the map always answers — but it is the
+						// argument the signature asks for, and it stays honest if that
+						// coercion ever stops being total.
+						const mapped = presentError(code);
+						const shown = presentScreenError(code, {
+							title: mapped.title,
+							body: mapped.body,
+							canRetry: false,
+						});
+						/**
+						 * A `link` recovery becomes a real link. Every code that carries
+						 * one — REPO_NO_ACCESS, CONNECTION_REVOKED — used to render as no
+						 * action, so an operator was told which credential was wrong and
+						 * given nowhere to go.
+						 *
+						 * `switch-target` is deliberately still unrendered: it means
+						 * "deliver a zip instead", and no screen can yet change an
+						 * export's target. A button that cannot do what it says is worse
+						 * than an absent one.
+						 */
+						const action =
+							shown.recovery?.kind === "link" ? (
+								<Link
+									className="text-sm text-accent-text hover:text-accent-hover"
+									data-testid="error-action-link"
+									to={shown.recovery.to}
+								>
+									{shown.recovery.label}
+								</Link>
+							) : null;
+						return (
+							<ErrorState
+								action={action}
+								body={shown.body}
+								code={shown.code}
+								retry={shown.canRetry ? retry : undefined}
+								title={shown.title}
+							/>
+						);
 					}}
 				>
 					{(data) => <BlastRadius data={data} />}
