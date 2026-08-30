@@ -69,6 +69,14 @@ export function AgentTemplateCatalog() {
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
+			{/* Outside the four-state boundary. See the note in skills-view.tsx:
+			    the title and the definition are static facts about the screen and
+			    a page with no endpoint behind it must still say what it is. */}
+			<PageHeader
+				data-testid="agents-header"
+				definition={TERM.agentTemplate}
+				title="Agent templates"
+			/>
 			<CatalogSurface
 				data-testid="agents"
 				empty={
@@ -150,29 +158,12 @@ function AgentCatalogBody({
 
 	return (
 		<>
-			<PageHeader
-				data-testid="agents-header"
-				definition={TERM.agentTemplate}
-				subtitle={
-					<>
-						<span>
-							{plural(live.length, "live template", "live templates")}
-						</span>
-						{/* The split, not two separate counts. "9 templates · 2 not run by
-						    a model" leaves the operator doing the subtraction. */}
-						<span>
-							{templates.length - nonModel.length} run by a model,{" "}
-							{nonModel.length} by a person or script
-						</span>
-						{templates.length === total ? null : (
-							<span>
-								{templates.length} of {total} loaded
-							</span>
-						)}
-					</>
-				}
-				title="Agent templates"
-			/>
+			{templates.length === total ? null : (
+				<p className="text-micro text-text-subtle" data-testid="agents-partial">
+					{templates.length} of {total} loaded. The rest are on a page this
+					screen does not fetch yet, so every count below is of what is loaded.
+				</p>
+			)}
 
 			<div className="flex flex-wrap gap-3">
 				<MetricStat
@@ -600,7 +591,7 @@ function AgentDetail({ template }: { template: AgentTemplateRow }) {
 					<ul className="flex flex-col">
 						{template.skills.map((skill) => (
 							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-4 py-3 last:border-b-0"
+								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
 								key={skill.id}
 							>
 								<span

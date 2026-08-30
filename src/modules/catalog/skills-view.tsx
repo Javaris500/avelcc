@@ -59,6 +59,28 @@ export function SkillsCatalog() {
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
+			{/*
+			 * OUTSIDE THE FOUR-STATE BOUNDARY, and the first draft had it inside.
+			 *
+			 * The reasoning for inside was that the subtitle carries counts and a
+			 * count is not knowable until the read resolves. It was right about the
+			 * counts and wrong about the header. Driving the real page settled it:
+			 * with no endpoint behind this screen the whole page rendered as one
+			 * grey sentence and nothing else, no title, on a shell whose own header
+			 * does not carry the page name yet either. An operator would not know
+			 * what they were looking at.
+			 *
+			 * So the two halves split along the line UI-PLAN section 2 already
+			 * draws. Title and definition are static facts about the screen and
+			 * render always. The counts were the only part that had to wait, and
+			 * they are on the MetricStat row below, where they were already, which
+			 * makes the subtitle duplication this removes.
+			 */}
+			<PageHeader
+				data-testid="skills-header"
+				definition={TERM.skill}
+				title="Skills"
+			/>
 			<CatalogSurface
 				data-testid="skills"
 				empty={
@@ -92,16 +114,6 @@ export function SkillsCatalog() {
 	);
 }
 
-/**
- * The header renders OUTSIDE the four-state boundary in every other screen in
- * this app, and here it renders inside it. That is deliberate: the subtitle
- * carries counts, and a count is not knowable until the read resolves. A header
- * printing "14 skills" above a skeleton, or above an error, is the screen
- * asserting a number it does not have.
- *
- * The cost is that a failed read shows no title. `CatalogSurface` states what
- * failed in plain words, so the screen is not anonymous.
- */
 function SkillsCatalogBody({
 	skills,
 	total,
@@ -144,25 +156,23 @@ function SkillsCatalogBody({
 
 	return (
 		<>
-			<PageHeader
-				data-testid="skills-header"
-				definition={TERM.skill}
-				subtitle={
-					<>
-						<span>{plural(live.length, "live skill", "live skills")}</span>
-						<span>{plural(revoked.length, "revoked", "revoked")}</span>
-						<span>from {plural(sources, "source", "sources")}</span>
-						{skills.length === total ? null : (
-							<span>
-								{skills.length} of {total} loaded
-							</span>
-						)}
-					</>
-				}
-				title="Skills"
-			/>
+			{skills.length === total ? null : (
+				// The only count that has nowhere else to live. A partial page is a
+				// fact about the READ, not about the catalog, so no MetricStat can
+				// carry it and its absence would leave the totals below quietly wrong.
+				<p className="text-micro text-text-subtle" data-testid="skills-partial">
+					{skills.length} of {total} loaded. The rest are on a page this screen
+					does not fetch yet, so every count below is of what is loaded.
+				</p>
+			)}
 
 			<div className="flex flex-wrap gap-3">
+				<MetricStat
+					data-testid="skills-metric-sources"
+					hint="Distinct sources across the loaded skills."
+					label="Sources"
+					value={sources}
+				/>
 				<MetricStat
 					data-testid="skills-metric-live"
 					hint="Available to attach to an agent."
@@ -503,7 +513,7 @@ function SkillDetail({ skill }: { skill: SkillRow }) {
 					<ul className="flex flex-col">
 						{skill.attachedTo.templates.map((template) => (
 							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-4 py-3 last:border-b-0"
+								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
 								key={template.id}
 							>
 								<span className="font-display text-sm text-text">
@@ -543,7 +553,7 @@ function SkillDetail({ skill }: { skill: SkillRow }) {
 					<ul className="flex flex-col">
 						{skill.attachedTo.rosterEntries.map((entry) => (
 							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-4 py-3 last:border-b-0"
+								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
 								key={entry.id}
 							>
 								<Link

@@ -42,6 +42,12 @@ export function SkillSourceCatalog() {
 
 	return (
 		<div className="flex flex-col gap-5 px-6 py-5">
+			{/* Outside the four-state boundary. See the note in skills-view.tsx. */}
+			<PageHeader
+				data-testid="sources-header"
+				definition={TERM.source}
+				title="Skill sources"
+			/>
 			<CatalogSurface
 				data-testid="sources"
 				empty={

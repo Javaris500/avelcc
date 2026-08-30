@@ -148,7 +148,17 @@ export function SectionCard({
 			className={cn("elev-1 rounded-md", className)}
 			data-testid={testId}
 		>
-			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 border-b border-[var(--elevation-border-rest)] px-4 py-3">
+			{/*
+			 * NO RULE UNDER THE HEADER. The card's own border stays, being a border
+			 * around one thing rather than a line between two, and the plan draws
+			 * exactly that distinction: dividers go, container borders stay because
+			 * app-panel, app-raised and app-float are all #ffffff in light and the
+			 * border is half the elevation mechanism there.
+			 *
+			 * What separated header from body was a 1px line. It is gap now: py-4
+			 * on the header against the body's own padding.
+			 */}
+			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 px-4 pt-4 pb-2">
 				<h2
 					className="font-display text-sm font-semibold text-text"
 					data-testid={`${testId}-title`}
@@ -384,13 +394,16 @@ export function DataTable<T>({
 			>
 				<caption className="sr-only">{caption}</caption>
 				<thead>
-					<tr className="border-b border-[var(--elevation-border-raised)]">
+					{/* No rule under the header row either. The label tone already
+					    separates it from the data, and the extra bottom padding does
+					    what the line was doing. */}
+					<tr>
 						{columns.map((column) => {
 							const active = sort?.key === column.key;
 							return (
 								<th
 									className={cn(
-										"px-3 py-2 text-micro font-medium text-text-subtle",
+										"px-3 pt-2 pb-3 text-micro font-medium text-text-subtle",
 										column.align === "end" ? "text-right" : "text-left",
 										column.secondary ? "hidden lg:table-cell" : "",
 									)}
@@ -434,7 +447,11 @@ export function DataTable<T>({
 						return (
 							<tr
 								className={cn(
-									"border-b border-[var(--elevation-border-rest)]",
+									// No rule between rows. `--row-pad` is the separation now,
+									// which is what "tone and gap" means for a table: the rows
+									// are already distinguished by their own content and a line
+									// per row is 200 lines on a full catalog.
+									//
 									// Selection is a background, and it transitions on the
 									// state duration rather than the micro one: it is a panel
 									// state change, which is what --duration-state is for.
