@@ -33,6 +33,8 @@ import {
  */
 export type MissionListItem = {
 	id: string;
+	/** Null is unnamed, not missing. See the contract. */
+	title: string | null;
 	type: string;
 	sprintN: number;
 	status: string;
@@ -59,6 +61,7 @@ export async function listMissions(
 	const rows = await db
 		.select({
 			id: missions.id,
+			title: missions.title,
 			type: missions.type,
 			sprintN: missions.sprintN,
 			status: missions.status,
@@ -92,6 +95,7 @@ export async function listMissions(
 	return {
 		items: page.map((r) => ({
 			id: r.id,
+			title: r.title,
 			type: r.type,
 			sprintN: r.sprintN,
 			status: r.status,
@@ -108,6 +112,7 @@ export async function listMissions(
 export type MissionView = {
 	id: string;
 	engagementId: string;
+	title: string | null;
 	type: string;
 	brief: Record<string, unknown>;
 	sprintN: number;
@@ -135,6 +140,7 @@ export async function getMission(
 	return {
 		id: row.id,
 		engagementId: row.engagementId,
+		title: row.title,
 		type: row.type,
 		brief: row.brief,
 		sprintN: row.sprintN,
@@ -224,6 +230,9 @@ export async function createMission(
 		mission: {
 			id: row.id,
 			engagementId: row.engagementId,
+			// Never set at create: the create body does not accept one, so a new
+			// mission is unnamed until somebody names it.
+			title: row.title,
 			type: row.type,
 			brief: row.brief,
 			sprintN: row.sprintN,
