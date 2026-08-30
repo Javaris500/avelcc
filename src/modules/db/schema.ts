@@ -165,7 +165,24 @@ export const agentTemplates = pgTable(
 		 * bypassed.
 		 */
 		engagementId: uuid("engagement_id").references(() => engagements.id),
-		team: agentTeam("team").notNull(),
+		/**
+		 * NULLABLE FOR A FEATURE AGENT, and that is the same distinction `kind`
+		 * already draws rather than a relaxation.
+		 *
+		 * `team` is a horizontal BAND — frontend, backend, qa, root. A horizontal
+		 * agent lives in exactly one of them because that is what it owns. A
+		 * feature agent owns one slice through EVERY layer: its schema, its
+		 * service, its routes, its screens. Asking which band it belongs to has no
+		 * answer, and NOT NULL forced one to be invented — CounselOS's seven
+		 * agents each own a feature end to end, and every one of them would have
+		 * had to claim a band it does not occupy.
+		 *
+		 * The CHECK below makes the two cases exclusive in the database rather
+		 * than by convention, and it is deliberately the mirror of
+		 * agent_templates_feature_requires_engagement: an engagement is required
+		 * exactly when a team is not.
+		 */
+		team: agentTeam("team"),
 		waveDefaults: text("wave_defaults").array().notNull().default([]),
 		identityMd: text("identity_md").notNull(),
 		depthMd: text("depth_md"),
@@ -237,6 +254,14 @@ export const agentTemplates = pgTable(
 			"agent_templates_feature_requires_engagement",
 			sql`(${t.kind} = 'feature') = (${t.engagementId} IS NOT NULL)`,
 		),
+		// The mirror of the check above, and the pair is the whole rule: a
+		// horizontal agent has a band and no engagement, a feature agent has an
+		// engagement and no band. Equality rather than implication in both, so
+		// neither direction can be satisfied by leaving the column null.
+		check(
+			"agent_templates_horizontal_requires_team",
+			sql`(${t.kind} = 'horizontal') = (${t.team} IS NOT NULL)`,
+		),
 	],
 );
 
@@ -294,6 +319,20 @@ export const missions = pgTable(
 		 * playbook UP by this value rather than branching on it, which is the
 		 * doc's own enum-vs-catalogue test.
 		 */
+		/**
+		 * The mission's human name. MISSION.md's first line renders from it —
+		 * "# Mission: CounselOS Slice 1 — Transactions".
+		 *
+		 * NULLABLE, because five mission rows already exist without one and a
+		 * default would have to invent a title for each. An untitled mission is a
+		 * real state; a mission titled "Untitled" is a lie the schema told.
+		 *
+		 * Two consumers needed this independently and neither knew about the
+		 * other: RenderMission.title, and the mission list screen, where 001, 002
+		 * and a leftover test row are indistinguishable because all three render
+		 * as "CounselOS · full-build · sprint 1 · draft".
+		 */
+		title: text("title"),
 		type: text("type").notNull(),
 		/** Structured, shape owned by the mission type. */
 		brief: jsonb("brief")

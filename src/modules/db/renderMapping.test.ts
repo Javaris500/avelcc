@@ -79,9 +79,10 @@ const MISSION: Record<keyof RenderMission, Mapping> = {
 		note: "Joined via missions.engagement_id -> engagements.client_id.",
 	},
 	title: {
-		status: "unmodelled",
-		question:
-			"MISSION.md renders '# Mission: CounselOS Slice 1 — Transactions' from this, and `missions` has no title column. Absent from DATA-CONTRACTS-V2's Mission block too. Is the title a stored column, or derived from the brief?",
+		status: "mapped",
+		table: "missions",
+		column: "title",
+		note: "RULED 2026-08-29. Nullable: five mission rows predate the column and a default would invent a title for each. Two consumers needed it independently — MISSION.md's first line, and the mission list screen where 001, 002 and a test row all read 'CounselOS · full-build · sprint 1 · draft'.",
 	},
 	whatShips: {
 		status: "unmodelled",
@@ -372,7 +373,6 @@ describe("every render field is classified against the schema", () => {
 			"RenderMission.doneCommands",
 			"RenderMission.edges",
 			"RenderMission.phases",
-			"RenderMission.title",
 			"RenderMission.whatShips",
 			"RenderPlaybook.hardBlock",
 		]);
