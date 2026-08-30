@@ -19,8 +19,6 @@ const OPERATOR = "javaris@avelco.dev";
 /** Reference `:root` — the values the dark theme must resolve to. */
 const DARK = {
 	pageBg: "rgb(26, 29, 35)", // --bg        #1a1d23
-	sidebarBg: "rgb(42, 46, 54)", // --surface   #2a2e36
-	switcherBg: "rgb(57, 62, 70)", // --surface-2 #393e46
 	text: "rgb(238, 238, 238)", // --text      #eeeeee
 	border: "rgb(74, 80, 88)", // --border    #4a5058
 	gatePass: "rgb(34, 197, 94)", // --pass      #22c55e
@@ -29,8 +27,6 @@ const DARK = {
 /** Reference `.light`. */
 const LIGHT = {
 	border: "rgb(229, 231, 235)", // --border    #e5e7eb
-	panel: "rgb(255, 255, 255)", // --color-app-panel  #ffffff
-	raised: "rgb(238, 238, 238)", // --color-app-raised #eeeeee, correction 5
 	text: "rgb(26, 29, 35)", // --text      #1a1d23
 	gatePass: "rgb(21, 128, 61)", // --pass      #15803d
 };
@@ -45,7 +41,23 @@ async function gotoApp(page: Page) {
 		},
 	]);
 	await page.goto("/missions");
-	await expect(page.getByTestId("app-shell")).toBeVisible();
+	/**
+	 * A GENEROUS GATE HERE, AND SHORT POLLS EVERYWHERE ELSE, because the two
+	 * waits are different questions.
+	 *
+	 * This one waits for a DEV SERVER to compile a route on demand, which is
+	 * unbounded-ish and has nothing to do with the app being correct. The
+	 * measurement polls below stay at five seconds so a genuinely wrong value
+	 * still fails fast.
+	 *
+	 * Conflating them is a real source of noise in this suite: a cold compile
+	 * blew a 5s measurement poll and reported a colour as wrong, and the tell is
+	 * a failure that moves between runs and reads as a MISSING value rather than
+	 * an incorrect one. Diagnosed by avel-fa hitting the same thing in the
+	 * catalog specs, where a fixed wait reported zero headings on a page that
+	 * had them.
+	 */
+	await expect(page.getByTestId("app-shell")).toBeVisible({ timeout: 30_000 });
 }
 
 /** Computed style of one testid, read out of the live DOM. */
@@ -75,6 +87,34 @@ function expectStyle(page: Page, testId: string, prop: string) {
 		message: `${testId} ${prop}`,
 		timeout: 5_000,
 	});
+}
+
+/**
+ * A token as the browser would PAINT it, in the same rgb form getComputedStyle
+ * reports for a background.
+ *
+ * ASSERT AGAINST THIS, NOT AGAINST A HEX. Four tests in this file pinned
+ * literal rgb values that happened to equal a token on the day they were
+ * written, and every one of them went red when the ramp moved — asserting
+ * "the sidebar is #2a2e36" rather than "the sidebar is the app background".
+ * The first is a fact about today's palette; the second is the design rule,
+ * and only the second survives a re-tune. Same failure as --color-skeleton,
+ * which was pinned to a value derived from a surface that later moved.
+ */
+async function paintedToken(page: Page, name: string): Promise<string> {
+	return page.evaluate((prop) => {
+		const shell = document.querySelector('[data-testid="app-shell"]');
+		if (!shell) throw new Error("no app-shell");
+		// Resolved INSIDE the shell, because `.light` sits on that wrapper rather
+		// than on <html> — a probe on document.body would read the dark value in
+		// both themes.
+		const probe = document.createElement("div");
+		probe.style.backgroundColor = `var(${prop})`;
+		shell.appendChild(probe);
+		const painted = getComputedStyle(probe).backgroundColor;
+		probe.remove();
+		return painted;
+	}, name);
 }
 
 /** A custom property as the shell wrapper resolves it. */
@@ -208,14 +248,33 @@ test.describe("theme", () => {
 		);
 	});
 
-	test("resolves the reference's dark values", async ({ page }) => {
+	test("paints each surface from the token that names its role", async ({
+		page,
+	}) => {
 		await gotoApp(page);
 
-		await expectStyle(page, "app-shell", "background-color").toBe(DARK.pageBg);
-		await expectStyle(page, "sidebar", "background-color").toBe(DARK.sidebarBg);
+		/**
+		 * THE SIDEBAR IS A DIFFERENT PLANE, NOT A RAISED ONE. This asserted the
+		 * literal #2a2e36 — the old app-panel — which is to say it asserted that
+		 * the sidebar IS A CARD. That premise is exactly what the operator's
+		 * ruling removed, so the test was pinning the design it was meant to
+		 * protect us from changing by accident.
+		 *
+		 * Now it asserts the ROLE: whatever app-bg resolves to, the desktop and
+		 * the sidebar share it. That survives the next re-tune and still fails if
+		 * somebody paints the sidebar as a panel again.
+		 */
+		const appBg = await paintedToken(page, "--color-app-bg");
+		await expectStyle(page, "app-shell", "background-color").toBe(appBg);
+		await expectStyle(page, "sidebar", "background-color").toBe(appBg);
+
+		// The switcher is a control ON that plane, so it takes the raised surface.
+		// It is what makes "a white control reads on a grey sidebar" true.
+		const raised = await paintedToken(page, "--color-app-raised");
 		await expectStyle(page, "workspace-switcher", "background-color").toBe(
-			DARK.switcherBg,
+			raised,
 		);
+
 		await expectStyle(page, "app-shell", "color").toBe(DARK.text);
 		// The idle dot is neutral, so gate-pass is asserted on the token itself.
 		// That is the more direct form of DAY-ONE's check anyway: it asks whether
@@ -262,11 +321,30 @@ test.describe("theme", () => {
  * correct the whole time.
  */
 test.describe("borders follow the theme", () => {
+	/**
+	 * WHAT IS STILL BORDERED, AFTER THE NO-RULES RULING.
+	 *
+	 * The sidebar's `border-r` and the header's `border-b` were INTERNAL
+	 * dividers between panes and are gone: panes separate by tone and gap now,
+	 * and a hairline is what you reach for when two surfaces share a colour.
+	 * These two are not internal dividers. `app-window` is the frame's edge
+	 * against the desktop mat, without which the rounded corners have nothing to
+	 * describe them against, and the switcher's is a control's own container.
+	 */
 	const BORDERED = [
 		["app-window", "border-top-color"],
-		["sidebar", "border-right-color"],
-		["topbar", "border-bottom-color"],
 		["workspace-switcher", "border-top-color"],
+	] as const;
+
+	/**
+	 * The removals, pinned POSITIVELY rather than left to the absence of a test.
+	 * Deleting the assertions would have left nothing to stop a border coming
+	 * back, and "we removed the test when we removed the border" is how a ruling
+	 * quietly reverts.
+	 */
+	const UNBORDERED = [
+		["sidebar", "border-right-width"],
+		["page-header", "border-bottom-width"],
 	] as const;
 
 	test("every frame border is the dark border in dark", async ({ page }) => {
@@ -286,6 +364,18 @@ test.describe("borders follow the theme", () => {
 		}
 	});
 
+	test("no rule separates the panes, in either theme", async ({ page }) => {
+		await gotoApp(page);
+		for (const [id, prop] of UNBORDERED) {
+			await expectStyle(page, id, prop).toBe("0px");
+		}
+
+		await toggleToLight(page);
+		for (const [id, prop] of UNBORDERED) {
+			await expectStyle(page, id, prop).toBe("0px");
+		}
+	});
+
 	test("the switcher is distinguishable from the sidebar in light", async ({
 		page,
 	}) => {
@@ -294,20 +384,54 @@ test.describe("borders follow the theme", () => {
 
 		// RESOLVED, and this test now guards the resolution.
 		//
-		// Light --color-app-raised was #ffffff, identical to --color-app-panel, so
-		// the switcher's fill carried no separation from the sidebar it sits on
-		// and a 1px hairline was doing all the work for a control the operator is
-		// meant to click. Correction 5 took the reference's #eeeeee.
-		//
-		// The reference never relied on either alone: it uses a distinct fill AND
-		// a border, and the two together are what make a control read as one.
-		// These three assert both halves are present. A revert of either — the
-		// fill back to white, or the elevation-border alias back to frozen — fails
-		// here rather than shipping a control nobody can see.
-		await expectStyle(page, "sidebar", "background-color").toBe(LIGHT.panel);
+		/**
+		 * THE SIGNAL IS THE RELATIONSHIP, NOT THE TWO VALUES.
+		 *
+		 * This asserted sidebar #ffffff and switcher #eeeeee. Both are now wrong
+		 * and, more to the point, the reasoning under them has INVERTED. Light
+		 * app-raised was raised to #eeeeee by correction 5 because a white
+		 * switcher sat on a white sidebar with a hairline doing all the work.
+		 * The sidebar has since moved to app-bg, so correction 5 was reverted and
+		 * raised went back to #ffffff — a white control on a grey sidebar, which
+		 * is what correction 5 wanted all along and could not have while the
+		 * sidebar was painted as a panel.
+		 *
+		 * Both spellings satisfy the real requirement, and pinning either one
+		 * makes the test fail the next time the palette answers it differently.
+		 * So assert the requirement: the switcher must not share its fill with
+		 * the surface it sits on, and it must carry its own border. A revert of
+		 * either half fails here rather than shipping a control nobody can see.
+		 */
+		/**
+		 * POLLED, NOT READ ONCE, and the reason is a race I built into the first
+		 * version of this test.
+		 *
+		 * The switcher carries the `interactive` utility, which transitions
+		 * `background`. On a theme toggle its colour ANIMATES from the dark value
+		 * to the light one over --duration-micro. The probe `paintedToken` creates
+		 * has no transition, so it reports the destination immediately — and a
+		 * one-shot `styleOf` on the switcher caught it mid-flight, comparing a
+		 * colour partway through an animation against a settled one.
+		 *
+		 * It failed reading `rgb(38, 43, 53)` in light, which is the DARK raised
+		 * value, and looked exactly like a token frozen at the wrong theme —
+		 * correction 4's signature. Driving it by hand showed the token and the
+		 * paint both correct in both themes. The bug was the measurement.
+		 */
+		const appBg = await paintedToken(page, "--color-app-bg");
+		const raised = await paintedToken(page, "--color-app-raised");
+
+		expect(
+			raised,
+			"the switcher's surface must differ from the sidebar's",
+		).not.toBe(appBg);
+
+		// Each is still the token that names its role, not a one-off colour.
+		await expectStyle(page, "sidebar", "background-color").toBe(appBg);
 		await expectStyle(page, "workspace-switcher", "background-color").toBe(
-			LIGHT.raised,
+			raised,
 		);
+
 		await expectStyle(page, "workspace-switcher", "border-top-color").toBe(
 			LIGHT.border,
 		);
@@ -542,15 +666,26 @@ test.describe("honest state", () => {
 		expect(animation).toBe("none");
 	});
 
-	test("the nav shows a cut edge only once it is scrolled", async ({
-		page,
-	}) => {
+	test("a cut-off nav list looks cut off", async ({ page }) => {
 		await gotoApp(page);
-		const slot = page.getByTestId("nav-slot");
 
-		await expect(slot).toHaveAttribute("data-scrolled", "false");
-		await expectStyle(page, "nav-slot", "border-top-color").toBe(
-			"rgba(0, 0, 0, 0)",
+		/**
+		 * THE SIGNAL SURVIVED THE RULE. This asserted a `border-t` that appeared
+		 * once the list was scrolled, plus the `data-scrolled` state driving it.
+		 * Both are gone — the border was an internal divider under the no-rules
+		 * ruling — and a fade mask does the same job without drawing a line.
+		 *
+		 * So the test asserts the fade rather than the border. What it is
+		 * protecting is unchanged and is worth stating: a list with more content
+		 * below must not look complete. Asserting only that the border is absent
+		 * would have left the SIGNAL untested and passed on a nav with a hard cut.
+		 *
+		 * The mask is unconditional, because with a short list the fade lands on
+		 * empty space and shows nothing. There is no state left to assert.
+		 */
+		const mask = await styleOf(page, "nav-slot", "mask-image");
+		expect(mask, "the nav's bottom edge must fade").toContain(
+			"linear-gradient",
 		);
 	});
 });
@@ -779,14 +914,24 @@ test.describe("compact width", () => {
 	test("interactive controls clear a 44px touch target", async ({ page }) => {
 		await gotoApp(page);
 
-		for (const id of [
-			"nav-drawer-trigger",
-			"control-gates",
-			"control-target",
-		]) {
-			const box = await page.getByTestId(id).boundingBox();
-			expect(box?.height ?? 0, `${id} height`).toBeGreaterThanOrEqual(44);
-		}
+		/**
+		 * THIS WAS NOT A SIZING FAILURE. It listed `control-gates` and
+		 * `control-target`, the two header dropdowns deleted for opening a menu
+		 * and changing nothing — so `boundingBox()` waited 30 seconds for
+		 * elements that no longer exist and timed out. It reads as "the target is
+		 * too small", which is what a reader assumes from the test's name, and it
+		 * is why this sat undiagnosed: the failure mode of a missing element and
+		 * of a small one look nothing alike but the test name describes only one.
+		 *
+		 * Two of three ids were removed rather than the list being deleted. The
+		 * drawer trigger is the one compact-only control that survives, and the
+		 * 44px floor is still the rule worth holding.
+		 */
+		const box = await page.getByTestId("nav-drawer-trigger").boundingBox();
+		expect(
+			box?.height ?? 0,
+			"nav-drawer-trigger height",
+		).toBeGreaterThanOrEqual(44);
 	});
 
 	test("does not overflow horizontally", async ({ page }) => {

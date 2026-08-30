@@ -95,6 +95,14 @@ export function PageHeader({
 					// made every selector ambiguous — the same duplicate-testid defect
 					// this codebase already fixed once in the violations list.
 					data-testid="page-header-title"
+					/**
+					 * The full text on hover, because the line above truncates. A
+					 * clipped title still reaches a screen reader in full — the text is
+					 * in the DOM and only visually cut — so this is the sighted
+					 * operator's only way to read a long mission name. Verified
+					 * clipping at 1440 with a real 110-character title.
+					 */
+					title={title}
 				>
 					{title}
 				</h1>

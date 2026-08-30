@@ -148,8 +148,16 @@ function Row({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 				<span className="absolute inset-x-2 bottom-0 h-px bg-[linear-gradient(to_right,transparent,var(--color-accent),transparent)]" />
 				{/* The bloom, breathing. */}
 				<span className="absolute inset-x-4 bottom-0 h-2 animate-pulse rounded-full bg-accent opacity-50 blur-md motion-reduce:animate-none" />
-				{/* A wider, dimmer wash that bleeds past the row edges. */}
-				<span className="-bottom-1 absolute inset-x-8 h-3 rounded-full bg-accent opacity-25 blur-lg motion-reduce:animate-none" />
+				{/* A wider, dimmer wash that bleeds past the row edges. STATIC, so it
+				    carries no motion guard — it had a `motion-reduce:animate-none`
+				    and no `animate-*` for it to disable. Harmless to run and not
+				    harmless to read: a motion guard on something that never moves
+				    tells the next person reduced motion was handled here, and it
+				    counts as covered to anyone auditing polish item 2 by grepping
+				    for the variant. The bloom above is the layer that animates and
+				    the layer that needs one. Found by avel-bb, in their copy of
+				    these three layers before it was found in the original. */}
+				<span className="-bottom-1 absolute inset-x-8 h-3 rounded-full bg-accent opacity-25 blur-lg" />
 			</span>
 		</Link>
 	);

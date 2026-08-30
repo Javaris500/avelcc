@@ -23,7 +23,7 @@
 
 ---
 
-## AVEL's own build — 2026-08-29
+## AVEL's own build
 
 *Three AVEL sessions building the export engine. Not a CounselOS slice; the section headings below are that client's. Whether this file covers AVEL working on itself is an open structural question — the content is exactly what the file asks for, so it is recorded here rather than discarded for want of a heading.*
 
@@ -35,6 +35,10 @@
 2026-08-29 · AVEL · avel-a8 · Refused to write an enum four times from vocabularies that existed, on the grounds that a value list you cannot read is a guess; three of the four later proved to have a fourth value the template did not list.
 2026-08-29 · AVEL · avel-a8 · A query that is RIGHT BY ACCIDENT in the half people copy is worse than one wrong in both halves — `listMissions` filtered the mission and not the client it joined, and every service copied from it inherited the correct half without anyone re-deriving the other.
 2026-08-29 · AVEL · all three · THE RECURRING ONE: a check that is real, and answers a narrower question than the claim it is about to support. "My log says 3000" ≠ "the port is mine". "I stopped it" ≠ "it is stopped". "The selector resolved" ≠ "the page is done". Each was caught only by going to the source before sending the message.
+2026-08-30 · AVEL · avel-71 · A theme test raced a CSS transition IT introduced by measuring: the probe resolving a token has no `transition`, so it reports the destination instantly, while the real element carries `interactive` and animates `background` — a single-instant read caught the switcher mid-flight and reported the dark value in light mode, which is indistinguishable from a token frozen at the wrong theme.
+2026-08-30 · AVEL · avel-71 · Deleted two controls, updated two lists that named them, missed a third — and the only mechanism that would have caught it was an e2e suite that had been silently unrunnable for an unknown length of time, so a correct rule failed for a reason unrelated to anyone's discipline.
+2026-08-30 · AVEL · avel-71 · One timeout budget for "wait for the dev server to compile" and for "wait for the value to be correct" makes a slow machine indistinguishable from a wrong colour; the tell is a failure that moves between runs and reads as a MISSING value rather than an incorrect one.
+2026-08-30 · AVEL · avel-71 · Shipped a header commit whose own message said it was unverified, and it was broken in two visible ways — saying "not verified" makes the note accurate, not the shipping safe.
 
 ---
 
