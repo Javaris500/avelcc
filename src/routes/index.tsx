@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { readSession, signOut } from "#/modules/auth/session";
+import { ChatHome } from "#/modules/chat/home";
 import { NAV } from "#/modules/nav";
 import { Shell } from "#/modules/shell/shell";
 import { Wordmark } from "#/modules/shell/wordmark";
@@ -10,19 +11,23 @@ import { Button } from "#/ui/button";
 /**
  * Home.
  *
- * Deliberately OUTSIDE the session gate. It used to redirect to /missions,
- * which for a signed-out visitor bounced straight into the hard-refusal
- * screen — so the first thing anyone saw was "this request was refused"
- * rather than a front door.
+ * UI-PLAN decision 1: chat replaces home. `/` is a conversation with the
+ * Command Center agent, because every other nav item is a noun you browse and
+ * this is where you start when you do not yet know which noun you want.
  *
- * It is an index of what is actually built, not a dashboard. DAY-ONE-FRONTEND
- * forbids a dashboard and it is right to: two missions is not a trend, and
- * zero have run.
+ * ONE ENDPOINT, TWO STATES, AND THE SPLIT IS KEPT. This route is deliberately
+ * OUTSIDE the session gate. It used to redirect to /missions, which for a
+ * signed-out visitor bounced straight into the hard-refusal screen, so the
+ * first thing anyone saw was "this request was refused" rather than a front
+ * door. UI-PLAN section 8 rules on what home is for an operator and is silent
+ * on what it is for a visitor, so the front door stays as it was:
  *
- * ONE ENDPOINT, TWO STATES. Signed in, the same content renders INSIDE the
- * shell, so the sidebar and nav are there — an operator with a session should
- * land in the app, not on a doorway. Signed out it renders bare, because the
- * shell implies an authenticated context that does not exist yet.
+ *   signed in  -> the chat, inside the shell
+ *   signed out -> the bare door, an index of what is actually built
+ *
+ * Putting the chat on the signed-out side would be worse than the redirect it
+ * replaced. A conversation with an agent nobody is authenticated to is a
+ * control that cannot work, offered as the first thing a visitor sees.
  */
 export const Route = createFileRoute("/")({
 	ssr: false,
@@ -65,9 +70,7 @@ function Home() {
 	const navigate = useNavigate();
 	const session = readSession();
 
-	const body = <HomeBody onToggle={toggle} session={session} theme={theme} />;
-
-	// Signed in: render inside the shell, so the nav is where it belongs.
+	// Signed in: the chat, inside the shell, so the nav is where it belongs.
 	if (session) {
 		return (
 			<Shell
@@ -79,32 +82,36 @@ function Home() {
 				}}
 				session={session}
 			>
-				{body}
+				<ChatHome />
 			</Shell>
 		);
 	}
 
-	// Signed out: a bare front door. No shell, because there is no session to
-	// frame — and the gate refusing hard should never be the first screen.
+	// Signed out: a bare front door. No shell, because the shell implies an
+	// authenticated context that does not exist yet, and the gate refusing hard
+	// should never be the first screen.
 	return (
 		<div
 			className={`app min-h-screen bg-app-bg text-text${theme === "light" ? " light" : ""}`}
 			data-testid="home"
 			data-theme={theme}
 		>
-			{body}
+			<FrontDoor onToggle={toggle} theme={theme} />
 		</div>
 	);
 }
 
-function HomeBody({
+/**
+ * The signed-out door. An index of what is actually built, not a dashboard.
+ * DAY-ONE-FRONTEND forbids a dashboard and it is right to: two missions is not
+ * a trend, and zero have run.
+ */
+function FrontDoor({
 	theme,
 	onToggle,
-	session,
 }: {
 	theme: "dark" | "light";
 	onToggle: () => void;
-	session: ReturnType<typeof readSession>;
 }) {
 	return (
 		<div data-testid="home-body">
@@ -121,19 +128,17 @@ function HomeBody({
 							it. Nothing ships past a gate it did not pass.
 						</p>
 					</div>
-					{/* Only when bare. Inside the shell the top bar owns the toggle,
-					    and two useTheme instances would desync the moment either
-					    one was pressed. */}
-					{session ? null : (
-						<Button
-							data-testid="home-theme"
-							onClick={onToggle}
-							size="sm"
-							variant="ghost"
-						>
-							{theme === "dark" ? "Light" : "Dark"}
-						</Button>
-					)}
+					{/* Only on the door. Inside the shell the sidebar footer owns the
+					    toggle, and two useTheme instances would desync the moment
+					    either one was pressed. */}
+					<Button
+						data-testid="home-theme"
+						onClick={onToggle}
+						size="sm"
+						variant="ghost"
+					>
+						{theme === "dark" ? "Light" : "Dark"}
+					</Button>
 				</header>
 
 				<div className="flex flex-col gap-2">
@@ -167,9 +172,8 @@ function HomeBody({
 				</div>
 
 				<p className="border-t border-[var(--elevation-border-rest)] pt-4 text-sm leading-relaxed text-text-subtle">
-					{session
-						? `Signed in as ${session.operator}.`
-						: "Not signed in. Missions and pre-flight are behind the session gate — it refuses rather than redirecting, which is deliberate."}
+					Not signed in. Missions and pre-flight are behind the session gate —
+					it refuses rather than redirecting, which is deliberate.
 				</p>
 			</div>
 		</div>
