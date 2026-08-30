@@ -1,19 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Library } from "lucide-react";
 
-import { PageEmpty } from "#/ui/page-empty";
+import { SkillsCatalog } from "#/modules/catalog/skills-view";
 
+/**
+ * The route is a mount point and nothing else. The screen lives in
+ * `src/modules/catalog/` so that the shape of it is reviewable without reading
+ * a router file, and so the three catalog screens sit next to each other.
+ *
+ * `device: construction` is unchanged. A catalog with markdown bodies, path
+ * globs and a wide table is not a phone screen.
+ */
 export const Route = createFileRoute("/_app/catalog/skills")({
 	staticData: { device: "construction" as const },
-	component: Page,
+	component: SkillsCatalog,
 });
-
-function Page() {
-	return (
-		<PageEmpty
-			body="Skills carry a type: knowledge or capability. Capability is labelled declarative in the UI because it names a tool grant, it does not enforce one. A badge implying enforcement would be the product lying about itself."
-			icon={Library}
-			title="No skills yet"
-		/>
-	);
-}

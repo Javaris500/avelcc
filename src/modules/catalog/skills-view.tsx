@@ -1,0 +1,598 @@
+import { Link } from "@tanstack/react-router";
+import { ShieldAlert } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { RevocationChip, SkillTypeChip } from "#/modules/catalog/chips";
+import {
+	danglingAttachments,
+	isRevoked,
+	type SkillRow,
+} from "#/modules/catalog/contract";
+import { isoDate, plural } from "#/modules/catalog/format";
+import { TERM } from "#/modules/catalog/jargon";
+import { useSkills } from "#/modules/catalog/queries";
+import { CatalogSurface } from "#/modules/catalog/screen";
+import {
+	type Column,
+	DataNotice,
+	DataTable,
+	DefinitionList,
+	EmptyState,
+	FilterChips,
+	MetricStat,
+	PageHeader,
+	type RowTone,
+	SectionCard,
+} from "#/modules/catalog/ui";
+import { Tag } from "#/ui/badge";
+
+/**
+ * THE SKILLS CATALOG.
+ *
+ * Two decisions shape this screen and neither is cosmetic.
+ *
+ * 1. A REVOKED SKILL IS VISIBLY REVOKED, EVERYWHERE. It was possible for a
+ *    revoked skill to render into a client package on this project, and the
+ *    catalog is where that becomes noticeable or does not. So revocation gets a
+ *    column of its own rather than a shade of grey, a metric of its own on the
+ *    masthead, and a banner when a withdrawn skill is still attached to
+ *    something that will carry it into a package.
+ *
+ * 2. A SKILL IS SHOWN WITH WHAT HOLDS IT. A list of skill names answers no
+ *    question an operator has. "Which agents carry this" and "is anything still
+ *    carrying this after I withdrew it" are the two that matter, and both need
+ *    the attachment relations, so both sides of the join are on the row.
+ *
+ * REVOKED ROWS ARE NOT HIDDEN BY DEFAULT. The filter defaults to every row,
+ * marked. Hiding them would make the live list look clean while leaving the
+ * exposure invisible, which is exactly how the original bug survived.
+ */
+
+type StateFilter = "all" | "live" | "revoked";
+type TypeFilter = "all" | "knowledge" | "capability";
+
+export function SkillsCatalog() {
+	const query = useSkills();
+	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
+	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+
+	return (
+		<div className="flex flex-col gap-5 px-6 py-5">
+			<CatalogSurface
+				data-testid="skills"
+				empty={
+					<EmptyState
+						body="A skill is know-how you attach to an agent. Nothing has been imported yet, so every agent template is carrying only what is written on it directly. Skills arrive from a source, and the catalog starts empty on purpose: what belongs in it depends on the work you take on."
+						title="No skills in the catalog"
+					/>
+				}
+				noun="skills catalog"
+				query={query}
+			>
+				{(page) => {
+					const skills = page.data;
+					return (
+						<SkillsCatalogBody
+							onSelect={(id) =>
+								setSelectedId((current) => (current === id ? null : id))
+							}
+							onStateFilter={setStateFilter}
+							onTypeFilter={setTypeFilter}
+							selectedId={selectedId}
+							skills={skills}
+							stateFilter={stateFilter}
+							total={page.meta.total}
+							typeFilter={typeFilter}
+						/>
+					);
+				}}
+			</CatalogSurface>
+		</div>
+	);
+}
+
+/**
+ * The header renders OUTSIDE the four-state boundary in every other screen in
+ * this app, and here it renders inside it. That is deliberate: the subtitle
+ * carries counts, and a count is not knowable until the read resolves. A header
+ * printing "14 skills" above a skeleton, or above an error, is the screen
+ * asserting a number it does not have.
+ *
+ * The cost is that a failed read shows no title. `CatalogSurface` states what
+ * failed in plain words, so the screen is not anonymous.
+ */
+function SkillsCatalogBody({
+	skills,
+	total,
+	stateFilter,
+	typeFilter,
+	onStateFilter,
+	onTypeFilter,
+	selectedId,
+	onSelect,
+}: {
+	skills: SkillRow[];
+	total: number;
+	stateFilter: StateFilter;
+	typeFilter: TypeFilter;
+	onStateFilter: (value: StateFilter) => void;
+	onTypeFilter: (value: TypeFilter) => void;
+	selectedId: string | null;
+	onSelect: (id: string) => void;
+}) {
+	const live = skills.filter((s) => !isRevoked(s));
+	const revoked = skills.filter(isRevoked);
+	const dangling = revoked.filter((s) => danglingAttachments(s) > 0);
+	const danglingHolders = dangling.reduce(
+		(sum, s) => sum + danglingAttachments(s),
+		0,
+	);
+	const sources = new Set(skills.map((s) => s.sourceId)).size;
+
+	const shown = useMemo(() => {
+		return skills.filter((skill) => {
+			const stateOk =
+				stateFilter === "all" ||
+				(stateFilter === "live" ? !isRevoked(skill) : isRevoked(skill));
+			const typeOk = typeFilter === "all" || skill.type === typeFilter;
+			return stateOk && typeOk;
+		});
+	}, [skills, stateFilter, typeFilter]);
+
+	const selected = shown.find((s) => s.id === selectedId) ?? null;
+
+	return (
+		<>
+			<PageHeader
+				data-testid="skills-header"
+				definition={TERM.skill}
+				subtitle={
+					<>
+						<span>{plural(live.length, "live skill", "live skills")}</span>
+						<span>{plural(revoked.length, "revoked", "revoked")}</span>
+						<span>from {plural(sources, "source", "sources")}</span>
+						{skills.length === total ? null : (
+							<span>
+								{skills.length} of {total} loaded
+							</span>
+						)}
+					</>
+				}
+				title="Skills"
+			/>
+
+			<div className="flex flex-wrap gap-3">
+				<MetricStat
+					data-testid="skills-metric-live"
+					hint="Available to attach to an agent."
+					label="Live skills"
+					value={live.length}
+				/>
+				<MetricStat
+					data-testid="skills-metric-revoked"
+					hint="Withdrawn, and kept because delivered work refers to them."
+					label="Revoked"
+					value={revoked.length}
+				/>
+				{/*
+				 * THE NUMBER THIS SCREEN EXISTS FOR. Zero is the normal state and
+				 * renders in the resting tone; anything above zero is a live
+				 * exposure and renders as a warning, because every one of those
+				 * holders will render the skill into a package without re-checking
+				 * the catalog.
+				 */}
+				<MetricStat
+					data-testid="skills-metric-dangling"
+					hint={
+						dangling.length === 0
+							? "Nothing is carrying a withdrawn skill."
+							: `Held by ${plural(danglingHolders, "agent or mission", "agents and missions")}.`
+					}
+					label="Revoked but still attached"
+					tone={dangling.length === 0 ? "rest" : "warn"}
+					value={dangling.length}
+				/>
+			</div>
+
+			{dangling.length === 0 ? null : (
+				<DataNotice
+					body={`${plural(dangling.length, "skill has", "skills have")} been withdrawn from the catalog while something still holds ${dangling.length === 1 ? "it" : "them"}. Nothing re-checks the catalog when a package is built, so each holder will still ship the skill. Detaching it from the agent template is what stops that; revoking it here does not.`}
+					data-testid="skills-dangling-notice"
+					icon={ShieldAlert}
+					title="A revoked skill is still attached to work"
+					tone="block"
+				/>
+			)}
+
+			<SectionCard
+				action={
+					<div className="flex flex-wrap items-center gap-4">
+						<FilterChips
+							data-testid="skills-filter-state"
+							label="Filter by state"
+							onChange={onStateFilter}
+							options={[
+								{ key: "all", label: "All", count: skills.length },
+								{ key: "live", label: "Live", count: live.length },
+								{ key: "revoked", label: "Revoked", count: revoked.length },
+							]}
+							value={stateFilter}
+						/>
+						<FilterChips
+							data-testid="skills-filter-type"
+							label="Filter by type"
+							onChange={onTypeFilter}
+							options={[
+								{ key: "all", label: "Any type", count: skills.length },
+								{
+									key: "knowledge",
+									label: "Knowledge",
+									count: skills.filter((s) => s.type === "knowledge").length,
+								},
+								{
+									key: "capability",
+									label: "Capability",
+									count: skills.filter((s) => s.type === "capability").length,
+								},
+							]}
+							value={typeFilter}
+						/>
+					</div>
+				}
+				count={shown.length}
+				data-testid="skills-table-card"
+				title="Catalog"
+			>
+				<DataTable
+					caption="Skills in the catalog, with what each one is attached to."
+					columns={SKILL_COLUMNS}
+					data-testid="skills-table"
+					empty={
+						<EmptyState
+							body="No skill matches this filter. Every skill is still in the catalog; the filter above is hiding them."
+							title="Nothing matches"
+						/>
+					}
+					onSelect={onSelect}
+					rowId={(row) => row.id}
+					rowTone={skillRowTone}
+					rows={shown}
+					selectColumn="name"
+					selectedId={selectedId}
+				/>
+			</SectionCard>
+
+			{selected === null ? null : <SkillDetail skill={selected} />}
+		</>
+	);
+}
+
+function skillRowTone(skill: SkillRow): RowTone {
+	if (isRevoked(skill)) return "revoked";
+	// A live skill whose SOURCE was withdrawn is not itself withdrawn, and must
+	// not be painted as though it were. It is flagged in the source column.
+	return "rest";
+}
+
+const SKILL_COLUMNS: Column<SkillRow>[] = [
+	{
+		key: "name",
+		header: "Skill",
+		sortValue: (row) => row.name,
+		render: (row) => (
+			<div className="flex flex-col gap-1">
+				<span
+					className={
+						isRevoked(row)
+							? "font-display text-sm text-text-subtle line-through"
+							: "font-display text-sm font-medium text-text"
+					}
+				>
+					{row.name}
+				</span>
+				<span className="font-mono text-micro text-text-subtle">
+					{row.slug}
+				</span>
+			</div>
+		),
+	},
+	{
+		key: "state",
+		header: "State",
+		sortValue: (row) => (isRevoked(row) ? 0 : 1),
+		render: (row) =>
+			isRevoked(row) ? (
+				<RevocationChip
+					revokedAt={row.revokedAt}
+					testId={`skill-revoked-${row.slug}`}
+				/>
+			) : (
+				<span className="text-micro text-text-subtle">Live</span>
+			),
+	},
+	{
+		key: "type",
+		header: "Type",
+		sortValue: (row) => row.type,
+		render: (row) => (
+			<SkillTypeChip testId={`skill-type-${row.slug}`} type={row.type} />
+		),
+	},
+	{
+		key: "source",
+		header: "Source",
+		sortValue: (row) => row.sourceName,
+		render: (row) => (
+			<div className="flex flex-col gap-1">
+				<span className="text-sm text-text-muted">{row.sourceName}</span>
+				{row.sourceRevoked ? (
+					<span className="text-micro text-gate-warn">source revoked</span>
+				) : null}
+			</div>
+		),
+	},
+	{
+		key: "attached",
+		header: "Attached to",
+		align: "end",
+		sortValue: (row) =>
+			row.attachedTo.templates.length + row.attachedTo.rosterEntries.length,
+		render: (row) => {
+			const templates = row.attachedTo.templates.length;
+			const entries = row.attachedTo.rosterEntries.length;
+			if (templates === 0 && entries === 0) {
+				return (
+					// Not "0". Nothing carrying a skill is a real and useful state, and
+					// a bare zero in a column of counts reads as a missing value.
+					<span className="text-micro text-text-subtle">nothing</span>
+				);
+			}
+			return (
+				<div className="flex flex-col items-end gap-0.5">
+					<span className="text-sm text-text">
+						{plural(templates, "template", "templates")}
+					</span>
+					<span className="text-micro text-text-subtle">
+						{plural(entries, "roster entry", "roster entries")}
+					</span>
+				</div>
+			);
+		},
+	},
+	{
+		key: "updated",
+		header: "Updated",
+		align: "end",
+		secondary: true,
+		sortValue: (row) => row.updatedAt,
+		render: (row) => (
+			<span className="font-mono text-micro text-text-subtle">
+				{isoDate(row.updatedAt)}
+			</span>
+		),
+	},
+];
+
+/* ── detail ──────────────────────────────────────────────────────────────── */
+
+/**
+ * IN-PAGE, NOT A ROUTE.
+ *
+ * A `/catalog/skills/$skillId` route would be the obvious shape and it is not
+ * worth its cost right now: five sessions share one working tree,
+ * `routeTree.gen.ts` is generated, and it has blocked merges twice. A detail
+ * panel under the table costs no generated file and answers the same question.
+ *
+ * It becomes a route the moment the detail needs its own URL, which is the same
+ * rule UI-PLAN section 5 applies to engagement detail.
+ */
+function SkillDetail({ skill }: { skill: SkillRow }) {
+	const revoked = isRevoked(skill);
+	const holders =
+		skill.attachedTo.templates.length + skill.attachedTo.rosterEntries.length;
+
+	return (
+		<div className="flex flex-col gap-4" data-testid="skill-detail">
+			{revoked ? (
+				<DataNotice
+					body={
+						holders === 0
+							? `Withdrawn on ${isoDate(skill.revokedAt ?? "")}. Nothing is attached to it, so nothing will ship it. It stays listed because work already delivered refers to it.`
+							: `Withdrawn on ${isoDate(skill.revokedAt ?? "")}, and still attached to ${plural(holders, "place", "places")}. Each one will render this skill into its package. Revoking here did not detach it.`
+					}
+					data-testid="skill-detail-revoked"
+					icon={ShieldAlert}
+					title={
+						holders === 0
+							? "This skill is revoked"
+							: "This skill is revoked and still in use"
+					}
+					tone={holders === 0 ? "warn" : "block"}
+				/>
+			) : null}
+
+			<SectionCard data-testid="skill-detail-facts" title={skill.name}>
+				<div className="px-4 py-4">
+					<DefinitionList
+						data-testid="skill-detail-list"
+						items={[
+							{
+								label: "Slug",
+								value: <Tag data-testid="skill-detail-slug">{skill.slug}</Tag>,
+							},
+							{
+								label: "Type",
+								value: (
+									<SkillTypeChip testId="skill-detail-type" type={skill.type} />
+								),
+								hint:
+									skill.type === "capability"
+										? TERM.capabilitySkill
+										: TERM.knowledgeSkill,
+							},
+							{
+								label: "Source",
+								value: skill.sourceName,
+								hint: skill.sourceRevoked
+									? "This source has been revoked. The skill was not, so it is still live and still attachable."
+									: undefined,
+							},
+							{
+								label: "Recommended for",
+								value:
+									skill.recommendedFor.length === 0 ? (
+										<span className="text-text-subtle">
+											Nothing recorded. Nothing is filtered by this.
+										</span>
+									) : (
+										<div className="flex flex-wrap gap-1.5">
+											{skill.recommendedFor.map((entry) => (
+												<Tag data-testid="skill-detail-recommended" key={entry}>
+													{entry}
+												</Tag>
+											))}
+										</div>
+									),
+							},
+							{
+								label: "State",
+								value: revoked ? (
+									<RevocationChip
+										revokedAt={skill.revokedAt}
+										testId="skill-detail-state"
+									/>
+								) : (
+									"Live"
+								),
+								hint: revoked ? TERM.revoked : undefined,
+							},
+							{
+								label: "Added",
+								value: (
+									<span className="font-mono text-micro">
+										{isoDate(skill.createdAt)}
+									</span>
+								),
+							},
+							{
+								label: "Updated",
+								value: (
+									<span className="font-mono text-micro">
+										{isoDate(skill.updatedAt)}
+									</span>
+								),
+							},
+						]}
+					/>
+				</div>
+			</SectionCard>
+
+			<SectionCard
+				count={skill.attachedTo.templates.length}
+				data-testid="skill-detail-templates"
+				definition={TERM.agentTemplate}
+				title="On agent templates"
+			>
+				{skill.attachedTo.templates.length === 0 ? (
+					<EmptyState
+						body="No agent template carries this skill, so no future mission will pick it up. A skill in the catalog does nothing until it is attached to a template."
+						title="Not attached to any template"
+					/>
+				) : (
+					<ul className="flex flex-col">
+						{skill.attachedTo.templates.map((template) => (
+							<li
+								className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-4 py-3 last:border-b-0"
+								key={template.id}
+							>
+								<span className="font-display text-sm text-text">
+									{template.name}
+								</span>
+								<Tag data-testid="skill-template-slug">{template.slug}</Tag>
+								{template.revoked ? (
+									<span className="text-micro text-text-subtle">
+										template revoked
+									</span>
+								) : null}
+								<Link
+									className="ml-auto text-micro text-accent-text hover:text-accent-hover"
+									data-testid="skill-template-link"
+									to="/catalog/agents"
+								>
+									Open agent templates
+								</Link>
+							</li>
+						))}
+					</ul>
+				)}
+			</SectionCard>
+
+			<SectionCard
+				count={skill.attachedTo.rosterEntries.length}
+				data-testid="skill-detail-roster"
+				definition={TERM.rosterEntry}
+				title="On mission teams"
+			>
+				{skill.attachedTo.rosterEntries.length === 0 ? (
+					<EmptyState
+						body="No mission team carries this skill today. That is not the same as no template carrying it: a template hands its skills over when a mission copies it in, so a newly attached skill shows up here only on the next mission."
+						title="Not on any mission team"
+					/>
+				) : (
+					<ul className="flex flex-col">
+						{skill.attachedTo.rosterEntries.map((entry) => (
+							<li
+								className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--elevation-border-rest)] px-4 py-3 last:border-b-0"
+								key={entry.id}
+							>
+								<Link
+									className="font-display text-sm text-accent-text hover:text-accent-hover"
+									data-testid="skill-roster-link"
+									params={{ missionId: entry.missionId }}
+									to="/missions/$missionId"
+								>
+									{entry.missionTitle ?? "Unnamed mission"}
+								</Link>
+								<Tag data-testid="skill-roster-agent">{entry.agentSlug}</Tag>
+								{entry.inactive ? (
+									// Inactive is NOT safe here. `active` gates dispatch, not the
+									// render, so an inactive entry still carries the skill into
+									// the package.
+									<span className="text-micro text-text-subtle">
+										inactive · still carries this skill
+									</span>
+								) : null}
+							</li>
+						))}
+					</ul>
+				)}
+			</SectionCard>
+
+			<SectionCard data-testid="skill-detail-content" title="Skill content">
+				<div className="px-4 py-4">
+					<p className="pb-2 text-micro text-text-subtle">
+						The source text, as stored. It is rendered as written rather than
+						formatted, because nothing in this app turns markdown into markup
+						and showing it half-formatted would misrepresent what an agent
+						receives.
+					</p>
+					<pre className="app-scroll max-h-[28rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
+						{skill.contentMd}
+					</pre>
+					{skill.avelEnhancementMd === null ? null : (
+						<>
+							<p className="pt-4 pb-2 text-micro text-text-subtle">
+								AVEL's own addition to the imported text. It travels with the
+								skill.
+							</p>
+							<pre className="app-scroll max-h-[28rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
+								{skill.avelEnhancementMd}
+							</pre>
+						</>
+					)}
+				</div>
+			</SectionCard>
+		</div>
+	);
+}
