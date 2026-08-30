@@ -9,6 +9,7 @@ import {
 } from "#/modules/blast/blast-radius";
 import { presentScreenError } from "#/modules/errors/screenError";
 import { GateRow } from "#/modules/gate";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -88,15 +89,25 @@ function PreFlight() {
 		retry: false,
 	});
 
+	/**
+	 * This route has NO NAV ENTRY, so before it claimed a title the header fell
+	 * back to the generic and read "AVEL" above the pre-flight screen. A route
+	 * off the nav is exactly the case the fallback cannot serve, and exactly the
+	 * case where claiming costs one call.
+	 *
+	 * `definition` rather than `subtitle`: the mission id is not a count, and
+	 * "pre-flight" is jargon that earns one plain sentence in front of an
+	 * operator deciding whether to ship someone else's code.
+	 */
+	usePageHeader({
+		title: "Pre-flight",
+		definition:
+			"What delivery would do to the repository, before anything is written.",
+	});
+
 	return (
 		<div className="flex max-w-[68ch] flex-col gap-4 px-6 py-5">
 			<div className="flex flex-col gap-1">
-				<h1
-					className="font-display text-title font-semibold"
-					data-testid="page-title"
-				>
-					Pre-flight
-				</h1>
 				<p className="flex items-center gap-2 text-sm text-text-muted">
 					mission <Tag data-testid="preflight-mission">{missionId}</Tag>
 				</p>

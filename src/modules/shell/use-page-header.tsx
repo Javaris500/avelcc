@@ -5,7 +5,6 @@ import {
 	type SetStateAction,
 	useContext,
 	useEffect,
-	useRef,
 	useState,
 } from "react";
 
@@ -48,20 +47,46 @@ export type PageAction = {
 	onClick?: () => void;
 	variant?: "primary" | "secondary";
 	testId?: string;
+	/**
+	 * DISABLED NEEDS A REASON, and the reason is not optional decoration.
+	 * Section 12 rule 6 means a large share of the controls in this product are
+	 * honestly disabled — "a request belongs to an engagement", "sharing is not
+	 * built, AVEL is single-operator" — and a control that is dead with no
+	 * stated cause is the product refusing without saying why. Requested by
+	 * avel-c2, who had two such actions and correctly would not move them into
+	 * the header while the type could not represent them: promoting them as
+	 * plain descriptors would have silently made them live.
+	 */
+	disabled?: boolean;
+	disabledReason?: string;
 };
 
 export type PageHeaderState = {
 	title?: string;
 	/**
-	 * FREE-FORM AND STILL SAFE. These stay ReactNode because they are genuinely
-	 * prose and a descriptor would be a straitjacket — but they are kept OUT of
-	 * the effect's dependency array and read from a ref instead, so a route
-	 * passing an inline fragment cannot loop either. The header re-renders when
-	 * the provider's state changes, so the nodes stay fresh without the effect
-	 * depending on their identity.
+	 * STRINGS, NOT NODES, and this is the second half of the same lesson the
+	 * actions descriptor taught.
+	 *
+	 * They were ReactNode, kept out of the dependency array and read from a ref
+	 * so an inline fragment could not loop. The comment claimed the header would
+	 * re-render and pick the fresh value up. THAT REASONING WAS CIRCULAR: the
+	 * provider's state only changes when the effect calls `set`, the effect only
+	 * runs when `title` or the action key changes, so a subtitle that arrived
+	 * late while the title stayed put was written into the ref and never read by
+	 * anything again. Found by avel-c2 on a two-query page where the counts
+	 * resolve after the name — which is precisely the shape section 2 asks for,
+	 * since "counts, status, last activity" are the things that arrive late.
+	 *
+	 * Putting them back in the deps as nodes would restore the infinite loop.
+	 * So they stop being nodes. Section 2 describes both as one line of prose —
+	 * "counts, status, last activity" and "the one plain sentence that names the
+	 * jargon" — neither of which needs JSX. As strings they compare by value,
+	 * they can sit in the dependency array honestly, and both the staleness and
+	 * the loop are gone by construction rather than by a comment asking someone
+	 * to be careful.
 	 */
-	subtitle?: ReactNode;
-	definition?: ReactNode;
+	subtitle?: string;
+	definition?: string;
 	actions?: PageAction[];
 };
 
@@ -92,7 +117,10 @@ export function usePageHeaderState(): PageHeaderState {
 function actionsKey(actions: PageAction[] | undefined): string {
 	if (!actions) return "";
 	return actions
-		.map((a) => `${a.label}|${a.to ?? ""}|${a.variant ?? ""}`)
+		.map(
+			(a) =>
+				`${a.label}|${a.to ?? ""}|${a.variant ?? ""}|${a.disabled ? "d" : ""}|${a.disabledReason ?? ""}`,
+		)
 		.join("~");
 }
 
@@ -110,18 +138,15 @@ export function usePageHeader({
 	actions,
 }: PageHeaderState): void {
 	const set = useContext(SetContext);
-
-	// Read at effect time rather than depended upon. See PageHeaderState.
-	const nodes = useRef({ subtitle, definition, actions });
-	nodes.current = { subtitle, definition, actions };
-
 	const key = actionsKey(actions);
 
 	useEffect(() => {
-		const { subtitle: s, definition: d, actions: a } = nodes.current;
-		set({ title, subtitle: s, definition: d, actions: a });
+		// Every input is compared by VALUE — two strings and a derived key — so
+		// this runs exactly when the header's content actually changed, and never
+		// because a render produced a new object saying the same thing.
+		set({ title, subtitle, definition, actions });
 		return () => set({});
-		// `title` and `key` are the value-identity of this header. The nodes come
-		// from the ref precisely so their object identity cannot drive this.
-	}, [set, title, key]);
+		// `key` stands in for `actions`, whose array identity is fresh each render.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: actions is keyed
+	}, [set, title, subtitle, definition, key]);
 }

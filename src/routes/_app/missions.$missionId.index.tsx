@@ -12,6 +12,7 @@ import { success } from "#/contract/shared/envelope";
  */
 import { presentScreenError } from "#/modules/errors/screenError";
 import type { RosterAgent } from "#/modules/mission/service";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { Tag } from "#/ui/badge";
 import { SkeletonRows } from "#/ui/skeleton";
 import { ErrorState } from "#/ui/states";
@@ -469,15 +470,28 @@ function MissionOverview() {
 		? (query.data.data.title ?? "Unnamed mission")
 		: "Mission";
 
+	/**
+	 * THIS ROUTE CLAIMS ITS TITLE RATHER THAN DELETING IT, and the difference
+	 * matters. The header derives a title from the nav when a route offers
+	 * nothing, which here would read "Missions" above a page about ONE mission —
+	 * worse than either the mission's name or the nav label alone.
+	 *
+	 * Claiming it also earns the breadcrumb its line: the header suppresses the
+	 * parent while it equals the title, so "Missions" only appears above
+	 * "Slice 1 — transactions + browser gate" once the two differ. That is the
+	 * `Clients > Northwind` shape from the plan, arrived at by the route saying
+	 * what it is rather than by the shell guessing.
+	 */
+	usePageHeader({
+		title: heading,
+		subtitle: query.isSuccess
+			? `${query.data.data.type} · sprint ${query.data.data.sprintN}`
+			: undefined,
+	});
+
 	return (
 		<div className="flex max-w-[72ch] flex-col gap-4 px-6 py-5">
 			<div className="flex flex-col gap-1">
-				<h1
-					className="font-display text-title font-semibold"
-					data-testid="page-title"
-				>
-					{heading}
-				</h1>
 				<p className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
 					<Link
 						className="text-accent-text hover:text-accent-hover"

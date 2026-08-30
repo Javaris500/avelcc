@@ -5,6 +5,7 @@ import type { z } from "zod";
 import { missionListRow } from "#/contract/mission";
 import { successList } from "#/contract/shared/envelope";
 import { presentScreenError } from "#/modules/errors/screenError";
+import { usePageHeader } from "#/modules/shell/use-page-header";
 import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -202,15 +203,25 @@ function Missions() {
 		retry: false,
 	});
 
+	/**
+	 * THE TITLE LIVES IN THE SHELL HEADER NOW, not in the content.
+	 *
+	 * This page printed its own h1 and the header printed one too, so every page
+	 * rendered its name twice — as two h1s, which is a broken document outline
+	 * as well as a visible duplicate. That was the second half of moving the
+	 * title up; the first half shipped without it.
+	 *
+	 * The subtitle carries what the list can say about itself before the rows
+	 * load. It is a count rather than a sentence, which is the split between
+	 * `subtitle` and `definition`.
+	 */
+	usePageHeader({
+		title: "Missions",
+		subtitle: query.isSuccess ? `${query.data.meta.total} missions` : undefined,
+	});
+
 	return (
 		<div className="px-6 py-5">
-			<h1
-				className="font-display text-lg font-semibold"
-				data-testid="page-title"
-			>
-				Missions
-			</h1>
-
 			{/* The only other built route today. Linked so it is reachable rather
 			    than needing the URL typed. */}
 			<p className="pt-1 pb-3 text-sm text-text-muted">

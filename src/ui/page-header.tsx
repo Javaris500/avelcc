@@ -41,7 +41,7 @@ export function PageHeader({
 	 */
 	breadcrumb?: ReactNode;
 	/** One line of orienting context: counts, status, last activity. */
-	subtitle?: ReactNode;
+	subtitle?: string;
 	/**
 	 * SEPARATE FROM subtitle, and the separation is the point. Subtitle carries
 	 * counts; this carries the one plain sentence that names the jargon on
@@ -50,7 +50,7 @@ export function PageHeader({
 	 * operator inside one viewport. Requested independently by two sessions,
 	 * which is the strongest evidence a slot is real.
 	 */
-	definition?: ReactNode;
+	definition?: string;
 	/**
 	 * The route's own actions, as DATA. The header builds the controls, so a
 	 * route never constructs an element and cannot hand the shell a value whose
@@ -73,7 +73,11 @@ export function PageHeader({
 			)}
 			data-testid="page-header"
 		>
-			<div className="flex min-w-0 flex-col gap-0.5">
+			{/* min-w-0 lets the column shrink; without it a long title keeps its
+			    intrinsic width, the flex row overflows, and `flex-wrap` drops the
+			    core group onto a second line where `ml-auto` shoves it hard right.
+			    The title truncates instead. */}
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				{breadcrumb ? (
 					<nav
 						aria-label="Breadcrumb"
@@ -85,7 +89,7 @@ export function PageHeader({
 				) : null}
 
 				<h1
-					className="font-display text-title font-semibold text-text"
+					className="truncate font-display text-title font-semibold text-text"
 					// DISTINCT FROM the routes' own in-content h1, which still exists
 					// on every page. Sharing `page-title` gave two elements one id and
 					// made every selector ambiguous — the same duplicate-testid defect
@@ -112,13 +116,27 @@ export function PageHeader({
 			</div>
 
 			{/*
-			 * RESERVED, NOT COLLAPSED. `min-h` and the auto margin keep the core
-			 * group in the same place whether or not the route supplied actions. A
-			 * control that moves between pages cannot be found by muscle memory,
-			 * which is the whole reason the core group is fixed.
+			 * RESERVED, NOT COLLAPSED — and it now actually is.
+			 *
+			 * This comment promised that "`min-h` and the auto margin keep the core
+			 * group in the same place", and `min-h` appeared NOWHERE in the file
+			 * except in the sentence claiming it. The only thing holding the group
+			 * was `ml-auto`, which fixes the horizontal position and says nothing
+			 * about the vertical one — so the run pill rode up and down with
+			 * whatever the title block happened to contain.
+			 *
+			 * `min-h-8` is the pill's own height, so the row keeps its box whether
+			 * or not the route supplied actions. A control that moves between pages
+			 * cannot be found by muscle memory, which is the whole reason the core
+			 * group is fixed.
+			 *
+			 * `items-start` rather than `items-center`: the parent aligns to the top
+			 * and the title block grows DOWNWARD as a subtitle or definition
+			 * appears. Centring here would float the pill against a tall block and
+			 * put it level with the subtitle on one page and the title on the next.
 			 */}
 			<div
-				className="ml-auto flex shrink-0 flex-wrap items-center gap-2"
+				className="ml-auto flex min-h-8 shrink-0 flex-wrap items-start gap-2"
 				data-testid="page-actions"
 			>
 				{actions?.map((action) => (
@@ -137,6 +155,28 @@ export function PageHeader({
  */
 function PageActionButton({ action }: { action: PageAction }) {
 	const testId = action.testId ?? `page-action-${action.label}`;
+
+	/**
+	 * A DISABLED ACTION SAYS WHY. Rendered as a real disabled button carrying
+	 * the reason, rather than hidden — an operator who cannot find a control
+	 * cannot learn that it exists and what it waits on. Disabled BY STATE, never
+	 * by styling, which is the same rule the pre-flight deliver button follows.
+	 * A `to` is ignored while disabled: a link cannot be disabled in HTML, and
+	 * rendering one anyway would leave it clickable.
+	 */
+	if (action.disabled) {
+		return (
+			<Button
+				data-testid={testId}
+				disabled
+				title={action.disabledReason}
+				variant={action.variant ?? "secondary"}
+			>
+				{action.label}
+			</Button>
+		);
+	}
+
 	if (action.to) {
 		return (
 			<Button
