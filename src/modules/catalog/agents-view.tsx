@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import type { AgentRuntime, AgentTemplateRow } from "#/contract/catalog";
 import {
 	RevocationChip,
 	RevokedAttachmentChip,
@@ -9,12 +9,7 @@ import {
 	runtimeLabel,
 	SkillTypeChip,
 } from "#/modules/catalog/chips";
-import {
-	type AgentRuntime,
-	type AgentTemplateRow,
-	isRevoked,
-	strandedModelContext,
-} from "#/modules/catalog/contract";
+import { isRevoked, strandedModelContext } from "#/modules/catalog/derive";
 import { isoDate, plural } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useAgentTemplates } from "#/modules/catalog/queries";

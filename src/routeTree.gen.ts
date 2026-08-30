@@ -16,12 +16,15 @@ import { Route as AppActivityRouteImport } from './routes/_app/activity'
 import { Route as AppClientsRouteImport } from './routes/_app/clients'
 import { Route as AppPlaybooksRouteImport } from './routes/_app/playbooks'
 import { Route as AppPresetsRouteImport } from './routes/_app/presets'
+import { Route as ApiAgentTemplatesRouteImport } from './routes/api/agent-templates'
 import { Route as ApiClientsRouteImport } from './routes/api/clients'
 import { Route as ApiConnectionsRouteImport } from './routes/api/connections'
 import { Route as ApiEngagementsRouteImport } from './routes/api/engagements'
 import { Route as ApiExportsRouteImport } from './routes/api/exports'
 import { Route as ApiIntakesRouteImport } from './routes/api/intakes'
 import { Route as ApiMissionsRouteImport } from './routes/api/missions'
+import { Route as ApiSkillSourcesRouteImport } from './routes/api/skill-sources'
+import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as AppCatalogAgentsRouteImport } from './routes/_app/catalog.agents'
 import { Route as AppCatalogSkillsRouteImport } from './routes/_app/catalog.skills'
 import { Route as AppCatalogSourcesRouteImport } from './routes/_app/catalog.sources'
@@ -82,6 +85,11 @@ const AppPresetsRoute = AppPresetsRouteImport.update({
   path: '/presets',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAgentTemplatesRoute = ApiAgentTemplatesRouteImport.update({
+  id: '/api/agent-templates',
+  path: '/api/agent-templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiClientsRoute = ApiClientsRouteImport.update({
   id: '/api/clients',
   path: '/api/clients',
@@ -110,6 +118,16 @@ const ApiIntakesRoute = ApiIntakesRouteImport.update({
 const ApiMissionsRoute = ApiMissionsRouteImport.update({
   id: '/api/missions',
   path: '/api/missions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSkillSourcesRoute = ApiSkillSourcesRouteImport.update({
+  id: '/api/skill-sources',
+  path: '/api/skill-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSkillsRoute = ApiSkillsRouteImport.update({
+  id: '/api/skills',
+  path: '/api/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppCatalogAgentsRoute = AppCatalogAgentsRouteImport.update({
@@ -248,12 +266,15 @@ export interface FileRoutesByFullPath {
   '/clients': typeof AppClientsRouteWithChildren
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
+  '/api/agent-templates': typeof ApiAgentTemplatesRoute
   '/api/clients': typeof ApiClientsRouteWithChildren
   '/api/connections': typeof ApiConnectionsRouteWithChildren
   '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/intakes': typeof ApiIntakesRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
+  '/api/skill-sources': typeof ApiSkillSourcesRoute
+  '/api/skills': typeof ApiSkillsRoute
   '/catalog/agents': typeof AppCatalogAgentsRoute
   '/catalog/skills': typeof AppCatalogSkillsRoute
   '/catalog/sources': typeof AppCatalogSourcesRoute
@@ -287,12 +308,15 @@ export interface FileRoutesByTo {
   '/clients': typeof AppClientsRouteWithChildren
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
+  '/api/agent-templates': typeof ApiAgentTemplatesRoute
   '/api/clients': typeof ApiClientsRouteWithChildren
   '/api/connections': typeof ApiConnectionsRouteWithChildren
   '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/intakes': typeof ApiIntakesRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
+  '/api/skill-sources': typeof ApiSkillSourcesRoute
+  '/api/skills': typeof ApiSkillsRoute
   '/catalog/agents': typeof AppCatalogAgentsRoute
   '/catalog/skills': typeof AppCatalogSkillsRoute
   '/catalog/sources': typeof AppCatalogSourcesRoute
@@ -328,12 +352,15 @@ export interface FileRoutesById {
   '/_app/clients': typeof AppClientsRouteWithChildren
   '/_app/playbooks': typeof AppPlaybooksRoute
   '/_app/presets': typeof AppPresetsRoute
+  '/api/agent-templates': typeof ApiAgentTemplatesRoute
   '/api/clients': typeof ApiClientsRouteWithChildren
   '/api/connections': typeof ApiConnectionsRouteWithChildren
   '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/intakes': typeof ApiIntakesRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
+  '/api/skill-sources': typeof ApiSkillSourcesRoute
+  '/api/skills': typeof ApiSkillsRoute
   '/_app/catalog/agents': typeof AppCatalogAgentsRoute
   '/_app/catalog/skills': typeof AppCatalogSkillsRoute
   '/_app/catalog/sources': typeof AppCatalogSourcesRoute
@@ -369,12 +396,15 @@ export interface FileRouteTypes {
     | '/clients'
     | '/playbooks'
     | '/presets'
+    | '/api/agent-templates'
     | '/api/clients'
     | '/api/connections'
     | '/api/engagements'
     | '/api/exports'
     | '/api/intakes'
     | '/api/missions'
+    | '/api/skill-sources'
+    | '/api/skills'
     | '/catalog/agents'
     | '/catalog/skills'
     | '/catalog/sources'
@@ -408,12 +438,15 @@ export interface FileRouteTypes {
     | '/clients'
     | '/playbooks'
     | '/presets'
+    | '/api/agent-templates'
     | '/api/clients'
     | '/api/connections'
     | '/api/engagements'
     | '/api/exports'
     | '/api/intakes'
     | '/api/missions'
+    | '/api/skill-sources'
+    | '/api/skills'
     | '/catalog/agents'
     | '/catalog/skills'
     | '/catalog/sources'
@@ -448,12 +481,15 @@ export interface FileRouteTypes {
     | '/_app/clients'
     | '/_app/playbooks'
     | '/_app/presets'
+    | '/api/agent-templates'
     | '/api/clients'
     | '/api/connections'
     | '/api/engagements'
     | '/api/exports'
     | '/api/intakes'
     | '/api/missions'
+    | '/api/skill-sources'
+    | '/api/skills'
     | '/_app/catalog/agents'
     | '/_app/catalog/skills'
     | '/_app/catalog/sources'
@@ -485,12 +521,15 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiAgentTemplatesRoute: typeof ApiAgentTemplatesRoute
   ApiClientsRoute: typeof ApiClientsRouteWithChildren
   ApiConnectionsRoute: typeof ApiConnectionsRouteWithChildren
   ApiEngagementsRoute: typeof ApiEngagementsRouteWithChildren
   ApiExportsRoute: typeof ApiExportsRouteWithChildren
   ApiIntakesRoute: typeof ApiIntakesRouteWithChildren
   ApiMissionsRoute: typeof ApiMissionsRouteWithChildren
+  ApiSkillSourcesRoute: typeof ApiSkillSourcesRoute
+  ApiSkillsRoute: typeof ApiSkillsRoute
   ApiAuthGithubRoute: typeof ApiAuthGithubRouteWithChildren
   ApiPreflightBlastRadiusRoute: typeof ApiPreflightBlastRadiusRoute
 }
@@ -546,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPresetsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/agent-templates': {
+      id: '/api/agent-templates'
+      path: '/api/agent-templates'
+      fullPath: '/api/agent-templates'
+      preLoaderRoute: typeof ApiAgentTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/clients': {
       id: '/api/clients'
       path: '/api/clients'
@@ -586,6 +632,20 @@ declare module '@tanstack/react-router' {
       path: '/api/missions'
       fullPath: '/api/missions'
       preLoaderRoute: typeof ApiMissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/skill-sources': {
+      id: '/api/skill-sources'
+      path: '/api/skill-sources'
+      fullPath: '/api/skill-sources'
+      preLoaderRoute: typeof ApiSkillSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/skills': {
+      id: '/api/skills'
+      path: '/api/skills'
+      fullPath: '/api/skills'
+      preLoaderRoute: typeof ApiSkillsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/catalog/agents': {
@@ -953,12 +1013,15 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiAgentTemplatesRoute: ApiAgentTemplatesRoute,
   ApiClientsRoute: ApiClientsRouteWithChildren,
   ApiConnectionsRoute: ApiConnectionsRouteWithChildren,
   ApiEngagementsRoute: ApiEngagementsRouteWithChildren,
   ApiExportsRoute: ApiExportsRouteWithChildren,
   ApiIntakesRoute: ApiIntakesRouteWithChildren,
   ApiMissionsRoute: ApiMissionsRouteWithChildren,
+  ApiSkillSourcesRoute: ApiSkillSourcesRoute,
+  ApiSkillsRoute: ApiSkillsRoute,
   ApiAuthGithubRoute: ApiAuthGithubRouteWithChildren,
   ApiPreflightBlastRadiusRoute: ApiPreflightBlastRadiusRoute,
 }

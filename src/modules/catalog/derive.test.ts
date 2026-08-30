@@ -6,13 +6,15 @@ import {
 	agentRuntime,
 	agentTeam,
 	agentTemplateRow,
-	danglingAttachments,
-	isRevoked,
 	type SkillRow,
 	skillRow,
 	skillType,
+} from "#/contract/catalog";
+import {
+	danglingAttachments,
+	isRevoked,
 	strandedModelContext,
-} from "#/modules/catalog/contract";
+} from "#/modules/catalog/derive";
 import { describeCatalogFailure } from "#/modules/catalog/queries";
 
 /**

@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
-
+import type { SkillSourceRow } from "#/contract/catalog";
 import { RevocationChip } from "#/modules/catalog/chips";
-import { isRevoked, type SkillSourceRow } from "#/modules/catalog/contract";
+import { isRevoked } from "#/modules/catalog/derive";
 import { isoDate, plural } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useSkillSources } from "#/modules/catalog/queries";

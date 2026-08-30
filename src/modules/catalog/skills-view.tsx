@@ -1,13 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import type { SkillRow } from "#/contract/catalog";
 import { RevocationChip, SkillTypeChip } from "#/modules/catalog/chips";
-import {
-	danglingAttachments,
-	isRevoked,
-	type SkillRow,
-} from "#/modules/catalog/contract";
+import { danglingAttachments, isRevoked } from "#/modules/catalog/derive";
 import { isoDate, plural } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useSkills } from "#/modules/catalog/queries";

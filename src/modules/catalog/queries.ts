@@ -8,7 +8,7 @@ import {
 	type SkillSourceListResponse,
 	skillListResponse,
 	skillSourceListResponse,
-} from "#/modules/catalog/contract";
+} from "#/contract/catalog";
 import {
 	presentScreenError,
 	type ScreenError,

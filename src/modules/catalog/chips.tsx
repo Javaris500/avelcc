@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, Bot, Terminal, User, Wrench } from "lucide-react";
 
-import type { AgentRuntime, SkillType } from "#/modules/catalog/contract";
+import type { AgentRuntime, SkillType } from "#/contract/catalog";
 import { StatusChip } from "#/modules/catalog/ui";
 import { Pill } from "#/ui/badge";
 
