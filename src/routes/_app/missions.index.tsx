@@ -4,6 +4,7 @@ import type { z } from "zod";
 
 import { missionListRow } from "#/contract/mission";
 import { successList } from "#/contract/shared/envelope";
+import { presentScreenError } from "#/modules/errors/screenError";
 import { Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -66,14 +67,34 @@ async function fetchMissions(): Promise<MissionListResponse> {
  * actually receive rather than inventing a table for a vocabulary it does not
  * own.
  */
-function describeFailure(code: string): string {
+function describeFailure(code: string): {
+	title: string;
+	body: string;
+	canRetry: boolean;
+} {
+	const title = "The mission list could not be read.";
 	switch (code) {
 		case "FORBIDDEN":
-			return "This session is not permitted to read missions. Nothing was loaded.";
+			return {
+				title,
+				body: "This session is not permitted to read missions. Nothing was loaded.",
+				// A permission does not change because it was asked twice.
+				canRetry: false,
+			};
 		case SHAPE_MISMATCH:
-			return "The endpoint answered, but the body did not match mission.list. The screen and the route have drifted apart, and rendering it anyway would be a guess.";
+			return {
+				title,
+				body: "The endpoint answered, but the body did not match mission.list. The screen and the route have drifted apart, and rendering it anyway would be a guess.",
+				// Deterministic: the same request produces the same mismatch.
+				canRetry: false,
+			};
 		default:
-			return "The request to /api/missions did not complete, so nothing was loaded. This screen only reads, so nothing was written either.";
+			return {
+				title,
+				body: "The request to /api/missions did not complete, so nothing was loaded. This screen only reads, so nothing was written either.",
+				// No envelope arrived, so this is transport and genuinely retryable.
+				canRetry: true,
+			};
 	}
 }
 
@@ -190,14 +211,22 @@ function Missions() {
 						title="No missions yet"
 					/>
 				}
-				error={({ error, retry }) => (
-					<ErrorState
-						body={describeFailure(error.message)}
-						code={error.message}
-						retry={retry}
-						title="The mission list could not be read."
-					/>
-				)}
+				error={({ error, retry }) => {
+					// The affordance comes from the error map, not from this call site:
+					// a code whose recovery is `none` must not be handed a retry.
+					const shown = presentScreenError(
+						error.message,
+						describeFailure(error.message),
+					);
+					return (
+						<ErrorState
+							body={shown.body}
+							code={shown.code}
+							retry={shown.canRetry ? retry : undefined}
+							title={shown.title}
+						/>
+					);
+				}}
 				// The query resolves the ENVELOPE, not the array, so the default
 				// heuristic cannot see the rows. Emptiness is the page being empty.
 				isEmpty={(page) => page.data.length === 0}

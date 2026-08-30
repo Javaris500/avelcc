@@ -10,6 +10,7 @@ import { success } from "#/contract/shared/envelope";
  * client; a value import would ship the connection string to the browser.
  * verbatimModuleSyntax guarantees an `import type` is erased at build.
  */
+import { presentScreenError } from "#/modules/errors/screenError";
 import type { RosterAgent } from "#/modules/mission/service";
 import { Tag } from "#/ui/badge";
 import { SkeletonRows } from "#/ui/skeleton";
@@ -77,14 +78,32 @@ async function fetchRoster(missionId: string): Promise<RosterResponse> {
 	return { data: body.data as RosterAgent[] };
 }
 
-function describeFailure(code: string): string {
+function describeFailure(
+	code: string,
+	title: string,
+): { title: string; body: string; canRetry: boolean } {
 	switch (code) {
 		case "NOT_FOUND":
-			return "There is no mission with this identifier. It may have been deleted, or the link may be wrong.";
-		case "SHAPE_MISMATCH":
-			return "The endpoint answered, but the body did not match mission.get. The screen and the route have drifted apart, and rendering it anyway would be a guess.";
+			return {
+				title,
+				body: "There is no mission with this identifier. It may have been deleted, or the link may be wrong.",
+				// Asking again will not bring a mission into existence.
+				canRetry: false,
+			};
+		case SHAPE_MISMATCH:
+			return {
+				title,
+				body: "The endpoint answered, but the body did not match the contract. The screen and the route have drifted apart, and rendering it anyway would be a guess.",
+				// Deterministic: the same request produces the same mismatch.
+				canRetry: false,
+			};
 		default:
-			return "The request did not complete, so nothing was loaded. This screen only reads, so nothing was written either.";
+			return {
+				title,
+				body: "The request did not complete, so nothing was loaded. This screen only reads, so nothing was written either.",
+				// No envelope arrived, so this is transport and genuinely retryable.
+				canRetry: true,
+			};
 	}
 }
 
@@ -384,14 +403,22 @@ function MissionOverview() {
 
 			<Surface
 				empty={<NotBuilt what="The endpoint returned no mission." />}
-				error={({ error, retry }) => (
-					<ErrorState
-						body={describeFailure(error.message)}
-						code={error.message}
-						retry={retry}
-						title="This mission could not be read."
-					/>
-				)}
+				error={({ error, retry }) => {
+					// The affordance comes from the error map, not from this call site:
+					// a code whose recovery is `none` must not be handed a retry.
+					const shown = presentScreenError(
+						error.message,
+						describeFailure(error.message, "This mission could not be read."),
+					);
+					return (
+						<ErrorState
+							body={shown.body}
+							code={shown.code}
+							retry={shown.canRetry ? retry : undefined}
+							title={shown.title}
+						/>
+					);
+				}}
 				loading={<SkeletonRows count={5} />}
 				query={query}
 			>
@@ -477,14 +504,23 @@ function MissionOverview() {
 											by the operator directly, and this one was.
 										</p>
 									}
-									error={({ error, retry }) => (
-										<ErrorState
-											body={describeFailure(error.message)}
-											code={error.message}
-											retry={retry}
-											title="The roster could not be read."
-										/>
-									)}
+									error={({ error, retry }) => {
+										const shown = presentScreenError(
+											error.message,
+											describeFailure(
+												error.message,
+												"The roster could not be read.",
+											),
+										);
+										return (
+											<ErrorState
+												body={shown.body}
+												code={shown.code}
+												retry={shown.canRetry ? retry : undefined}
+												title={shown.title}
+											/>
+										);
+									}}
 									isEmpty={(r) => r.data.length === 0}
 									loading={<SkeletonRows count={3} />}
 									query={roster}
