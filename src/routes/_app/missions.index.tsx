@@ -89,39 +89,59 @@ function describeFailure(code: string): string {
 function MissionRowView({ mission }: { mission: MissionRow }) {
 	return (
 		<li
-			className="flex flex-col gap-1 border-b border-[var(--elevation-border-rest)] py-3"
+			className="border-b border-[var(--elevation-border-rest)]"
 			data-testid="mission-row"
 		>
-			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-				<span
-					className="font-display text-sm font-semibold text-text"
-					data-testid="mission-client"
-				>
-					{mission.clientName}
-				</span>
-				<span className="text-sm text-text-muted" data-testid="mission-type">
-					{mission.type}
-				</span>
-				<Tag data-testid="mission-sprint">sprint {mission.sprintN}</Tag>
-				{/* Right-aligned as a column on desktop. On a phone the row wraps, and
+			{/*
+			 * THE WHOLE ROW IS THE TARGET, not the client name alone. This route is
+			 * phone-allowed, and a link the width of a word is a link you miss with
+			 * a thumb. Nothing else in the row is interactive, so there is no nested
+			 * control to swallow the tap.
+			 *
+			 * `interactive` rather than a hover class of my own: patch.css defines it
+			 * as "one definition, every surface, both themes", carrying the hover
+			 * AND active states and the brand's transition. My first attempt reached
+			 * for an --elevation-surface-hover token that does not exist, which
+			 * would have compiled, passed the token check, and silently done
+			 * nothing.
+			 */}
+			<Link
+				className="interactive flex flex-col gap-1 rounded-sm px-2 py-3"
+				data-testid="mission-row-link"
+				params={{ missionId: mission.id }}
+				to="/missions/$missionId"
+			>
+				<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+					<span
+						className="font-display text-sm font-semibold text-text"
+						data-testid="mission-client"
+					>
+						{mission.clientName}
+					</span>
+					<span className="text-sm text-text-muted" data-testid="mission-type">
+						{mission.type}
+					</span>
+					<Tag data-testid="mission-sprint">sprint {mission.sprintN}</Tag>
+					{/* Right-aligned as a column on desktop. On a phone the row wraps, and
 				    an auto margin there strands the status alone on its own line, so it
 				    flows inline with the rest instead. */}
-				<Tag className="sm:ml-auto" data-testid="mission-status">
-					{mission.status}
-				</Tag>
-			</div>
-			{/* Both are NULL for every row today and are rendered as empty rather
+					<Tag className="sm:ml-auto" data-testid="mission-status">
+						{mission.status}
+					</Tag>
+				</div>
+				{/* Both are NULL for every row today and are rendered as empty rather
 			    than filled from somewhere else. ROUTES.md: ship the column when the
 			    aggregate join exists, and never substitute updatedAt, which is
 			    row-edit time and not audited activity. */}
-			<div className="flex flex-wrap gap-x-4 text-micro text-text-subtle">
-				<span data-testid="mission-activity">
-					last activity {mission.lastActivity ?? "—"}
-				</span>
-				<span data-testid="mission-export">
-					last export {mission.lastExportResult ?? "—"}
-				</span>
-			</div>
+				<div className="flex flex-wrap gap-x-4 text-micro text-text-subtle">
+					<span data-testid="mission-activity">
+						last activity {mission.lastActivity ?? "—"}
+					</span>
+					<span data-testid="mission-export">
+						last export {mission.lastExportResult ?? "—"}
+					</span>
+				</div>
+			</Link>
 		</li>
 	);
 }
