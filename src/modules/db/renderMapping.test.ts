@@ -96,7 +96,7 @@ const MISSION: Record<keyof RenderMission, Mapping> = {
 	agents: {
 		status: "derived",
 		from: "roster_entries joined to agent_templates, skills via roster_entry_skills",
-		note: "Composite. Its per-agent fields are classified separately in AGENT below, where `owns` remains unmodelled and `phase` is an unruled shape conflict.",
+		note: "Composite. Its per-agent fields are classified separately in AGENT below, where `owns` is the only one still unmodelled.",
 	},
 	edges: {
 		status: "unmodelled",
@@ -146,11 +146,10 @@ const MISSION: Record<keyof RenderMission, Mapping> = {
 const AGENT: Record<keyof RenderAgent, Mapping> = {
 	slug: { status: "mapped", table: "agent_templates", column: "slug" },
 	phase: {
-		status: "conflict",
+		status: "mapped",
 		table: "roster_entries",
-		column: "waves",
-		detail:
-			"SHAPE MISMATCH, flagged by types.ts itself: 'A scalar here; RosterEntry models waves as an array.' An agent active in waves ['B','C'] has no single phase, and MISSION.md's table has one Phase cell per agent. Either the renderer collapses (by what rule?) or the roster is wrong to allow multiple.",
+		column: "wave",
+		note: "RULED 2026-08-29: roster_entries.waves text[] became roster_entries.wave text, nullable. ROSTER-V2:33 makes phases global and sequential precisely to kill a scheduling contradiction, and an agent spanning waves reintroduces it. Every consumer was already singular, and a set would have forced the renderer to invent a collapse rule no document specifies. Nullable because unassigned is a real state; playbooks.waves_applicable stays text[] because a playbook spanning waves is a different fact.",
 	},
 	kind: { status: "mapped", table: "agent_templates", column: "kind" },
 	runtime: {
@@ -311,7 +310,12 @@ describe("every render field is classified against the schema", () => {
 			"active", // whether the agent is on the mission, filters rather than renders
 			"monitor_priority", // wezterm pane priority
 			"customized_md", // per-mission agent prose
-			"wave_defaults", // template default for roster_entries.waves
+			// The template's default waves, still text[]. NOT tidied to match
+			// roster_entries.wave becoming singular, because nobody ruled on it:
+			// what a template offering several default waves means once an entry
+			// holds exactly one is a real question, and DATA-CONTRACTS-V2 types it
+			// `wave[]`. Reported, not harmonised in passing.
+			"wave_defaults",
 		]);
 
 		const claimed = new Set<string>();
@@ -375,10 +379,7 @@ describe("every render field is classified against the schema", () => {
 
 		// Not gaps — columns that exist and are the wrong shape. A migration does
 		// not fix these; a ruling does.
-		expect(conflicts.sort()).toEqual([
-			"RenderAgent.phase",
-			"RenderMission.brief",
-		]);
+		expect(conflicts.sort()).toEqual(["RenderMission.brief"]);
 	});
 
 	it("states a question for every unmodelled field", () => {

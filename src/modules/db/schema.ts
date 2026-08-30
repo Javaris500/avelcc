@@ -462,7 +462,38 @@ export const rosterEntries = pgTable(
 			.references(() => agentTemplates.id),
 		/** Whether the agent is ON the mission. Not a delete. */
 		active: boolean("active").notNull().default(true),
-		waves: text("waves").array().notNull().default([]),
+		/**
+		 * SINGULAR, and that is the point rather than a simplification.
+		 *
+		 * ROSTER-V2:33 is the deciding line: "Phases are global. Foundations, then
+		 * builders, then verification, then quality. Team or feature is a label,
+		 * not a schedule. The v1 roster had frontend in wave 2 depending on an
+		 * artifact produced by backend in wave 3, which is the kind of
+		 * contradiction global phases prevent." Global sequential phases are the
+		 * FIX for a scheduling contradiction, and an agent spanning waves
+		 * reintroduces the ambiguity that fix removes.
+		 *
+		 * Every consumer is already singular: MISSION.md renders one Phase cell per
+		 * agent, roster.json emits `phase`, and the renderer's agent sort key is
+		 * `${phase} ${slug}` — an array would sort by its stringification. Nothing
+		 * consumes this as a set.
+		 *
+		 * The decisive one: were this genuinely a set, the renderer would have to
+		 * COLLAPSE it to fill one cell — first, lowest, comma-joined — and no
+		 * document specifies a collapse rule. Inventing one would put a made-up
+		 * rule on the path that produces a client-visible artifact.
+		 *
+		 * NULLABLE, not `NOT NULL DEFAULT 'A'`. An agent not yet assigned to a
+		 * phase is a real state, and a default would silently claim every
+		 * unassigned agent is a foundations agent. This is the one column in this
+		 * area where safe-by-absence argues AGAINST a default.
+		 *
+		 * `playbooks.waves_applicable` STAYS text[] AND THAT IS NOT AN
+		 * INCONSISTENCY TO TIDY. A playbook legitimately spans several waves; an
+		 * agent occupies one position in the sequence. Two different facts, two
+		 * different shapes. Do not harmonise them.
+		 */
+		wave: text("wave"),
 		/** wezterm pane priority. Nullable per the contract schema. */
 		monitorPriority: integer("monitor_priority"),
 		customizedMd: text("customized_md"),
