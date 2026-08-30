@@ -17,6 +17,8 @@ import { Route as AppClientsRouteImport } from './routes/_app/clients'
 import { Route as AppIntakeRouteImport } from './routes/_app/intake'
 import { Route as AppPlaybooksRouteImport } from './routes/_app/playbooks'
 import { Route as AppPresetsRouteImport } from './routes/_app/presets'
+import { Route as ApiClientsRouteImport } from './routes/api/clients'
+import { Route as ApiEngagementsRouteImport } from './routes/api/engagements'
 import { Route as ApiExportsRouteImport } from './routes/api/exports'
 import { Route as ApiMissionsRouteImport } from './routes/api/missions'
 import { Route as AppCatalogAgentsRouteImport } from './routes/_app/catalog.agents'
@@ -27,6 +29,8 @@ import { Route as AppSettingsAccountRouteImport } from './routes/_app/settings.a
 import { Route as AppSettingsConnectionsRouteImport } from './routes/_app/settings.connections'
 import { Route as AppSettingsRepositoriesRouteImport } from './routes/_app/settings.repositories'
 import { Route as ApiAuthGithubRouteImport } from './routes/api/auth/github'
+import { Route as ApiClientsIdRouteImport } from './routes/api/clients.$id'
+import { Route as ApiEngagementsIdRouteImport } from './routes/api/engagements.$id'
 import { Route as ApiExportsIdRouteImport } from './routes/api/exports.$id'
 import { Route as ApiExportsPreviewRouteImport } from './routes/api/exports.preview'
 import { Route as ApiMissionsIdRouteImport } from './routes/api/missions.$id'
@@ -75,6 +79,16 @@ const AppPresetsRoute = AppPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiClientsRoute = ApiClientsRouteImport.update({
+  id: '/api/clients',
+  path: '/api/clients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEngagementsRoute = ApiEngagementsRouteImport.update({
+  id: '/api/engagements',
+  path: '/api/engagements',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiExportsRoute = ApiExportsRouteImport.update({
   id: '/api/exports',
@@ -125,6 +139,16 @@ const ApiAuthGithubRoute = ApiAuthGithubRouteImport.update({
   id: '/api/auth/github',
   path: '/api/auth/github',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiClientsIdRoute = ApiClientsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiClientsRoute,
+} as any)
+const ApiEngagementsIdRoute = ApiEngagementsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiEngagementsRoute,
 } as any)
 const ApiExportsIdRoute = ApiExportsIdRouteImport.update({
   id: '/$id',
@@ -182,6 +206,8 @@ export interface FileRoutesByFullPath {
   '/intake': typeof AppIntakeRoute
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
+  '/api/clients': typeof ApiClientsRouteWithChildren
+  '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
   '/catalog/agents': typeof AppCatalogAgentsRoute
@@ -191,6 +217,8 @@ export interface FileRoutesByFullPath {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
@@ -210,6 +238,8 @@ export interface FileRoutesByTo {
   '/intake': typeof AppIntakeRoute
   '/playbooks': typeof AppPlaybooksRoute
   '/presets': typeof AppPresetsRoute
+  '/api/clients': typeof ApiClientsRouteWithChildren
+  '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
   '/catalog/agents': typeof AppCatalogAgentsRoute
@@ -219,6 +249,8 @@ export interface FileRoutesByTo {
   '/settings/connections': typeof AppSettingsConnectionsRoute
   '/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
@@ -240,6 +272,8 @@ export interface FileRoutesById {
   '/_app/intake': typeof AppIntakeRoute
   '/_app/playbooks': typeof AppPlaybooksRoute
   '/_app/presets': typeof AppPresetsRoute
+  '/api/clients': typeof ApiClientsRouteWithChildren
+  '/api/engagements': typeof ApiEngagementsRouteWithChildren
   '/api/exports': typeof ApiExportsRouteWithChildren
   '/api/missions': typeof ApiMissionsRouteWithChildren
   '/_app/catalog/agents': typeof AppCatalogAgentsRoute
@@ -249,6 +283,8 @@ export interface FileRoutesById {
   '/_app/settings/connections': typeof AppSettingsConnectionsRoute
   '/_app/settings/repositories': typeof AppSettingsRepositoriesRoute
   '/api/auth/github': typeof ApiAuthGithubRouteWithChildren
+  '/api/clients/$id': typeof ApiClientsIdRoute
+  '/api/engagements/$id': typeof ApiEngagementsIdRoute
   '/api/exports/$id': typeof ApiExportsIdRouteWithChildren
   '/api/exports/preview': typeof ApiExportsPreviewRoute
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
@@ -270,6 +306,8 @@ export interface FileRouteTypes {
     | '/intake'
     | '/playbooks'
     | '/presets'
+    | '/api/clients'
+    | '/api/engagements'
     | '/api/exports'
     | '/api/missions'
     | '/catalog/agents'
@@ -279,6 +317,8 @@ export interface FileRouteTypes {
     | '/settings/connections'
     | '/settings/repositories'
     | '/api/auth/github'
+    | '/api/clients/$id'
+    | '/api/engagements/$id'
     | '/api/exports/$id'
     | '/api/exports/preview'
     | '/api/missions/$id'
@@ -298,6 +338,8 @@ export interface FileRouteTypes {
     | '/intake'
     | '/playbooks'
     | '/presets'
+    | '/api/clients'
+    | '/api/engagements'
     | '/api/exports'
     | '/api/missions'
     | '/catalog/agents'
@@ -307,6 +349,8 @@ export interface FileRouteTypes {
     | '/settings/connections'
     | '/settings/repositories'
     | '/api/auth/github'
+    | '/api/clients/$id'
+    | '/api/engagements/$id'
     | '/api/exports/$id'
     | '/api/exports/preview'
     | '/api/missions/$id'
@@ -327,6 +371,8 @@ export interface FileRouteTypes {
     | '/_app/intake'
     | '/_app/playbooks'
     | '/_app/presets'
+    | '/api/clients'
+    | '/api/engagements'
     | '/api/exports'
     | '/api/missions'
     | '/_app/catalog/agents'
@@ -336,6 +382,8 @@ export interface FileRouteTypes {
     | '/_app/settings/connections'
     | '/_app/settings/repositories'
     | '/api/auth/github'
+    | '/api/clients/$id'
+    | '/api/engagements/$id'
     | '/api/exports/$id'
     | '/api/exports/preview'
     | '/api/missions/$id'
@@ -352,6 +400,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiClientsRoute: typeof ApiClientsRouteWithChildren
+  ApiEngagementsRoute: typeof ApiEngagementsRouteWithChildren
   ApiExportsRoute: typeof ApiExportsRouteWithChildren
   ApiMissionsRoute: typeof ApiMissionsRouteWithChildren
   ApiAuthGithubRoute: typeof ApiAuthGithubRouteWithChildren
@@ -415,6 +465,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/presets'
       preLoaderRoute: typeof AppPresetsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/clients': {
+      id: '/api/clients'
+      path: '/api/clients'
+      fullPath: '/api/clients'
+      preLoaderRoute: typeof ApiClientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/engagements': {
+      id: '/api/engagements'
+      path: '/api/engagements'
+      fullPath: '/api/engagements'
+      preLoaderRoute: typeof ApiEngagementsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/exports': {
       id: '/api/exports'
@@ -485,6 +549,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/github'
       preLoaderRoute: typeof ApiAuthGithubRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/clients/$id': {
+      id: '/api/clients/$id'
+      path: '/$id'
+      fullPath: '/api/clients/$id'
+      preLoaderRoute: typeof ApiClientsIdRouteImport
+      parentRoute: typeof ApiClientsRoute
+    }
+    '/api/engagements/$id': {
+      id: '/api/engagements/$id'
+      path: '/$id'
+      fullPath: '/api/engagements/$id'
+      preLoaderRoute: typeof ApiEngagementsIdRouteImport
+      parentRoute: typeof ApiEngagementsRoute
     }
     '/api/exports/$id': {
       id: '/api/exports/$id'
@@ -588,6 +666,30 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface ApiClientsRouteChildren {
+  ApiClientsIdRoute: typeof ApiClientsIdRoute
+}
+
+const ApiClientsRouteChildren: ApiClientsRouteChildren = {
+  ApiClientsIdRoute: ApiClientsIdRoute,
+}
+
+const ApiClientsRouteWithChildren = ApiClientsRoute._addFileChildren(
+  ApiClientsRouteChildren,
+)
+
+interface ApiEngagementsRouteChildren {
+  ApiEngagementsIdRoute: typeof ApiEngagementsIdRoute
+}
+
+const ApiEngagementsRouteChildren: ApiEngagementsRouteChildren = {
+  ApiEngagementsIdRoute: ApiEngagementsIdRoute,
+}
+
+const ApiEngagementsRouteWithChildren = ApiEngagementsRoute._addFileChildren(
+  ApiEngagementsRouteChildren,
+)
+
 interface ApiExportsIdRouteChildren {
   ApiExportsIdArchiveRoute: typeof ApiExportsIdArchiveRoute
 }
@@ -654,6 +756,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiClientsRoute: ApiClientsRouteWithChildren,
+  ApiEngagementsRoute: ApiEngagementsRouteWithChildren,
   ApiExportsRoute: ApiExportsRouteWithChildren,
   ApiMissionsRoute: ApiMissionsRouteWithChildren,
   ApiAuthGithubRoute: ApiAuthGithubRouteWithChildren,
