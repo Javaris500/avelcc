@@ -1,4 +1,4 @@
-import type { ErrorCode } from "#/contract/shared/errors";
+import type { CrudCode, ErrorCode } from "#/contract/shared/errors";
 import { isTerminal } from "#/modules/export/delivery/lifecycle";
 import type { ExportRow, RenderPackage } from "#/modules/export/service";
 import { packageHashOf } from "#/modules/export/service";
@@ -18,13 +18,23 @@ import { writeZip } from "#/modules/export/zip/writeZip";
  * re-running the render, and a re-run can be COMPARED against the hash the
  * delivery recorded.
  *
- * THAT COMPARISON IS THE POINT OF THIS MODULE. A mismatch means the render
- * moved between delivery and now, so the archive this would hand back is not
- * the archive that was delivered. Serving it would quietly substitute one
- * artifact for another under the same export id, which for a client deliverable
- * is the worst thing this endpoint could do. It refuses instead. The same free
- * determinism gate the preview/delivery comparison provides, obtained a second
- * time at retrieval.
+ * THAT COMPARISON IS THE POINT OF THIS MODULE. A mismatch means the archive
+ * this would hand back cannot be shown to be the archive that was delivered.
+ * Serving it anyway would quietly substitute one artifact for another under the
+ * same export id, which for a client deliverable is the worst thing this
+ * endpoint could do. It refuses instead. The same free determinism gate the
+ * preview/delivery comparison provides, obtained a second time at retrieval.
+ *
+ * A MISMATCH DOES NOT MEAN THE RENDER MOVED, and this module must not claim it
+ * does. There are at least two causes and it can tell them apart from neither:
+ * the render genuinely changed, or the recorded hash was computed by a
+ * different DEFINITION of the package hash. The second is not hypothetical —
+ * exports delivered before the hash stopped including manifest.json recorded a
+ * value no rebuild can reproduce, so those rows are permanently unservable as a
+ * consequence of a correctness fix rather than as evidence of drift. The two
+ * call for completely different responses from whoever reads the refusal, so it
+ * reports the disagreement and names both rather than diagnosing one. There is
+ * a test pinning the two definitions apart in archive.test.ts.
  */
 
 /** What `RenderPackage` needs. Narrower than a mission row on purpose. */
@@ -44,7 +54,8 @@ export type ArchiveDeps = {
 };
 
 export type ArchiveFailure = {
-	code: ErrorCode;
+	/** Both vocabularies, matching what `errorResponse` accepts. */
+	code: ErrorCode | CrudCode;
 	status: 404 | 422;
 	detail: string;
 	details?: Record<string, unknown>;
@@ -62,7 +73,7 @@ export type ArchiveResult =
 	| { ok: false; failure: ArchiveFailure };
 
 const fail = (
-	code: ErrorCode,
+	code: ErrorCode | CrudCode,
 	status: 404 | 422,
 	detail: string,
 	details?: Record<string, unknown>,
@@ -98,25 +109,29 @@ export async function buildArchive(
 	if (!row) return fail("REPO_NOT_FOUND", 404, `No export with id ${id}.`);
 
 	/**
-	 * THE THREE REFUSALS BELOW ARE ALL 404, AND THAT IS A CHOICE.
+	 * THE FOUR REFUSALS BELOW ARE PRECONDITION_FAILED, NOT 404.
 	 *
-	 * The export exists in each case; its ARCHIVE does not. A github_pr delivered
-	 * a pull request and no archive was ever built. A row that never reached a
-	 * terminal state has not delivered anything yet. A row with no recorded hash
-	 * has nothing to compare a rebuild against, so no archive can be vouched for.
-	 * "This sub-resource does not exist" is what 404 means, and it keeps the
-	 * route inside the 200/404 the contract declares.
+	 * The export exists in every one of them; what is missing is a condition it
+	 * would need to have an archive. A github_pr delivered a pull request and no
+	 * archive was ever built. A row short of a terminal delivered state has not
+	 * produced one yet. A row with no recorded hash has nothing for a rebuild to
+	 * be checked against. A row whose mission is gone cannot be re-rendered at
+	 * all. Answering 404 to any of these would say "no such export", which is
+	 * false and sends the reader looking for the wrong thing.
 	 *
-	 * The alternative is 422 with CRUD_CODES' PRECONDITION_FAILED, which says
-	 * precisely what each of these is and would separate them from a genuinely
-	 * missing row. It is filed rather than taken: it needs a second vocabulary on
-	 * this route AND a widening of `errorResponse`, which is not this session's
-	 * file. The distinction survives in the message meanwhile.
+	 * PRECONDITION_FAILED comes from CRUD_CODES because ERROR_CODES cannot
+	 * express it — the same gap that produced IDEMPOTENCY_REPLAY and
+	 * GITHUB_REJECTED, and the same answer `http.ts` already gives for a
+	 * malformed body. `export.get` declares 200 and 404 only, so 422 here is a
+	 * KNOWN DEVIATION, filed with the other contract gaps rather than hidden.
+	 *
+	 * A genuinely missing row is still a 404 above, which is the distinction this
+	 * split exists to preserve.
 	 */
 	if (row.targetKind !== "zip") {
 		return fail(
-			"REPO_NOT_FOUND",
-			404,
+			"PRECONDITION_FAILED",
+			422,
 			`Export ${id} is a ${row.targetKind} export. Only a zip export has an archive; a GitHub delivery's artifact is the commit it wrote.`,
 		);
 	}
@@ -129,8 +144,8 @@ export async function buildArchive(
 	 */
 	if (!isTerminal(row.status) || row.status !== "done") {
 		return fail(
-			"REPO_NOT_FOUND",
-			404,
+			"PRECONDITION_FAILED",
+			422,
 			`Export ${id} is ${row.status}, so nothing was delivered and there is no archive to rebuild.`,
 		);
 	}
@@ -139,8 +154,8 @@ export async function buildArchive(
 		?.packageSha256;
 	if (!recorded) {
 		return fail(
-			"REPO_NOT_FOUND",
-			404,
+			"PRECONDITION_FAILED",
+			422,
 			`Export ${id} recorded no package hash, so a rebuild cannot be compared against what was delivered. Serving it would assert an equality nobody checked.`,
 		);
 	}
@@ -148,8 +163,8 @@ export async function buildArchive(
 	const mission = await deps.loadMission(row.missionId);
 	if (!mission) {
 		return fail(
-			"REPO_NOT_FOUND",
-			404,
+			"PRECONDITION_FAILED",
+			422,
 			`Export ${id} references mission ${row.missionId}, which no longer exists, so its package cannot be re-rendered.`,
 		);
 	}
@@ -181,7 +196,7 @@ export async function buildArchive(
 		return fail(
 			"DETERMINISM_VIOLATION",
 			422,
-			`Export ${id} re-rendered to a different package than it delivered, so the archive that would be served is not the archive that was sent. Nothing was returned.`,
+			`Export ${id} rebuilt to a package hash different from the one it recorded, so the archive that would be served cannot be shown to be the archive that was delivered. Nothing was returned. Either the render moved, or the recorded hash predates a change in how that hash is computed; this cannot tell which.`,
 			{ recordedPackageSha256: recorded, rebuiltPackageSha256: rebuilt },
 		);
 	}

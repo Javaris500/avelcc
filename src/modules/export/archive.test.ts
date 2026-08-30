@@ -7,6 +7,7 @@ import {
 	buildArchive,
 } from "#/modules/export/archive";
 import { fixtureMission } from "#/modules/export/render/fixture-mission";
+import { packageSha256, sha256Hex } from "#/modules/export/render/manifest";
 import { render } from "#/modules/export/render/render";
 import type { ExportRow, RenderPackage } from "#/modules/export/service";
 import { packageHashOf } from "#/modules/export/service";
@@ -128,7 +129,8 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.code).toBe("PRECONDITION_FAILED");
+		expect(result.failure.status).toBe(422);
 		expect(result.failure.detail).toContain("github_pr");
 		expect(result.failure.detail).toContain("commit");
 	});
@@ -141,7 +143,8 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.code).toBe("PRECONDITION_FAILED");
+		expect(result.failure.status).toBe(422);
 		expect(result.failure.detail).toContain("previewed");
 	});
 
@@ -151,7 +154,7 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.status).toBe(422);
 	});
 
 	it("refuses a failed row", async () => {
@@ -160,7 +163,7 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.status).toBe(422);
 	});
 
 	it("refuses a row that recorded no package hash", async () => {
@@ -172,7 +175,8 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.code).toBe("PRECONDITION_FAILED");
+		expect(result.failure.status).toBe(422);
 		expect(result.failure.detail).toContain("no package hash");
 	});
 
@@ -185,7 +189,10 @@ describe("rows that have no archive", () => {
 		expect(result.failure.detail).toContain("no package hash");
 	});
 
-	it("refuses when the export id matches nothing", async () => {
+	it("refuses when the export id matches nothing, and this is the ONLY 404", async () => {
+		// The split that matters. Every other refusal here concerns an export that
+		// exists, so answering 404 would say "no such export" — false, and it
+		// sends whoever reads it looking for the wrong thing.
 		const result = await buildArchive(
 			deps({ loadExport: async () => null }),
 			EXPORT_ID,
@@ -201,7 +208,8 @@ describe("rows that have no archive", () => {
 			EXPORT_ID,
 		);
 		if (result.ok) throw new Error("expected a refusal");
-		expect(result.failure.status).toBe(404);
+		expect(result.failure.code).toBe("PRECONDITION_FAILED");
+		expect(result.failure.status).toBe(422);
 		expect(result.failure.detail).toContain(MISSION_ID);
 	});
 });
@@ -271,6 +279,51 @@ describe("archiveFilename", () => {
 	it("is a pure function of the mission and the sprint", () => {
 		expect(archiveFilename({ missionId: MISSION_ID, sprintN: 3 })).toBe(
 			`avel-mission-${MISSION_ID}-sprint-3.zip`,
+		);
+	});
+});
+
+describe("the hash definition every refusal here depends on", () => {
+	/**
+	 * WHY ROWS DELIVERED BEFORE THE HASH FIX CAN NEVER BE SERVED.
+	 *
+	 * `packageHashOf` excludes manifest.json, because a manifest cannot hash
+	 * itself and the manifest's own package_sha256 excludes it. An earlier
+	 * definition hashed every rendered entry INCLUDING the manifest, so exports
+	 * delivered before that fix recorded a value this endpoint's rebuild can
+	 * never reproduce.
+	 *
+	 * Those rows are permanently unservable, and that is a consequence of a
+	 * correctness fix rather than evidence of a nondeterministic render. This
+	 * test exists so the distinction is checkable rather than remembered: the two
+	 * definitions must keep producing different values over the same bytes, or
+	 * the reasoning above has quietly stopped being true.
+	 *
+	 * Observed on the fixture package, and matching the two values recorded in
+	 * Neon before and after the fix:
+	 *   including manifest.json  444fa0cd5822e6cb2e7e194e842a88d7a3bc0bbd5e7d460cdc386a433aaf2ee6
+	 *   excluding manifest.json  0b094e20b37481e97069c5c1a6a725623ab98907e8419cc33a7da240c9fab0d9
+	 */
+	it("excludes manifest.json, and including it hashes differently", () => {
+		const all = [...files.entries()].map(([path, bytes]) => ({
+			path,
+			sha256: sha256Hex(bytes),
+		}));
+		const including = packageSha256(all);
+		const excluding = packageSha256(
+			all.filter((f) => f.path !== "manifest.json"),
+		);
+
+		// The manifest is in the package, so the two questions differ.
+		expect(all.some((f) => f.path === "manifest.json")).toBe(true);
+		expect(including).not.toBe(excluding);
+		// And the one the endpoint compares against is the excluding one.
+		expect(excluding).toBe(REAL_HASH);
+		expect(including).toBe(
+			"444fa0cd5822e6cb2e7e194e842a88d7a3bc0bbd5e7d460cdc386a433aaf2ee6",
+		);
+		expect(excluding).toBe(
+			"0b094e20b37481e97069c5c1a6a725623ab98907e8419cc33a7da240c9fab0d9",
 		);
 	});
 });
