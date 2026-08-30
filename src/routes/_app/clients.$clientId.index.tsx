@@ -6,7 +6,6 @@ import { clientDetail, clientSchema } from "#/contract/client";
 import { success } from "#/contract/shared/envelope";
 import {
 	DefinitionListShell,
-	SectionRailShell,
 	SectionShell,
 } from "#/modules/client/ui/scaffold";
 import { SECTIONS } from "#/modules/client/ui/sections";
@@ -426,7 +425,15 @@ function ClientDetail() {
 									 * the button honest-looking rather than honest.
 									 */}
 									<p
-										className="max-w-sm text-right text-micro text-text-subtle"
+										/*
+										 * LEFT-ALIGNED INSIDE A RIGHT-ALIGNED COLUMN. The block
+										 * sits under its buttons, but ragged-left text is harder
+										 * to read than ragged-right and at `max-w-sm` this
+										 * sentence orphaned "yet." on a line of its own. The
+										 * column stays `items-end`; only the text direction
+										 * changes.
+										 */
+										className="max-w-md text-left text-micro text-text-subtle"
 										data-testid="client-new-request-reason"
 									>
 										{requestReason}
@@ -450,27 +457,33 @@ function ClientDetail() {
 							 * accident rather than by design, which is how it is likeliest
 							 * to ship.
 							 */}
-							<div className="flex flex-col gap-4 md:flex-row md:items-start">
-								{detail.isError ? null : (
-									<SectionRailShell
-										className="md:sticky md:top-4 md:w-40 md:shrink-0"
-										items={SECTIONS.map((s) => ({
-											id: s.id,
-											label: s.railLabel,
-										}))}
-									/>
-								)}
-
-								{/*
-								 * No extra `HeadingLevel` here. The shell header owns the h1
-								 * and the panel prints no title of its own, so the section
-								 * headings are already the first level beneath it. Wrapping
-								 * would push all nine a level deeper than the structure they
-								 * actually have.
-								 */}
-								<div className="flex min-w-0 flex-1 flex-col gap-4">
-									<Sections client={c} detail={detail} />
-								</div>
+							{/*
+							 * VERTICAL, AND THE RAIL IS GONE. Operator ruling: "sections need
+							 * to be vertical not horizontal".
+							 *
+							 * The rail was a 10rem column beside the sections, which is what
+							 * made this layout horizontal — and once the sections collapse it
+							 * is doing a job they now do themselves. A closed section is one
+							 * line carrying its own title, count and state, so ten of them
+							 * stacked ARE the table of contents the rail was drawn to be.
+							 * Keeping both is two lists of the same ten things, one of which
+							 * cannot tell you whether a section has anything in it.
+							 *
+							 * It also buys the sections the rail's width back, and this pane
+							 * is the one on the page that had the most to say and the least
+							 * room to say it.
+							 *
+							 * WHAT GOES WITH IT: the dead-link hazard the rail carried. Every
+							 * rail item was an anchor to a section id, so a failed detail
+							 * read left ten links pointing at elements that were not on the
+							 * page. That whole class of failure leaves with the component.
+							 *
+							 * No extra `HeadingLevel` here. The shell header owns the h1 and
+							 * the panel prints no title of its own, so the section headings
+							 * are already the first level beneath it.
+							 */}
+							<div className="flex min-w-0 flex-col gap-4">
+								<Sections client={c} detail={detail} />
 							</div>
 						</>
 					);
