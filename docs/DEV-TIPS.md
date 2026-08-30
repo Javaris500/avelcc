@@ -149,6 +149,18 @@ Error: Interactive prompts require a TTY terminal
 
 Two migrations, no terminal. Verified against `roster_entries.waves text[]` becoming `wave text`.
 
+**And the split buys a second thing, which matters more on a populated table.** A drop-and-add in one statement destroys the old column's data. Split across two, there is an intermediate state where BOTH columns exist — which is where a data migration goes:
+
+```sql
+-- 0012  add the new column
+ALTER TABLE t ADD COLUMN "wave" text;
+UPDATE t SET wave = waves[1] WHERE array_length(waves, 1) >= 1;
+-- 0013  now the old one is safe to drop
+ALTER TABLE t DROP COLUMN "waves";
+```
+
+The single-statement version was safe here only because the table was empty, verified before applying. On a populated one it silently blanks the column. So the split is the right shape even where the TTY problem does not apply.
+
 **`--custom` is not the workaround, and it fails quietly.** It writes an empty stub *and copies the previous snapshot* — so the SQL you hand-write fixes the database while drizzle's own metadata still asserts the old shape. Every later `generate` then re-diffs the same change and builds on a false baseline. Applying an empty stub is worse still: the journal records the migration as shipped, and the real change needs a new number under one that already claims to have done it.
 
 **Read the generated SQL either way.** A schema-versus-database check catches drift, but a rename would produce the right column name and pass it. Choosing "create column" rather than "rename column" is not something a test can verify for you.
