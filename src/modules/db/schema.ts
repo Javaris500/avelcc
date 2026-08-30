@@ -1,8 +1,10 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
+	bigint,
 	boolean,
 	check,
+	date,
 	index,
 	integer,
 	jsonb,
@@ -940,6 +942,521 @@ export const exports = pgTable(
 	],
 );
 
+/* ── the telemetry layer ────────────────────────────────────────────────── */
+
+/**
+ * NOT CORE ENTITIES, AND THE COUNT STAYS SIXTEEN.
+ *
+ * DATA-CONTRACTS-V2:98 names sixteen core entities and `Finding` is one of them
+ * — the only entity in that list with no field block, which is why its shape is
+ * derived below from the two places canon does constrain it (:102 and :311)
+ * rather than from a spec.
+ *
+ * The other five tables here are a different KIND of thing. Core entities model
+ * the domain; these model the PROCESS that produced it — what was assigned, what
+ * came back, what review found, what it cost. Counting them as core would take
+ * sixteen to twenty-one and misdescribe both halves. Anyone counting entities
+ * should count sixteen and read this divider.
+ *
+ * ALL SIX ARE APPEND-ONLY, enforced by the refuse_mutation() trigger installed
+ * in migration 0015 and asserted by appendOnly.test.ts. The rule comes from the
+ * corpus these tables ingest, and the reasoning is theirs, verbatim from
+ * `.team-5/log/error-log.md`:
+ *
+ *   "An append-only ledger where closure is a new entry preserves when a thing
+ *   was open and for how long — which is the data these logs exist to produce.
+ *   A flipped cell destroys exactly that: it makes a blocker that stalled an
+ *   agent for two hours indistinguishable from one resolved in a minute."
+ *
+ * APPEND-ONLY SATISFIES THE SOFT-DELETE INVARIANT AT :399 RATHER THAN EXCEPTING
+ * IT. That invariant exists so an export can always resolve what it referenced.
+ * A table with no delete path meets it more completely than `deleted_at` does:
+ * there is no flag for a reader to interpret and no state in which an export
+ * points at a row marked gone. So none of these carries `deleted_at`.
+ *
+ * NONE CARRIES `updated_at` EITHER, and that is not an omission. An updated_at
+ * on a table nothing may update is a contradiction, and appendOnly.test.ts
+ * asserts its absence. Each table has ONE domain timestamp instead — the moment
+ * the thing it records happened.
+ */
+
+/**
+ * Documented closed set, and the only value ever observed outside the template
+ * is none: all four dispatches in the corpus read `mock` or `live`.
+ *
+ * Whether a slice was built against MSW mocks or the real API changes what its
+ * gate proves, so this is a branch waiting to happen rather than a label.
+ */
+export const dispatchBuildsAgainst = pgEnum("dispatch_builds_against", [
+	"mock",
+	"live",
+]);
+
+/**
+ * From `_TEMPLATE-completion.md`, which declares the set. Code branches: a
+ * `blocked` completion is an outcome, not a failure to report.
+ *
+ * ONLY `complete` IS OBSERVED so far — both real completions succeeded. That is
+ * a sample-bias risk of the MISSING-value kind, not the wrong-value kind, and
+ * `ALTER TYPE ... ADD VALUE` is cheap. It is a different situation from
+ * `severity`, where the corpus contains a value the template does not list.
+ */
+export const completionStatus = pgEnum("completion_status", [
+	"complete",
+	"partial",
+	"blocked",
+]);
+
+/** Documented in `error-log.md` as `open → escalated → closed | wont-fix`. */
+export const blockerStatus = pgEnum("blocker_status", [
+	"open",
+	"escalated",
+	"closed",
+	"wont-fix",
+]);
+
+/** Who spent it. Agent and operator spend are the comparison that matters. */
+export const costActorKind = pgEnum("cost_actor_kind", ["agent", "operator"]);
+
+/**
+ * The assignment. One half of the unit of measurement.
+ *
+ * `.team-5/README.md`: "One dispatch → one completion, identical dispatch_id.
+ * That pair is the unit of measurement... A completion without a matching
+ * dispatch can't be harvested. Never reuse a dispatch_id."
+ */
+export const dispatches = pgTable(
+	"dispatches",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id),
+		/**
+		 * The agent as the FILE names it. Kept beside the resolved FK rather than
+		 * replaced by it, because ingestion must not fail on an agent whose roster
+		 * entry has not been seeded yet — and because the source string is the
+		 * evidence, while the link is our interpretation of it.
+		 */
+		agentSlug: text("agent_slug").notNull(),
+		rosterEntryId: uuid("roster_entry_id").references(() => rosterEntries.id),
+		/** `{agent}-{slice}`. Never reused — stated in README and in COST-LOG. */
+		dispatchRef: text("dispatch_ref").notNull(),
+		/**
+		 * TEXT, and NOT `missions.sprint_n`. Observed values are `1`, `slice-1`,
+		 * `0b` and `draft-review` — mapping those onto an integer loses two of
+		 * them outright. Their slice and our sprint are different fields that
+		 * happen to coincide on the numeric cases.
+		 */
+		slice: text("slice").notNull(),
+		branch: text("branch"),
+		/** `date`, not a timestamp: the source records YYYY-MM-DD and nothing finer. */
+		issuedOn: date("issued_on"),
+		scope: text("scope"),
+		/**
+		 * THE BOUNDARY AS ISSUED, snapshot rather than joined.
+		 *
+		 * These are `may_edit` / `may_append_only` / `must_not_touch` in the
+		 * dispatch file, and they map one-to-one onto the three grants on
+		 * agent_templates. They are COPIED here because a dispatch records what the
+		 * agent was told at that moment; roster_entries holds current state and can
+		 * change. Resolving them by join at read time would let history rewrite
+		 * itself, which is the same failure as a flipped cell one table over.
+		 */
+		writablePaths: text("writable_paths").array().notNull().default([]),
+		appendOnlyPaths: text("append_only_paths").array().notNull().default([]),
+		readonlyPaths: text("readonly_paths").array().notNull().default([]),
+		buildsAgainst: dispatchBuildsAgainst("builds_against"),
+		exitCondition: text("exit_condition"),
+		sliceHardStops: text("slice_hard_stops").array().notNull().default([]),
+		/** The one domain timestamp. No created_at beside it saying the same thing. */
+		dispatchedAt: timestamp("dispatched_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		// "Never reuse a dispatch_id", stated in two independent places. Not
+		// partial: this table has no soft delete to exclude, by design.
+		uniqueIndex("dispatches_ref_unique").on(t.dispatchRef),
+		index("dispatches_mission_idx").on(t.missionId),
+		index("dispatches_roster_entry_idx").on(t.rosterEntryId),
+		check("dispatches_ref_present", sql`length(btrim(${t.dispatchRef})) > 0`),
+	],
+);
+
+/**
+ * The outcome. The other half of the pair.
+ *
+ * THE README'S RULE IS TWO CONSTRAINTS HERE. `dispatch_id NOT NULL` makes "a
+ * completion without a matching dispatch" unrepresentable rather than merely
+ * detectable, and UNIQUE makes the pairing one-to-one. Together they are
+ * "one dispatch → one completion, identical dispatch_id, never reused", in the
+ * database rather than in a convention.
+ */
+export const completions = pgTable(
+	"completions",
+	{
+		...identity,
+		dispatchId: uuid("dispatch_id")
+			.notNull()
+			.references(() => dispatches.id),
+		status: completionStatus("status").notNull(),
+		branch: text("branch"),
+		completedOn: date("completed_on"),
+		summary: text("summary"),
+		filesTouched: text("files_touched").array().notNull().default([]),
+		sharedFilesTouched: text("shared_files_touched")
+			.array()
+			.notNull()
+			.default([]),
+		componentsCreated: text("components_created").array().notNull().default([]),
+		errorCodesHandled: text("error_codes_handled")
+			.array()
+			.notNull()
+			.default([]),
+		contractDrift: text("contract_drift").array().notNull().default([]),
+		/**
+		 * NULLABLE booleans, all three. The corpus writes `false` with a reason
+		 * ("none needed: every selector this gate uses already existed"), and a
+		 * completion that simply did not answer is a third state that `false`
+		 * would misreport as a negative answer.
+		 */
+		testidsAdded: boolean("testids_added"),
+		fourStatesCovered: boolean("four_states_covered"),
+		mockUsed: boolean("mock_used"),
+		/** `self_check: passed | failed` — two values, so a boolean, not an enum. */
+		selfCheckPassed: boolean("self_check_passed"),
+		/**
+		 * GATE RESULTS AGAINST WHATEVER THE PLAYBOOK DECLARED, never a hardcoded
+		 * vocabulary. `playbooks.gates` holds the declared `{gate, policy}[]` per
+		 * mission type, and `modules/export/verify/gates.ts` turns those plus these
+		 * measurements into verdicts. CounselOS's playbook declares `playwright`;
+		 * nothing about Playwright reaches this schema.
+		 *
+		 * jsonb for the same reason `playbooks.gates` is jsonb: an ordered list
+		 * read as a whole and never queried by element. The shape mirrors
+		 * `Measurement` in gates.ts and is written out rather than imported, to
+		 * keep modules/db from depending on modules/export.
+		 */
+		gateMeasurements:
+			jsonb("gate_measurements").$type<
+				{
+					gate: string;
+					state: "pass" | "block" | "warn";
+					source: string;
+					detail?: string;
+				}[]
+			>(),
+		/**
+		 * A COUNT, because the detail lives in the decision log and duplicating it
+		 * here would be two records of one fact. The corpus does exactly this:
+		 * `decisions: 3  # decision-log rows 18, 19, 20`.
+		 */
+		decisionsCount: integer("decisions_count"),
+		completedAt: timestamp("completed_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		// One completion per dispatch. The pairing rule, enforced.
+		uniqueIndex("completions_dispatch_unique").on(t.dispatchId),
+		check(
+			"completions_decisions_count_nonnegative",
+			sql`${t.decisionsCount} is null or ${t.decisionsCount} >= 0`,
+		),
+	],
+);
+
+/**
+ * What review surfaced. The one CORE entity in this block.
+ *
+ * SHAPE DERIVED, NOT SPECIFIED. DATA-CONTRACTS-V2 lists Finding among the
+ * sixteen and gives it no field block — the only core entity without one. Two
+ * places do constrain it: :102 says a finding "turns a confirmed defect from one
+ * mission into an executable check on every mission after it", and :311 has the
+ * export gate matching `{ finding_id, mission_id, rule, subject }`. Those four
+ * fields are therefore given rather than invented, and `id` here IS `finding_id`.
+ *
+ * IMMUTABLE, AND ITS IDENTITY MUST NOT MOVE. The gate matches on finding_id, so
+ * a design where every disposition writes a new row would move the identity the
+ * gate matches on every time somebody comments. Dispositions live in their own
+ * table for exactly that reason. This is the one place the corpus's
+ * self-referential ledger shape is the WRONG answer.
+ *
+ * ENGAGEMENT-SCOPED. `engagement_id` is carried rather than joined because the
+ * scope rule is engagement-level and has to be indexable: a pattern learned on
+ * one client's codebase must not be retrievable by an agent on another client's
+ * mission. Cross-client reuse goes through KnowledgeEntry's explicit promotion,
+ * which requires the entry be rewritten to strip anything client-specific.
+ */
+export const findings = pgTable(
+	"findings",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id),
+		engagementId: uuid("engagement_id")
+			.notNull()
+			.references(() => engagements.id),
+		/** The findings file this came from, and its 1-based position within it. */
+		sourceFile: text("source_file"),
+		ordinal: integer("ordinal"),
+		/** Canonical, from the gate's match tuple at :311. */
+		rule: text("rule").notNull(),
+		subject: text("subject").notNull(),
+		/**
+		 * The file-level `target_agent`, kept because it is what the source says
+		 * and DISTINCT from `subject`, which is per-finding. They disagree in the
+		 * corpus: nemi's file declares `target_agent: transactions` while findings
+		 * 6-9 are about the operator, and one file carries two agents in the
+		 * scalar (`fantem, transactions`). Recording it as written, not as tidied.
+		 */
+		targetAgent: text("target_agent"),
+		filePath: text("file_path"),
+		/**
+		 * TEXT, NOT AN ENUM, and the corpus is why. The template declares
+		 * `blocker | warn | note`; `operator-slice-1-polish-findings.md` writes
+		 * `withdrawn` into the severity array. A vocabulary its own data
+		 * contradicts is not closed, and an enum here would reject real rows.
+		 */
+		severity: text("severity").notNull(),
+		/**
+		 * TEXT for a second reason: `other` accounts for four of ten categories in
+		 * one file. A set whose most common member is "other" is not a set yet.
+		 */
+		category: text("category"),
+		/** `operator` · an agent slug · a tool. Observed, never declared closed. */
+		reviewerKind: text("reviewer_kind"),
+		/**
+		 * INCLUDING THE VERSION — the corpus writes `axe-core/playwright 4.13.0`.
+		 * A tool finding is only reproducible against the tool version that
+		 * produced it, which is the argument `contract_sha256` makes one layer up.
+		 */
+		reviewerRef: text("reviewer_ref").notNull(),
+		detail: text("detail"),
+		openedAt: timestamp("opened_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		index("findings_mission_idx").on(t.missionId),
+		// The index the scope rule needs: prior findings are matched within an
+		// engagement, never across clients.
+		index("findings_engagement_idx").on(t.engagementId),
+		index("findings_rule_idx").on(t.rule),
+		check(
+			"findings_ordinal_positive",
+			sql`${t.ordinal} is null or ${t.ordinal} >= 1`,
+		),
+	],
+);
+
+/**
+ * What happened to a finding, as events rather than as a mutable cell.
+ *
+ * Current disposition is the latest row; "how long was it open" is
+ * `findings.opened_at` to the first closing row. A `status` column on `findings`
+ * would answer the first question and destroy the second, which is precisely
+ * the loss the corpus describes.
+ *
+ * `disposition` IS TEXT AND WILL STAY TEXT UNTIL SOMEONE RULES A VOCABULARY.
+ * Two values are visible anywhere — `withdrawn`, from the severity array where
+ * it does not belong, and `applied`, from an undeclared header key in the axe
+ * file. Two values is not a vocabulary; this is the `missions.status` shape and
+ * writing an enum from it would repeat that defect exactly.
+ */
+export const findingDispositions = pgTable(
+	"finding_dispositions",
+	{
+		...identity,
+		findingId: uuid("finding_id")
+			.notNull()
+			.references(() => findings.id),
+		disposition: text("disposition").notNull(),
+		note: text("note"),
+		author: text("author"),
+		observedAt: timestamp("observed_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [index("finding_dispositions_finding_idx").on(t.findingId)],
+);
+
+/**
+ * The escalation ledger. `.team-5/log/error-log.md`, row for row.
+ *
+ * SELF-REFERENTIAL, UNLIKE findings, AND DELIBERATELY SO. Closure here is a new
+ * row naming the one it closes — the corpus's own shape, discovered by the
+ * transactions agent when `check-mounts.sh` refused to let it edit a status cell
+ * (error-log row 9) and defended in row 10: "a status row written mid-flight
+ * records an intention, not a result, and appending is the only honest fix."
+ *
+ * The asymmetry with `findings` is the point rather than an inconsistency.
+ * Nothing matches a blocker by a stable id — a completion references the
+ * ORIGINAL row (`blockers: [11, 12, 13]`), and that row never moves. A finding's
+ * id IS matched, by the export gate, so its identity has to be pinned away from
+ * its observations. Different reason, different shape.
+ *
+ * THE COST, STATED: a row count is not a blocker count. Rows 6, 7, 8 and 10 of
+ * the source ledger close earlier rows, so "19 rows" is not "19 blockers", and
+ * open blockers are rows with no row closing them. That is inherited from the
+ * format rather than chosen, and it is the price of round-tripping their file.
+ */
+export const blockers = pgTable(
+	"blockers",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id),
+		/**
+		 * The ledger is one file per engagement, so its numbering is unique within
+		 * an engagement and not within a mission — rows 1 to 19 span several
+		 * slices. Carried here so the uniqueness rule can live in the database.
+		 */
+		engagementId: uuid("engagement_id")
+			.notNull()
+			.references(() => engagements.id),
+		/** The `#` column. Assigned, with gaps and reservations — row 17 is reserved. */
+		ledgerRef: integer("ledger_ref").notNull(),
+		dispatchId: uuid("dispatch_id").references(() => dispatches.id),
+		agentSlug: text("agent_slug"),
+		slice: text("slice"),
+		raisedOn: date("raised_on"),
+		blocker: text("blocker").notNull(),
+		escalatedTo: text("escalated_to"),
+		resolution: text("resolution"),
+		/**
+		 * WHAT WAS TRUE WHEN THE ROW WAS WRITTEN, permanently. Not current state:
+		 * rows 2, 3 and 4 of the source still read `open` and were closed by rows
+		 * 6, 7 and 8. Reading this column alone and calling it the answer is the
+		 * mistake the whole append-only shape exists to prevent.
+		 */
+		status: blockerStatus("status").notNull(),
+		/** Set on a row that closes an earlier one. Never a rewrite of that row. */
+		closesBlockerId: uuid("closes_blocker_id").references(
+			(): AnyPgColumn => blockers.id,
+		),
+		raisedAt: timestamp("raised_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		uniqueIndex("blockers_engagement_ref_unique").on(
+			t.engagementId,
+			t.ledgerRef,
+		),
+		index("blockers_mission_idx").on(t.missionId),
+		index("blockers_dispatch_idx").on(t.dispatchId),
+		index("blockers_closes_idx").on(t.closesBlockerId),
+		check("blockers_ledger_ref_positive", sql`${t.ledgerRef} >= 1`),
+		check("blockers_closes_not_self", sql`${t.closesBlockerId} <> ${t.id}`),
+	],
+);
+
+/**
+ * Tokens and spend. Ingested from CounselOS's own COST-LOG.md.
+ *
+ * FOUR TOKEN COLUMNS, NOT TWO. Collapsing input into one number destroys the
+ * ledger's main result: 245,611,316 of 248,374,293 operator input tokens are
+ * cache reads — 98.7%, costing $164 against $1,639 uncached. Their own note is
+ * "the split matters more than the total", and `in`/`out` cannot express it.
+ *
+ * EVERY MEASURE IS NULLABLE, because the first row of the real ledger reads
+ * `unlogged` in every one of them. Mission 001's spend is permanently
+ * unrecoverable and the file records that deliberately — "exactly the loss the
+ * file exists to prevent, and it happened on mission one". A NOT NULL here would
+ * make the most instructive row in the corpus unrepresentable.
+ *
+ * `usd` IS AN ESTIMATE AT LIST RATE ON THE DATE OF THE RUN, not an invoice. The
+ * source says so plainly: if the sessions ran under a subscription, no invoice
+ * matches this figure. Never recompute it from the tokens later — rates change,
+ * and the row records what the work cost at the rates in force that day.
+ *
+ * ONE ROW PER AGENT PER DISPATCH, and a re-run after a blocked gate gets its own
+ * row. So `dispatch_id` is NOT unique here: "do not average away the retries,
+ * and do not drop blocked rows. The distribution is the finding."
+ */
+export const costEntries = pgTable(
+	"cost_entries",
+	{
+		...identity,
+		missionId: uuid("mission_id")
+			.notNull()
+			.references(() => missions.id),
+		/** NULL for an operator row — supervision has no dispatch. */
+		dispatchId: uuid("dispatch_id").references(() => dispatches.id),
+		actorKind: costActorKind("actor_kind").notNull(),
+		/** `transactions`, `operator (Axis)` — free text in the source. */
+		actorRef: text("actor_ref").notNull(),
+		occurredOn: date("occurred_on"),
+		/** Nullable: the unlogged mission-001 row records no model. */
+		model: text("model"),
+		inputUncached: bigint("input_uncached", { mode: "number" }),
+		inputCacheWrite: bigint("input_cache_write", { mode: "number" }),
+		inputCacheRead: bigint("input_cache_read", { mode: "number" }),
+		outputTokens: bigint("output_tokens", { mode: "number" }),
+		usd: numeric("usd", { precision: 12, scale: 2 }),
+		/** DISPATCH TO COMPLETION, HUMAN TIME, not billed time. Their definition. */
+		wallSeconds: integer("wall_seconds"),
+		assistantTurns: integer("assistant_turns"),
+		/**
+		 * TEXT. The field table declares `merged · blocked · abandoned`, and the
+		 * two real rows carry `merged-pending` and `—`. Both observed values sit
+		 * outside the documented set, which settles it the same way `severity` was
+		 * settled.
+		 */
+		outcome: text("outcome"),
+		note: text("note"),
+		recordedAt: timestamp("recorded_at", { withTimezone: true })
+			.notNull()
+			.default(sql`now()`),
+	},
+	(t) => [
+		index("cost_entries_mission_idx").on(t.missionId),
+		index("cost_entries_dispatch_idx").on(t.dispatchId),
+		// One-directional, like missions_override_requires_rationale: supervision
+		// has no dispatch. An agent row MAY lack one while its dispatch is
+		// unresolved, so the reverse is not asserted.
+		check(
+			"cost_entries_operator_has_no_dispatch",
+			sql`${t.actorKind} <> 'operator' or ${t.dispatchId} is null`,
+		),
+		check(
+			"cost_entries_tokens_nonnegative",
+			sql`(${t.inputUncached} is null or ${t.inputUncached} >= 0)
+			    and (${t.inputCacheWrite} is null or ${t.inputCacheWrite} >= 0)
+			    and (${t.inputCacheRead} is null or ${t.inputCacheRead} >= 0)
+			    and (${t.outputTokens} is null or ${t.outputTokens} >= 0)`,
+		),
+		check(
+			"cost_entries_wall_nonnegative",
+			sql`${t.wallSeconds} is null or ${t.wallSeconds} >= 0`,
+		),
+	],
+);
+
+/**
+ * THE APPEND-ONLY SET, exported so a test can assert it rather than a comment
+ * claim it.
+ *
+ * Migration 0003 attached its trigger by iterating an explicit array, which read
+ * like a blanket rule and was not one — every table added afterwards silently
+ * had none, and the symptom was invisible until a write that did not go through
+ * drizzle. This list has the identical failure mode, so appendOnly.test.ts
+ * checks it in both directions and additionally asserts that nothing in it
+ * carries `updated_at`.
+ */
+export const APPEND_ONLY_TABLES = [
+	"blockers",
+	"completions",
+	"cost_entries",
+	"dispatches",
+	"finding_dispositions",
+	"findings",
+] as const;
+
 /* ── relations ──────────────────────────────────────────────────────────── */
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -1063,5 +1580,77 @@ export const exportsRelations = relations(exports, ({ one }) => ({
 		fields: [exports.previewExportId],
 		references: [exports.id],
 		relationName: "export_preview",
+	}),
+}));
+
+export const dispatchesRelations = relations(dispatches, ({ one, many }) => ({
+	mission: one(missions, {
+		fields: [dispatches.missionId],
+		references: [missions.id],
+	}),
+	rosterEntry: one(rosterEntries, {
+		fields: [dispatches.rosterEntryId],
+		references: [rosterEntries.id],
+	}),
+	completion: one(completions),
+	blockers: many(blockers),
+	costEntries: many(costEntries),
+}));
+
+export const completionsRelations = relations(completions, ({ one }) => ({
+	dispatch: one(dispatches, {
+		fields: [completions.dispatchId],
+		references: [dispatches.id],
+	}),
+}));
+
+export const findingsRelations = relations(findings, ({ one, many }) => ({
+	mission: one(missions, {
+		fields: [findings.missionId],
+		references: [missions.id],
+	}),
+	engagement: one(engagements, {
+		fields: [findings.engagementId],
+		references: [engagements.id],
+	}),
+	dispositions: many(findingDispositions),
+}));
+
+export const findingDispositionsRelations = relations(
+	findingDispositions,
+	({ one }) => ({
+		finding: one(findings, {
+			fields: [findingDispositions.findingId],
+			references: [findings.id],
+		}),
+	}),
+);
+
+export const blockersRelations = relations(blockers, ({ one }) => ({
+	mission: one(missions, {
+		fields: [blockers.missionId],
+		references: [missions.id],
+	}),
+	dispatch: one(dispatches, {
+		fields: [blockers.dispatchId],
+		references: [dispatches.id],
+	}),
+	// Named, because two unnamed relations to one table are ambiguous to the
+	// relational query builder.
+	closes: one(blockers, {
+		fields: [blockers.closesBlockerId],
+		references: [blockers.id],
+		relationName: "blocker_closure",
+	}),
+}));
+
+export const costEntriesRelations = relations(costEntries, ({ one }) => ({
+	mission: one(missions, {
+		fields: [costEntries.missionId],
+		references: [missions.id],
+	}),
+	dispatch: one(dispatches, {
+		fields: [costEntries.dispatchId],
+		references: [dispatches.id],
 	}),
 }));
