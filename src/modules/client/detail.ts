@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Db } from "#/modules/db/client";
 import {
@@ -74,6 +75,39 @@ async function engagementIdsFor(db: Db, clientId: string): Promise<string[]> {
 }
 
 /**
+ * Open blockers per mission.
+ *
+ * AN ANTI-JOIN, NOT A CORRELATED SUBQUERY, and that is the whole point of this
+ * function existing. A blocker is open when no later row closes it — the ledger
+ * is append-only and closure is a new row referencing the old, so a row's own
+ * `status` records what was true when it was written and current state is found
+ * by reading forward.
+ *
+ * Written with `alias()` and a LEFT JOIN rather than hand-written SQL because
+ * hand-written SQL is what broke: drizzle renders `${table.column}` UNQUALIFIED
+ * inside a `sql` template, so a correlation to an outer table silently resolved
+ * against the inner one and matched nothing. Every reference here is qualified
+ * by drizzle itself and cannot drift that way.
+ */
+async function openBlockersByMission(
+	db: Db,
+	missionIds: string[],
+): Promise<Map<string, number>> {
+	if (missionIds.length === 0) return new Map();
+	const closer = alias(blockers, "closer");
+	const rows = await db
+		.select({
+			missionId: blockers.missionId,
+			open: sql<number>`count(*)::int`,
+		})
+		.from(blockers)
+		.leftJoin(closer, eq(closer.closesBlockerId, blockers.id))
+		.where(and(inArray(blockers.missionId, missionIds), isNull(closer.id)))
+		.groupBy(blockers.missionId);
+	return new Map(rows.map((r) => [r.missionId, r.open]));
+}
+
+/**
  * The masthead. Four metrics, the open-request count, and last activity.
  *
  * Returns null when the client itself does not exist or is soft-deleted, so a
@@ -103,22 +137,10 @@ export async function getClientDetail(
 		};
 	}
 
-	const [missionCounts] = await db
-		.select({
-			total: sql<number>`count(*)::int`,
-			// A mission is "blocked" when an unresolved blocker points at it. The
-			// ledger is append-only and closure is a new row referencing the old,
-			// so an open blocker is one nothing closes — never a status cell.
-			blocked: sql<number>`count(*) filter (
-				where exists (
-					select 1 from ${blockers} b
-					where b.mission_id = ${missions.id}
-					  and not exists (
-						select 1 from ${blockers} c where c.closes_blocker_id = b.id
-					  )
-				)
-			)::int`,
-		})
+	// Mission ids rather than a count, because `blockedMissions` needs them and
+	// counting rows twice to avoid carrying a list would be the worse trade.
+	const missionRows = await db
+		.select({ id: missions.id })
 		.from(missions)
 		.where(
 			and(
@@ -126,6 +148,8 @@ export async function getClientDetail(
 				isNull(missions.deletedAt),
 			),
 		);
+	const missionIds = missionRows.map((r) => r.id);
+	const openByMission = await openBlockersByMission(db, missionIds);
 
 	const [deliveryCount] = await db
 		.select({ total: sql<number>`count(*)::int` })
@@ -174,8 +198,8 @@ export async function getClientDetail(
 	return {
 		engagementIds,
 		metrics: {
-			missions: missionCounts?.total ?? 0,
-			blockedMissions: missionCounts?.blocked ?? 0,
+			missions: missionIds.length,
+			blockedMissions: openByMission.size,
 			deliveries: deliveryCount?.total ?? 0,
 			spendUsd: spend?.total ?? null,
 		},
@@ -198,20 +222,35 @@ export async function engagementsForClient(
 	db: Db,
 	clientId: string,
 ): Promise<EngagementRow[]> {
+	// LEFT JOIN with the soft-delete filter in the JOIN CONDITION, not the WHERE.
+	// In the WHERE it would turn this into an inner join and drop engagements
+	// with no live missions entirely — the row would vanish rather than read 0.
 	const rows = await db
 		.select({
 			id: engagements.id,
 			name: engagements.name,
 			status: engagements.status,
 			createdAt: engagements.createdAt,
-			missionCount: sql<number>`(
-				select count(*)::int from ${missions} m
-				where m.engagement_id = ${engagements.id} and m.deleted_at is null
-			)`,
+			// count(missions.id), not count(*): a left join with no match yields one
+			// row of nulls, and count(*) would report that as 1.
+			missionCount: sql<number>`count(${missions.id})::int`,
 		})
 		.from(engagements)
+		.leftJoin(
+			missions,
+			and(
+				eq(missions.engagementId, engagements.id),
+				isNull(missions.deletedAt),
+			),
+		)
 		.where(
 			and(eq(engagements.clientId, clientId), isNull(engagements.deletedAt)),
+		)
+		.groupBy(
+			engagements.id,
+			engagements.name,
+			engagements.status,
+			engagements.createdAt,
 		)
 		.orderBy(desc(engagements.createdAt));
 
@@ -252,13 +291,6 @@ export async function missionsForClient(
 			status: missions.status,
 			sprintN: missions.sprintN,
 			cut: missions.cut,
-			openBlockers: sql<number>`(
-				select count(*)::int from ${blockers} b
-				where b.mission_id = ${missions.id}
-				  and not exists (
-					select 1 from ${blockers} c where c.closes_blocker_id = b.id
-				  )
-			)`,
 		})
 		.from(missions)
 		.where(
@@ -269,7 +301,18 @@ export async function missionsForClient(
 		)
 		.orderBy(desc(missions.createdAt));
 
-	return rows.map((r) => ({ ...r }));
+	// Merged from one grouped anti-join rather than a per-row subquery. Same
+	// reason as above: a correlated `sql` template rendered the outer column
+	// unqualified and matched nothing, so every mission read 0 open blockers.
+	const openByMission = await openBlockersByMission(
+		db,
+		rows.map((r) => r.id),
+	);
+
+	return rows.map((r) => ({
+		...r,
+		openBlockers: openByMission.get(r.id) ?? 0,
+	}));
 }
 
 export type DeliveryRow = {
