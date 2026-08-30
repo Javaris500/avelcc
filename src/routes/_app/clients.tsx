@@ -11,7 +11,7 @@ import type { z } from "zod";
 
 import { clientListRow, clientStatus } from "#/contract/client";
 import { successList } from "#/contract/shared/envelope";
-import { CLIENT_STATUS_TONE } from "#/modules/client/ui/status";
+import { blockedTone, CLIENT_STATUS_TONE } from "#/modules/client/ui/status";
 import { StatusBadge } from "#/ui/badge";
 import { Button } from "#/ui/button";
 import {
@@ -315,11 +315,27 @@ function ClientSwitcher({
 							to="/clients/$clientId"
 						>
 							{r.name}
+							{/*
+							 * `blockedTone`, NOT a literal. This read `tone="warn"` and
+							 * the shared mapping returns `block`, so the same count would
+							 * have rendered a warn triangle here and a block cross on the
+							 * client detail page. That seam exists precisely to stop it:
+							 * the badge stays presentational over the existing tones and
+							 * the domain-to-tone decision lives in one function. A
+							 * literal at a call site is the second place, and the second
+							 * place is where two screens start disagreeing about what a
+							 * state looks like.
+							 *
+							 * If `warn` is the better read for a list row — attention
+							 * rather than a hard failure of the row itself — then
+							 * `blockedTone` changes and every surface moves together,
+							 * which is the point. Found by avel-c2.
+							 */}
 							{r.openBlockers > 0 ? (
 								<StatusBadge
 									className="ml-auto"
 									data-testid="client-switcher-blocked"
-									tone="warn"
+									tone={blockedTone(r.openBlockers)}
 								>
 									{r.openBlockers}
 								</StatusBadge>
