@@ -155,7 +155,14 @@ export function Sidebar({
 				// it sits at app-bg while content sits in app-panel cards. A
 				// hairline is what you reach for when two surfaces share a colour,
 				// and after the ramp they do not.
-				"flex flex-col bg-app-bg py-3.5 transition-[width] duration-[var(--duration-micro)]",
+				// ONE SOLID SURFACE WITH THE CONTENT, on the operator's instruction.
+				// This was bg-app-bg — the desktop tone — which made the sidebar the
+				// darkest plane in the window and read as a separate, heavier slab.
+				// It now sits on app-panel, the same surface the content column uses,
+				// so the window is ONE ground and the accent seam is what divides it.
+				// The earlier tonal step is gone deliberately: a divider and a tone
+				// change were doing the same job twice.
+				"flex flex-col bg-app-panel py-3.5 transition-[width] duration-[var(--duration-micro)]",
 				collapsed ? "w-16 items-center px-2" : "w-(--frame-sidebar) px-3",
 			)}
 			data-collapsed={collapsed}
@@ -198,7 +205,14 @@ export function Sidebar({
 				>
 					<DropdownMenuTrigger
 						className={cn(
-							"interactive group mb-2 flex shrink-0 items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-raised py-2 text-left hover:border-[var(--elevation-border-raised)]",
+							// RECESSED, NOT RAISED, AND THE SIDEBAR MOVING IS WHY. app-raised is
+							// #ffffff in light; with the sidebar now on app-panel — also
+							// #ffffff — this control would be white on white with a 1px
+							// hairline doing all the work. That is correction 5 verbatim,
+							// which this codebase already reverted once. Recessing it
+							// separates DOWNWARD, which is the one direction light still
+							// has, and it matches the search input directly below it.
+							"interactive group mb-2 flex shrink-0 items-center gap-2 rounded-sm border border-[var(--elevation-border-rest)] bg-app-recessed py-2 text-left hover:border-[var(--elevation-border-raised)]",
 							collapsed ? "justify-center px-2" : "px-2.5",
 						)}
 						data-testid="workspace-switcher"

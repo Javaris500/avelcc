@@ -132,7 +132,7 @@ export function Shell({
 						// internal dividers; this is the window's edge against the mat,
 						// and without it the rounded corners have nothing to describe
 						// them against. Every rule BETWEEN panes is gone.
-						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-bg shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
+						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-panel shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
 						data-testid="app-window"
 					>
 						{compact ? null : sidebar}
@@ -167,7 +167,7 @@ export function Shell({
 						*/}
 						<div
 							className={cn(
-								"relative flex min-w-0 flex-col overflow-hidden bg-app-panel",
+								"relative flex min-w-0 flex-col overflow-hidden",
 								"before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-px",
 								"before:bg-[linear-gradient(to_bottom,transparent,var(--color-accent)_18%,var(--color-accent)_82%,transparent)] before:opacity-60",
 							)}
