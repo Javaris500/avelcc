@@ -1,7 +1,14 @@
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Db } from "#/modules/db/client";
-import { clients } from "#/modules/db/schema";
+import {
+	blockers,
+	clients,
+	engagements,
+	intakes,
+	missions,
+} from "#/modules/db/schema";
 
 /**
  * Client reads and create.
@@ -11,14 +18,156 @@ import { clients } from "#/modules/db/schema";
  * Result-rather-than-throw for a known failure, same Dates-to-ISO at the edge.
  */
 
-export type ClientListItem = {
+export type ClientBase = {
 	id: string;
 	name: string;
 	status: "active" | "closed";
 	primaryContact: string | null;
 };
 
-export type ClientView = ClientListItem & {
+/** The list row. Carries the aggregates the detail read does not. */
+export type ClientListItem = ClientBase & {
+	/** Undecided requests. `draft` and `proposed`; the other two are decisions. */
+	openRequests: number;
+	activeMissions: number;
+	/**
+	 * Missions carrying a blocker nothing has closed. THE SIGNAL THE ROW IS FOR:
+	 * UI-PLAN section 5 asks that a client with blocked work look different in
+	 * the list, before you click.
+	 */
+	openBlockers: number;
+	lastActivityAt: string | null;
+};
+
+/**
+ * The per-client aggregates, in three grouped queries merged in JS.
+ *
+ * NO CORRELATED `sql` SUBQUERIES, and that is not a style preference. Drizzle
+ * renders `${table.column}` UNQUALIFIED inside a template, so a correlation to
+ * an outer table silently resolves against the INNER one and matches nothing.
+ * That shipped three wrong counts on the client detail page, two of which
+ * returned a plausible zero and were invisible until the telemetry tables had
+ * rows. Every join here is one drizzle renders itself.
+ *
+ * EVERYTHING IS TWO HOPS. `client_id` exists in exactly one place in the schema
+ * — `engagements.clientId` — so a client reaches its work only through its
+ * engagements, and every query below starts there.
+ */
+async function aggregatesFor(
+	db: Db,
+	clientIds: string[],
+): Promise<
+	Map<
+		string,
+		{
+			openRequests: number;
+			activeMissions: number;
+			openBlockers: number;
+			lastActivityAt: Date | null;
+		}
+	>
+> {
+	const out = new Map<
+		string,
+		{
+			openRequests: number;
+			activeMissions: number;
+			openBlockers: number;
+			lastActivityAt: Date | null;
+		}
+	>();
+	if (clientIds.length === 0) return out;
+	const row = (id: string) => {
+		const existing = out.get(id);
+		if (existing) return existing;
+		const fresh = {
+			openRequests: 0,
+			activeMissions: 0,
+			openBlockers: 0,
+			lastActivityAt: null as Date | null,
+		};
+		out.set(id, fresh);
+		return fresh;
+	};
+
+	// Missions and last activity. LEFT JOIN with the soft-delete filter in the
+	// JOIN CONDITION: in the WHERE it becomes an inner join and a client with no
+	// live mission disappears from the result instead of reporting zero.
+	const m = await db
+		.select({
+			clientId: engagements.clientId,
+			missions: sql<number>`count(${missions.id})::int`,
+			lastActivity: sql<Date | null>`max(${missions.updatedAt})`,
+		})
+		.from(engagements)
+		.leftJoin(
+			missions,
+			and(
+				eq(missions.engagementId, engagements.id),
+				isNull(missions.deletedAt),
+			),
+		)
+		.where(
+			and(
+				inArray(engagements.clientId, clientIds),
+				isNull(engagements.deletedAt),
+			),
+		)
+		.groupBy(engagements.clientId);
+	for (const r of m) {
+		const e = row(r.clientId);
+		e.activeMissions = r.missions;
+		e.lastActivityAt = r.lastActivity ? new Date(r.lastActivity) : null;
+	}
+
+	// Open blockers: an anti-join, because closure is a NEW ROW referencing the
+	// old one. A blocker's own `status` records what was true when it was
+	// written, so reading that column would report one closed four rows ago as
+	// still open.
+	const closer = alias(blockers, "closer");
+	const b = await db
+		.select({
+			clientId: engagements.clientId,
+			open: sql<number>`count(*)::int`,
+		})
+		.from(blockers)
+		.innerJoin(missions, eq(missions.id, blockers.missionId))
+		.innerJoin(engagements, eq(engagements.id, missions.engagementId))
+		.leftJoin(closer, eq(closer.closesBlockerId, blockers.id))
+		.where(
+			and(
+				inArray(engagements.clientId, clientIds),
+				isNull(missions.deletedAt),
+				isNull(engagements.deletedAt),
+				isNull(closer.id),
+			),
+		)
+		.groupBy(engagements.clientId);
+	for (const r of b) row(r.clientId).openBlockers = r.open;
+
+	// Undecided requests.
+	const i = await db
+		.select({
+			clientId: engagements.clientId,
+			open: sql<number>`count(*)::int`,
+		})
+		.from(intakes)
+		.innerJoin(engagements, eq(engagements.id, intakes.engagementId))
+		.where(
+			and(
+				inArray(engagements.clientId, clientIds),
+				isNull(intakes.deletedAt),
+				isNull(engagements.deletedAt),
+				inArray(intakes.status, ["draft", "proposed"]),
+			),
+		)
+		.groupBy(engagements.clientId);
+	for (const r of i) row(r.clientId).openRequests = r.open;
+
+	return out;
+}
+
+export type ClientView = ClientBase & {
 	notesMd: string | null;
 	createdAt: string;
 	updatedAt: string;
@@ -68,13 +217,29 @@ export async function listClients(
 		.from(clients)
 		.where(isNull(clients.deletedAt));
 
+	// One extra round trip for the whole page rather than one per row. The
+	// aggregates are three grouped queries keyed by client, merged here.
+	const agg = await aggregatesFor(
+		db,
+		page.map((r) => r.id),
+	);
+
 	return {
-		items: page.map((r) => ({
-			id: r.id,
-			name: r.name,
-			status: r.status,
-			primaryContact: r.primaryContact,
-		})),
+		items: page.map((r) => {
+			const a = agg.get(r.id);
+			return {
+				id: r.id,
+				name: r.name,
+				status: r.status,
+				primaryContact: r.primaryContact,
+				openRequests: a?.openRequests ?? 0,
+				activeMissions: a?.activeMissions ?? 0,
+				openBlockers: a?.openBlockers ?? 0,
+				lastActivityAt: a?.lastActivityAt
+					? a.lastActivityAt.toISOString()
+					: null,
+			};
+		}),
 		total: count?.total ?? 0,
 		nextCursor: hasMore && last ? last.createdAt.toISOString() : null,
 	};

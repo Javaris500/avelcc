@@ -43,12 +43,28 @@ export const clientSchema = z.object({
  * every read, so a client that reaches a caller always has it null. Sending a
  * column that is always the same value invites a screen to branch on it.
  */
-export const clientListRow = clientSchema.pick({
-	id: true,
-	name: true,
-	status: true,
-	primaryContact: true,
-});
+export const clientListRow = clientSchema
+	.pick({ id: true, name: true, status: true, primaryContact: true })
+	.extend({
+		/**
+		 * THE ROW CARRIES THE CLIENT'S STATE, not just its name. UI-PLAN section
+		 * 5: "rows should make the state of a client visible before you click",
+		 * and "a client with a blocked mission should look different in the list".
+		 * Four fields, all two-hop through engagements, all counted server-side —
+		 * a screen cannot derive any of them from what it already holds.
+		 */
+		openRequests: z.number().int(),
+		activeMissions: z.number().int(),
+		/**
+		 * Missions carrying a blocker nothing has closed. Counted by anti-join,
+		 * never by reading a blocker's own `status`: the ledger is append-only and
+		 * closure is a NEW ROW referencing the old, so that column records what
+		 * was true when it was written.
+		 */
+		openBlockers: z.number().int(),
+		/** Null when the client has no live mission to have been active on. */
+		lastActivityAt: z.string().nullable(),
+	});
 
 /* ── the client detail page ─────────────────────────────────────────────── */
 

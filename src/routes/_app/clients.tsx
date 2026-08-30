@@ -16,6 +16,7 @@ import { Button } from "#/ui/button";
 import { SkeletonRows } from "#/ui/skeleton";
 import { EmptyState, ErrorState } from "#/ui/states";
 import { Surface } from "#/ui/surface";
+import { cn } from "#/utils/cn";
 
 /**
  * Clients — the three-pane layout, and the second pane.
@@ -108,14 +109,58 @@ function describeFailure(code: string): {
  * ever leaves `clientListRow` stops compiling here instead of silently sorting
  * by undefined.
  */
-type SortKey = Extract<keyof ClientRow, "name" | "primaryContact" | "status">;
+type SortKey = Extract<
+	keyof ClientRow,
+	| "name"
+	| "primaryContact"
+	| "status"
+	| "openRequests"
+	| "activeMissions"
+	| "openBlockers"
+	| "lastActivityAt"
+>;
 type SortDir = "asc" | "desc";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
 	{ key: "name", label: "Account" },
 	{ key: "primaryContact", label: "Lead" },
 	{ key: "status", label: "State" },
+	{ key: "openRequests", label: "Requests" },
+	{ key: "activeMissions", label: "Missions" },
+	{ key: "openBlockers", label: "Blocked" },
+	{ key: "lastActivityAt", label: "Last activity" },
 ];
+
+/**
+ * ONE DEFINITION FOR EVERY CELL, so the hover band is unbroken across the row.
+ *
+ * The hover was on the `<tr>` with `interactive rounded-sm`, and a `<tr>` is
+ * `display: table-row` — WHICH CANNOT TAKE A BORDER RADIUS. Measured: the
+ * computed radius was 6px and the browser ignored it, so a wash meant to read
+ * as a rounded band painted as a hard-edged full-width stripe. The 3.5% white
+ * it used was also close to invisible.
+ *
+ * Painting the CELLS instead is what makes a radius possible at all: the first
+ * and last round their outer corners and the row reads as one pill. The tint is
+ * 7% accent rather than a neutral wash — visible, and the brand colour the rest
+ * of the shell already uses for state.
+ */
+const CELL =
+	"px-2 py-2 transition-colors duration-[var(--duration-micro)] first:rounded-l-sm last:rounded-r-sm group-hover:bg-[color-mix(in_oklab,var(--color-accent)_7%,transparent)] motion-reduce:transition-none";
+
+/**
+ * A COUNTED ZERO IS NOT A MISSING VALUE, and the row has to say which. An em
+ * dash means "we did not look"; a 0 means "we looked and there are none". Both
+ * appear in this table — `lastActivityAt` is genuinely null for a client with
+ * no mission — so the two cannot render alike.
+ */
+function Count({ n }: { n: number }) {
+	return n === 0 ? (
+		<span className="text-text-subtle">0</span>
+	) : (
+		<span className="text-text">{n}</span>
+	);
+}
 
 const STATUS_FILTERS = ["all", ...clientStatus.options] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -127,7 +172,9 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
  *
  * A null Lead sorts LAST in both directions rather than being treated as an
  * empty string. Reversing the sort should reorder the clients that have a lead,
- * not promote the ones that do not to the top of the list.
+ * not promote the ones that do not to the top of the list. `lastActivityAt` is
+ * nullable for the same reason and gets the same treatment — a client with no
+ * mission has no activity to rank.
  */
 function compare(a: ClientRow, b: ClientRow, key: SortKey, dir: SortDir) {
 	const x = a[key];
@@ -135,7 +182,13 @@ function compare(a: ClientRow, b: ClientRow, key: SortKey, dir: SortDir) {
 	if (x === null && y === null) return 0;
 	if (x === null) return 1;
 	if (y === null) return -1;
-	const result = x.localeCompare(y);
+	// NUMBERS COMPARE NUMERICALLY. Three of the columns are counts, and
+	// localeCompare on their string forms sorts 10 before 9. The null guards
+	// above already ran, so anything left is a string or a number.
+	const result =
+		typeof x === "number" && typeof y === "number"
+			? x - y
+			: String(x).localeCompare(String(y));
 	return dir === "asc" ? result : -result;
 }
 
@@ -401,16 +454,12 @@ function ClientsLayout() {
 													// line, and `aria-current` carries the same fact to
 													// anyone who cannot see the surface.
 													aria-current={selected ? "true" : undefined}
-													className={
-														selected
-															? "bg-app-raised"
-															: "interactive rounded-sm"
-													}
+													className={cn("group", selected && "bg-app-raised")}
 													data-selected={selected}
 													data-testid="client-row"
 													key={client.id}
 												>
-													<td className="px-2 py-2">
+													<td className={CELL}>
 														{/*
 														 * The link is the cell, stretched to the row, so
 														 * the whole row is the target. The mission list
@@ -426,7 +475,9 @@ function ClientsLayout() {
 															{client.name}
 														</Link>
 													</td>
-													<td className="px-2 py-2 text-micro text-text-subtle">
+													<td
+														className={cn(CELL, "text-micro text-text-subtle")}
+													>
 														{/*
 														 * An em dash, not blank. Blank reads as a
 														 * rendering fault; the dash says the field is
@@ -434,13 +485,56 @@ function ClientsLayout() {
 														 */}
 														{client.primaryContact ?? "—"}
 													</td>
-													<td className="px-2 py-2">
+													<td className={CELL}>
 														<StatusBadge
 															data-testid="client-status"
 															tone={CLIENT_STATUS_TONE[client.status]}
 														>
 															{client.status}
 														</StatusBadge>
+													</td>
+													<td
+														className={cn(CELL, "text-micro tabular-nums")}
+														data-testid="client-requests"
+													>
+														<Count n={client.openRequests} />
+													</td>
+													<td
+														className={cn(CELL, "text-micro tabular-nums")}
+														data-testid="client-missions"
+													>
+														<Count n={client.activeMissions} />
+													</td>
+													{/*
+													 * THE COLUMN THE RULING ASKED FOR. A client with
+													 * blocked work has to look different before it is
+													 * clicked, so this is the one number that carries a
+													 * tone rather than sitting muted with the others.
+													 */}
+													<td
+														className={cn(CELL, "text-micro tabular-nums")}
+														data-testid="client-blocked"
+													>
+														{client.openBlockers > 0 ? (
+															<StatusBadge
+																data-testid="client-blocked-badge"
+																tone="warn"
+															>
+																{client.openBlockers}
+															</StatusBadge>
+														) : (
+															<Count n={0} />
+														)}
+													</td>
+													<td
+														className={cn(CELL, "text-micro text-text-subtle")}
+														data-testid="client-last-activity"
+													>
+														{client.lastActivityAt
+															? new Date(
+																	client.lastActivityAt,
+																).toLocaleDateString()
+															: "—"}
 													</td>
 												</tr>
 											);
@@ -462,23 +556,6 @@ function ClientsLayout() {
 								{status === "all"
 									? `Total: ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}`
 									: `Showing ${visible.length} of ${data.data.length} clients`}
-							</p>
-
-							{/*
-							 * THE COLUMNS THAT ARE STILL MISSING, NAMED. The ruling asks for
-							 * a blocked client to look different in the row, before it is
-							 * clicked. `clientListRow` is still {id, name, status,
-							 * primaryContact} — the blocked signal needs a per-row aggregate
-							 * that avel-a8 has not shipped. Rendering a quiet neutral chip
-							 * for every row would make "not blocked" and "not counted" the
-							 * same pixel, which is the one thing this signal must not do.
-							 */}
-							<p
-								className="text-micro text-text-subtle"
-								data-testid="clients-blocked-pending"
-							>
-								Blocked work is not marked in these rows yet. It needs a count
-								per row, which the list read does not carry.
 							</p>
 						</div>
 					)}
