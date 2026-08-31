@@ -1,90 +1,118 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { AgentRuntime, AgentTemplateRow } from "#/contract/catalog";
 import {
 	RevocationChip,
-	RevokedAttachmentChip,
 	RuntimeChip,
 	runtimeLabel,
-	SkillTypeChip,
+	SkillTypeGlyph,
 } from "#/modules/catalog/chips";
 import { isRevoked, strandedModelContext } from "#/modules/catalog/derive";
-import { isoDate, plural } from "#/modules/catalog/format";
+import { plural, subtitleFor } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useAgentTemplates } from "#/modules/catalog/queries";
 import { CatalogSurface } from "#/modules/catalog/screen";
 import {
-	type Column,
+	ChecksPassed,
 	DataNotice,
-	DataTable,
-	DefinitionList,
 	EmptyState,
+	FilterBar,
 	FilterChips,
-	MetricStat,
-	PathList,
-	type RowTone,
+	FilterSummary,
+	PathBudget,
 	SectionCard,
 } from "#/modules/catalog/ui";
 import { usePageHeader } from "#/modules/shell/use-page-header";
-import { Tag } from "#/ui/badge";
+import { Pill } from "#/ui/badge";
+import { cn } from "#/utils/cn";
 
 /**
- * THE AGENT TEMPLATE CATALOG.
+ * THE AGENT ROSTER.
  *
- * RUNTIME IS THE ORGANISING FACT OF THIS SCREEN, not one field among many.
+ * WHY CARDS AND NOT A TABLE. An agent template is a WORKER: there are seven, the
+ * number grows slowly, and the verb is choosing one. A table of seven people is
+ * a spreadsheet of humans, sorting and filtering facts nobody sorts by. Cards
+ * suit few-things-you-choose-between; the skills page is a library for the
+ * opposite reason, many documents you read. Differentiating the two pages by
+ * colour or chrome instead would make them look different and still be the same
+ * page.
  *
- * `agent_runtime` is `'model' | 'human' | 'code'`, and schema.ts records where
- * that vocabulary came from: `render/types.ts` declares it and `render.ts`
- * branches on it, because "a non-model agent loads no model context, so it
- * renders neither identity.md nor depth.md".
+ * THE ADDITION THAT MATTERS MOST IS THE BOUNDARY SUMMARY. `writablePaths`,
+ * `appendOnlyPaths` and `readonlyPaths` were on the wire from the first commit
+ * and rendered nowhere. They are what makes an agent safe or dangerous and the
+ * first thing a reviewer looks for, so every card carries the three counts and
+ * the opened template carries the globs themselves.
  *
- * That branch is invisible from the data. `identity_md` is NOT NULL on every
- * row regardless of runtime, so a human agent can hold a full page of written
- * context that the renderer will silently drop. Shipping model context to a
- * non-model agent was a real bug on this project, and the reason it was
- * possible is that nothing ever showed the two facts side by side.
- *
- * So runtime sits in the second column, next to the name, with an icon and a
- * word; and the detail panel does not show model context for a non-model agent.
- * It shows the absence, and it flags the case where the columns are populated
- * anyway.
+ * RUNTIME REMAINS THE ORGANISING FACT. `render.ts` emits identity.md and
+ * depth.md only for `runtime === 'model'`, and `identity_md` is NOT NULL on
+ * every row regardless, so a human agent can hold a page of context the renderer
+ * silently drops. The badge is on every card, and the opened template refuses to
+ * show model context for a non-model agent.
  */
 
 type RuntimeFilter = "all" | AgentRuntime;
 type KindFilter = "all" | "horizontal" | "feature";
 type StateFilter = "all" | "live" | "revoked";
 
-/**
- * Totals only, and the runtime split rather than two separate counts.
- * "9 templates · 2 not run by a model" leaves the operator subtracting.
- */
-function summarise(
-	templates: AgentTemplateRow[] | undefined,
-): string | undefined {
-	// Absent while loading and when empty. See the note in skills-view.tsx.
-	if (templates === undefined || templates.length === 0) return undefined;
-	const nonModel = templates.filter((t) => t.runtime !== "model").length;
-	return `${plural(templates.length, "template", "templates")} · ${templates.length - nonModel} run by a model, ${nonModel} by a person or script`;
-}
+export type AgentsSearch = {
+	runtime?: RuntimeFilter;
+	kind?: KindFilter;
+	state?: StateFilter;
+	order?: OrderKey;
+};
 
-export function AgentTemplateCatalog() {
+/**
+ * CREATION ORDER IS NOT AN ORDER when the verb is "choose one". These three are
+ * the questions a roster is actually scanned for; `added` stays as the default
+ * because it is what the list already was and changing the default silently
+ * would reorder a page someone had learned.
+ */
+export type OrderKey = "added" | "name" | "scope" | "skills";
+
+const ORDER: Record<
+	OrderKey,
+	(a: AgentTemplateRow, b: AgentTemplateRow) => number
+> = {
+	added: () => 0,
+	name: (a, b) => a.name.localeCompare(b.name),
+	// Band or engagement, so horizontal agents group with their team and
+	// feature agents group with the engagement they belong to.
+	scope: (a, b) =>
+		`${a.team ?? a.engagementName ?? ""}`.localeCompare(
+			`${b.team ?? b.engagementName ?? ""}`,
+		),
+	// Most-carried first: the question is "which of these does the most".
+	skills: (a, b) => b.skills.length - a.skills.length,
+};
+
+/** Totals only, and the runtime split rather than two counts to subtract. */
+const summarise = (templates: AgentTemplateRow[] | undefined) =>
+	subtitleFor(templates, (rows) => {
+		const nonModel = rows.filter((t) => t.runtime !== "model").length;
+		return [
+			plural(rows.length, "template", "templates"),
+			`${rows.length - nonModel} run by a model, ${nonModel} by a person or script`,
+		];
+	});
+
+export function AgentTemplateCatalog({
+	search,
+	onSearch,
+}: {
+	search: AgentsSearch;
+	onSearch: (next: AgentsSearch) => void;
+}) {
 	const query = useAgentTemplates();
 
-	// The shell renders the title. See the note in skills-view.tsx.
-	const templates = query.data?.data;
 	usePageHeader({
 		title: "Agent templates",
 		definition: TERM.agentTemplate,
-		subtitle: summarise(templates),
+		subtitle: summarise(query.data?.data),
 	});
-	const [runtimeFilter, setRuntimeFilter] = useState<RuntimeFilter>("all");
-	const [kindFilter, setKindFilter] = useState<KindFilter>("all");
-	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
-	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	return (
-		<div className="flex flex-col gap-5 px-6 py-5">
+		<div className="flex flex-col gap-4">
 			<CatalogSurface
 				data-testid="agents"
 				empty={
@@ -97,17 +125,9 @@ export function AgentTemplateCatalog() {
 				query={query}
 			>
 				{(page) => (
-					<AgentCatalogBody
-						kindFilter={kindFilter}
-						onKindFilter={setKindFilter}
-						onSelect={(id) =>
-							setSelectedId((current) => (current === id ? null : id))
-						}
-						onStateFilter={setStateFilter}
-						onRuntimeFilter={setRuntimeFilter}
-						runtimeFilter={runtimeFilter}
-						selectedId={selectedId}
-						stateFilter={stateFilter}
+					<AgentRoster
+						onSearch={onSearch}
+						search={search}
 						templates={page.data}
 						total={page.meta.total}
 					/>
@@ -117,32 +137,22 @@ export function AgentTemplateCatalog() {
 	);
 }
 
-function AgentCatalogBody({
+function AgentRoster({
 	templates,
 	total,
-	runtimeFilter,
-	kindFilter,
-	stateFilter,
-	onRuntimeFilter,
-	onKindFilter,
-	onStateFilter,
-	selectedId,
-	onSelect,
+	search,
+	onSearch,
 }: {
 	templates: AgentTemplateRow[];
 	total: number;
-	runtimeFilter: RuntimeFilter;
-	kindFilter: KindFilter;
-	stateFilter: StateFilter;
-	onRuntimeFilter: (value: RuntimeFilter) => void;
-	onKindFilter: (value: KindFilter) => void;
-	onStateFilter: (value: StateFilter) => void;
-	selectedId: string | null;
-	onSelect: (id: string) => void;
+	search: AgentsSearch;
+	onSearch: (next: AgentsSearch) => void;
 }) {
+	const runtimeFilter = search.runtime ?? "all";
+	const kindFilter = search.kind ?? "all";
+	const stateFilter = search.state ?? "all";
+
 	const live = templates.filter((t) => !isRevoked(t));
-	const revoked = templates.filter(isRevoked);
-	const nonModel = templates.filter((t) => t.runtime !== "model");
 	const stranded = templates.filter(strandedModelContext);
 	const carryingRevoked = templates.filter((t) =>
 		t.skills.some((s) => s.revoked),
@@ -162,60 +172,34 @@ function AgentCatalogBody({
 		[templates, runtimeFilter, kindFilter, stateFilter],
 	);
 
-	const selected = shown.find((t) => t.id === selectedId) ?? null;
+	const order = search.order ?? "added";
+	// A copy. Sorting `shown` in place mutates a react-query cache entry.
+	const ordered = [...shown].sort(ORDER[order]);
+
+	/*
+	 * A CHECK IS A BANNER OR A CLAUSE, NEVER BOTH. Each of the two either fired
+	 * and gets a banner with room for the consequence, or passed and gets one
+	 * clause on the checked line. This pair used to be four metric cards, two of
+	 * which restated the header subtitle and two of which restated the banners
+	 * directly beneath them.
+	 */
+	const passed = [
+		stranded.length === 0
+			? {
+					key: "stranded",
+					label: "no template stores context its runtime cannot receive",
+				}
+			: null,
+		carryingRevoked.length === 0
+			? { key: "revoked-skill", label: "no template carries a revoked skill" }
+			: null,
+	].filter((item) => item !== null);
 
 	return (
-		<>
-			{templates.length === total ? null : (
-				<p className="text-micro text-text-subtle" data-testid="agents-partial">
-					{templates.length} of {total} loaded. The rest are on a page this
-					screen does not fetch yet, so every count below is of what is loaded.
-				</p>
+		<div className="flex flex-col gap-4">
+			{passed.length === 0 ? null : (
+				<ChecksPassed data-testid="agents-checks" items={passed} />
 			)}
-
-			<div className="flex flex-wrap gap-3">
-				<MetricStat
-					data-testid="agents-metric-live"
-					hint="Available for a mission to copy into its team."
-					label="Live templates"
-					value={live.length}
-				/>
-				<MetricStat
-					data-testid="agents-metric-nonmodel"
-					hint="A person or a script does the work. Neither receives written context."
-					label="Not run by a model"
-					value={nonModel.length}
-				/>
-				{/*
-				 * BOTH OF THESE ARE SHIPPED BUGS, COUNTED. Zero is the normal state
-				 * and reads as a fact; anything above zero reads as a warning,
-				 * because both conditions put something into a package that should
-				 * not be there.
-				 */}
-				<MetricStat
-					data-testid="agents-metric-stranded"
-					hint={
-						stranded.length === 0
-							? "No template stores context its runtime cannot receive."
-							: "Written context stored on an agent that is not a model. It will never be sent."
-					}
-					label="Context that will not be sent"
-					tone={stranded.length === 0 ? "rest" : "warn"}
-					value={stranded.length}
-				/>
-				<MetricStat
-					data-testid="agents-metric-revoked-skill"
-					hint={
-						carryingRevoked.length === 0
-							? "No template carries a skill that was withdrawn."
-							: "These templates still hand a withdrawn skill to every new mission."
-					}
-					label="Carrying a revoked skill"
-					tone={carryingRevoked.length === 0 ? "rest" : "warn"}
-					value={carryingRevoked.length}
-				/>
-			</div>
-
 			{stranded.length === 0 ? null : (
 				<DataNotice
 					body={`${plural(stranded.length, "template stores", "templates store")} identity or depth text and ${stranded.length === 1 ? "is" : "are"} not run by a model. The renderer emits that text only for a model agent, so what is written on ${stranded.length === 1 ? "it" : "them"} never reaches anyone. Either the runtime is wrong or the text belongs somewhere a person or a script will actually read.`}
@@ -225,514 +209,263 @@ function AgentCatalogBody({
 					tone="warn"
 				/>
 			)}
-
 			{carryingRevoked.length === 0 ? null : (
 				<DataNotice
-					body={`${plural(carryingRevoked.length, "template", "templates")} still ${carryingRevoked.length === 1 ? "carries" : "carry"} a skill that has been withdrawn from the catalog. Nothing re-checks the catalog when a package is built, so the withdrawn skill ships with every mission these templates join.`}
+					body={`${plural(carryingRevoked.length, "template", "templates")} still ${carryingRevoked.length === 1 ? "carries" : "carry"} a skill that has been withdrawn from the catalog. Nothing re-checks the catalog when a package is built, so the withdrawn skill ships with every mission ${carryingRevoked.length === 1 ? "that template joins" : "those templates join"}.`}
 					data-testid="agents-revoked-skill-notice"
 					icon={ShieldAlert}
 					title="A revoked skill is still attached to a template"
 					tone="block"
 				/>
 			)}
-
-			<SectionCard
-				action={
-					<div className="flex flex-wrap items-center gap-4">
-						<FilterChips
-							data-testid="agents-filter-runtime"
-							label="Filter by runtime"
-							onChange={onRuntimeFilter}
-							options={[
-								{ key: "all", label: "Any runtime", count: templates.length },
-								{
-									key: "model",
-									label: runtimeLabel("model"),
-									count: templates.filter((t) => t.runtime === "model").length,
-								},
-								{
-									key: "human",
-									label: runtimeLabel("human"),
-									count: templates.filter((t) => t.runtime === "human").length,
-								},
-								{
-									key: "code",
-									label: runtimeLabel("code"),
-									count: templates.filter((t) => t.runtime === "code").length,
-								},
-							]}
-							value={runtimeFilter}
-						/>
-						<FilterChips
-							data-testid="agents-filter-kind"
-							label="Filter by kind"
-							onChange={onKindFilter}
-							options={[
-								{ key: "all", label: "Any kind", count: templates.length },
-								{
-									key: "horizontal",
-									label: "Horizontal",
-									count: templates.filter((t) => t.kind === "horizontal")
-										.length,
-								},
-								{
-									key: "feature",
-									label: "Feature",
-									count: templates.filter((t) => t.kind === "feature").length,
-								},
-							]}
-							value={kindFilter}
-						/>
-						<FilterChips
-							data-testid="agents-filter-state"
-							label="Filter by state"
-							onChange={onStateFilter}
-							options={[
-								{ key: "all", label: "All", count: templates.length },
-								{ key: "live", label: "Live", count: live.length },
-								{ key: "revoked", label: "Revoked", count: revoked.length },
-							]}
-							value={stateFilter}
-						/>
-					</div>
-				}
-				count={shown.length}
-				data-testid="agents-table-card"
-				definition={TERM.runtime}
-				title="Templates"
-			>
-				<DataTable
-					caption="Agent templates, with what runs each one and what it carries."
-					columns={AGENT_COLUMNS}
-					data-testid="agents-table"
-					empty={
-						<EmptyState
-							body="No template matches this filter. Every template is still in the catalog; the filters above are hiding them."
-							title="Nothing matches"
-						/>
-					}
-					onSelect={onSelect}
-					rowId={(row) => row.id}
-					rowTone={(row): RowTone => (isRevoked(row) ? "revoked" : "rest")}
-					rows={shown}
-					selectColumn="name"
-					selectedId={selectedId}
-				/>
-			</SectionCard>
-
-			{selected === null ? null : <AgentDetail template={selected} />}
-		</>
-	);
-}
-
-const AGENT_COLUMNS: Column<AgentTemplateRow>[] = [
-	{
-		key: "name",
-		header: "Agent",
-		sortValue: (row) => row.name,
-		render: (row) => (
-			<div className="flex flex-col gap-1">
-				<span
-					className={
-						isRevoked(row)
-							? "font-display text-sm text-text-subtle line-through"
-							: "font-display text-sm font-medium text-text"
-					}
-				>
-					{row.name}
-				</span>
-				<span className="font-mono text-micro text-text-subtle">
-					{row.slug}
-				</span>
-			</div>
-		),
-	},
-	{
-		/*
-		 * SECOND COLUMN, and that placement is the point. It is the field that
-		 * decides whether half a template's content is real, and it sat nowhere
-		 * on any screen until now.
-		 */
-		key: "runtime",
-		header: "Run by",
-		sortValue: (row) => row.runtime,
-		render: (row) => (
-			<div className="flex flex-col items-start gap-1">
-				<RuntimeChip
-					runtime={row.runtime}
-					testId={`agent-runtime-${row.slug}`}
-				/>
-				{strandedModelContext(row) ? (
-					<span className="text-micro text-gate-warn">
-						stores context it cannot receive
-					</span>
-				) : null}
-			</div>
-		),
-	},
-	{
-		key: "state",
-		header: "State",
-		sortValue: (row) => (isRevoked(row) ? 0 : 1),
-		render: (row) =>
-			isRevoked(row) ? (
-				<RevocationChip
-					revokedAt={row.revokedAt}
-					testId={`agent-revoked-${row.slug}`}
-				/>
-			) : (
-				<span className="text-micro text-text-subtle">Live</span>
-			),
-	},
-	{
-		key: "kind",
-		header: "Scope",
-		sortValue: (row) => `${row.kind}:${row.team ?? row.clientName ?? ""}`,
-		render: (row) => (
-			<div className="flex flex-col gap-1">
-				<span className="text-sm text-text-muted">
-					{row.kind === "horizontal" ? "Horizontal" : "Feature"}
-				</span>
-				<span className="text-micro text-text-subtle">
-					{/*
-					 * The database guarantees exactly one of these is set: two CHECK
-					 * constraints make team and engagement mutually exclusive by kind.
-					 * The fallback exists for a row that arrived from somewhere that
-					 * does not enforce them, and says so rather than showing a blank.
-					 */}
-					{row.team ?? row.engagementName ?? "no band or engagement recorded"}
-				</span>
-			</div>
-		),
-	},
-	{
-		key: "skills",
-		header: "Skills",
-		align: "end",
-		sortValue: (row) => row.skills.length,
-		render: (row) => {
-			const revokedCount = row.skills.filter((s) => s.revoked).length;
-			if (row.skills.length === 0) {
-				return <span className="text-micro text-text-subtle">none</span>;
-			}
-			return (
-				<div className="flex flex-col items-end gap-0.5">
-					<span className="text-sm text-text">{row.skills.length}</span>
-					{revokedCount > 0 ? (
-						<span className="text-micro text-gate-block">
-							{revokedCount} revoked
-						</span>
-					) : null}
-				</div>
-			);
-		},
-	},
-	{
-		key: "missions",
-		header: "On teams",
-		align: "end",
-		secondary: true,
-		sortValue: (row) => row.rosterUseCount,
-		render: (row) =>
-			row.rosterUseCount === 0 ? (
-				<span className="text-micro text-text-subtle">never used</span>
-			) : (
-				<span className="text-sm text-text">{row.rosterUseCount}</span>
-			),
-	},
-	{
-		key: "updated",
-		header: "Updated",
-		align: "end",
-		secondary: true,
-		sortValue: (row) => row.updatedAt,
-		render: (row) => (
-			<span className="font-mono text-micro text-text-subtle">
-				{isoDate(row.updatedAt)}
-			</span>
-		),
-	},
-];
-
-/* ── detail ──────────────────────────────────────────────────────────────── */
-
-function AgentDetail({ template }: { template: AgentTemplateRow }) {
-	const revoked = isRevoked(template);
-	const stranded = strandedModelContext(template);
-	const revokedSkills = template.skills.filter((s) => s.revoked);
-
-	return (
-		<div className="flex flex-col gap-4" data-testid="agent-detail">
-			{revoked ? (
-				<DataNotice
-					body={`Withdrawn on ${isoDate(template.revokedAt ?? "")}. No new mission can copy it in. Missions that already did keep their own copy of it, because a roster entry is a copy rather than a reference.`}
-					data-testid="agent-detail-revoked"
-					icon={ShieldAlert}
-					title="This template is revoked"
-					tone="warn"
-				/>
-			) : null}
-
-			{stranded ? (
-				<DataNotice
-					body={`This template is run by ${runtimeLabel(template.runtime).toLowerCase()} and stores written context anyway. The renderer sends identity and depth text only to a model, so what is stored here reaches nobody. Either the runtime is wrong, or this text belongs in a brief a person can read.`}
-					data-testid="agent-detail-stranded"
-					icon={AlertTriangle}
-					title="Stored context that will never be sent"
-					tone="warn"
-				/>
-			) : null}
-
-			{revokedSkills.length === 0 ? null : (
-				<DataNotice
-					body={`${plural(revokedSkills.length, "skill on this template has", "skills on this template have")} been withdrawn from the catalog: ${revokedSkills.map((s) => s.name).join(", ")}. Nothing re-checks the catalog when a package is built, so ${revokedSkills.length === 1 ? "it ships" : "they ship"} with every mission this template joins.`}
-					data-testid="agent-detail-revoked-skills"
-					icon={ShieldAlert}
-					title="This template carries a revoked skill"
-					tone="block"
-				/>
+			{templates.length === total ? null : (
+				<p className="text-micro text-text-subtle" data-testid="agents-partial">
+					{templates.length} of {total} loaded. Every count is of what is
+					loaded.
+				</p>
 			)}
-
-			<SectionCard data-testid="agent-detail-facts" title={template.name}>
-				<div className="px-4 py-4">
-					<DefinitionList
-						data-testid="agent-detail-list"
-						items={[
-							{
-								label: "Slug",
-								value: (
-									<Tag data-testid="agent-detail-slug">{template.slug}</Tag>
-								),
-								hint: "The folder name in the delivered package and the key its file permissions are looked up by.",
-							},
-							{
-								label: "Run by",
-								value: (
-									<RuntimeChip
-										runtime={template.runtime}
-										testId="agent-detail-runtime"
-									/>
-								),
-								hint: TERM.runtime,
-							},
-							{
-								label: "Scope",
-								value:
-									template.kind === "horizontal"
-										? `Horizontal · ${template.team ?? "no band recorded"}`
-										: `Feature · ${template.engagementName ?? "no engagement recorded"}`,
-								hint:
-									template.kind === "horizontal"
-										? TERM.horizontalAgent
-										: TERM.feature,
-							},
-							...(template.kind === "feature"
-								? [
-										{
-											label: "Client",
-											value:
-												template.clientName ?? "No client name on the record.",
-										},
-									]
-								: []),
-							{
-								label: "Waves",
-								value:
-									template.waveDefaults.length === 0 ? (
-										<span className="text-text-subtle">
-											None set. The mission decides when this agent runs.
-										</span>
-									) : (
-										<div className="flex flex-wrap gap-1.5">
-											{template.waveDefaults.map((wave) => (
-												<Tag data-testid="agent-detail-wave" key={wave}>
-													{wave}
-												</Tag>
-											))}
-										</div>
-									),
-								hint: TERM.wave,
-							},
-							{
-								label: "On mission teams",
-								value:
-									template.rosterUseCount === 0
-										? "Never used. No mission has copied this template in."
-										: plural(template.rosterUseCount, "team", "teams"),
-								hint: TERM.rosterEntry,
-							},
-							{
-								label: "Added",
-								value: (
-									<span className="font-mono text-micro">
-										{isoDate(template.createdAt)}
-									</span>
-								),
-							},
-							{
-								label: "Updated",
-								value: (
-									<span className="font-mono text-micro">
-										{isoDate(template.updatedAt)}
-									</span>
-								),
-							},
+			<FilterBar
+				data-testid="agents-filterbar"
+				order={
+					/*
+					 * NO COUNTS. Ordering is not filtering, and every option carried
+					 * `templates.length` purely to satisfy the old required prop —
+					 * "Added 7 · Name 7 · Scope 7 · Skills 7", four identical numbers
+					 * that meant nothing and made a sort look like a filter that had
+					 * stopped working.
+					 */
+					<FilterChips
+						data-testid="agents-order"
+						label="Order by"
+						onChange={(next) => onSearch({ ...search, order: next })}
+						options={[
+							{ key: "added", label: "Added" },
+							{ key: "name", label: "Name" },
+							{ key: "scope", label: "Scope" },
+							{ key: "skills", label: "Skills" },
 						]}
+						value={order}
 					/>
-				</div>
-			</SectionCard>
-
-			<ModelContext template={template} />
-
-			<SectionCard
-				count={template.skills.length}
-				data-testid="agent-detail-skills"
-				definition={TERM.skill}
-				title="Skills it carries"
+				}
+				summary={
+					<FilterSummary
+						data-testid="agents-filter-summary"
+						noun="templates"
+						onClear={() => onSearch({})}
+						shown={ordered.length}
+						total={templates.length}
+					/>
+				}
 			>
-				{template.skills.length === 0 ? (
+				<FilterChips
+					data-testid="agents-filter-runtime"
+					label="Runtime"
+					onChange={(runtime) => onSearch({ ...search, runtime })}
+					options={[
+						{ key: "all", label: "All", count: templates.length },
+						{
+							key: "model",
+							label: runtimeLabel("model"),
+							count: templates.filter((t) => t.runtime === "model").length,
+						},
+						{
+							key: "human",
+							label: runtimeLabel("human"),
+							count: templates.filter((t) => t.runtime === "human").length,
+						},
+						{
+							key: "code",
+							label: runtimeLabel("code"),
+							count: templates.filter((t) => t.runtime === "code").length,
+						},
+					]}
+					value={runtimeFilter}
+				/>
+				<FilterChips
+					data-testid="agents-filter-kind"
+					label="Kind"
+					onChange={(kind) => onSearch({ ...search, kind })}
+					options={[
+						{ key: "all", label: "All", count: templates.length },
+						{
+							key: "horizontal",
+							label: "Horizontal",
+							count: templates.filter((t) => t.kind === "horizontal").length,
+						},
+						{
+							key: "feature",
+							label: "Feature",
+							count: templates.filter((t) => t.kind === "feature").length,
+						},
+					]}
+					value={kindFilter}
+				/>
+				<FilterChips
+					data-testid="agents-filter-state"
+					label="State"
+					onChange={(state) => onSearch({ ...search, state })}
+					options={[
+						{ key: "all", label: "All", count: templates.length },
+						{ key: "live", label: "Live", count: live.length },
+						{
+							key: "revoked",
+							label: "Revoked",
+							count: templates.length - live.length,
+						},
+					]}
+					value={stateFilter}
+				/>
+			</FilterBar>
+			{ordered.length === 0 ? (
+				<SectionCard data-testid="agents-grid-empty" title="No match">
 					<EmptyState
-						body="No skill is attached, so this agent works from what is written on it alone. Skills are attached from the skills catalog and travel with the agent into every mission."
-						title="No skills attached"
+						body="No template matches these filters. Every template is still in the catalog; the filters above are hiding them."
+						title="Nothing matches"
 					/>
-				) : (
-					<ul className="flex flex-col">
-						{template.skills.map((skill) => (
-							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
-								key={skill.id}
-							>
-								<span
-									className={
-										skill.revoked
-											? "font-display text-sm text-text-subtle line-through"
-											: "font-display text-sm text-text"
-									}
-								>
-									{skill.name}
-								</span>
-								<SkillTypeChip
-									testId={`agent-skill-type-${skill.slug}`}
-									type={skill.type}
-								/>
-								{skill.revoked ? (
-									<RevokedAttachmentChip
-										testId={`agent-skill-revoked-${skill.slug}`}
-									/>
-								) : null}
-								<Link
-									className="ml-auto text-micro text-accent-text hover:text-accent-hover"
-									data-testid="agent-skill-link"
-									to="/catalog/skills"
-								>
-									Open skills
-								</Link>
-							</li>
-						))}
-					</ul>
-				)}
-			</SectionCard>
-
-			<SectionCard data-testid="agent-detail-paths" title="What it may change">
-				<div className="flex flex-col gap-5 px-4 py-4">
-					<div>
-						<p className="pb-1 text-sm font-medium text-text">Writable</p>
-						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
-							{TERM.writablePaths}
-						</p>
-						<PathList
-							data-testid="agent-detail-writable"
-							emptyLabel="No writable paths. This agent cannot change any file, which is a real configuration and not a missing one."
-							paths={template.writablePaths}
-						/>
-					</div>
-					<div>
-						<p className="pb-1 text-sm font-medium text-text">Append-only</p>
-						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
-							{TERM.appendOnlyPaths}
-						</p>
-						<PathList
-							data-testid="agent-detail-append"
-							emptyLabel="No append-only paths. This agent cannot add itself to a shared file such as a composition root or a decision log."
-							paths={template.appendOnlyPaths}
-						/>
-					</div>
-					<div>
-						<p className="pb-1 text-sm font-medium text-text">Read-only</p>
-						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
-							{TERM.readonlyPaths}
-						</p>
-						<PathList
-							data-testid="agent-detail-readonly"
-							emptyLabel="No read-only paths recorded."
-							paths={template.readonlyPaths}
-						/>
-					</div>
-				</div>
-			</SectionCard>
+				</SectionCard>
+			) : (
+				/*
+				 * Three columns at xl, two at md, around 330px each in the 1440
+				 * frame. `auto-rows-fr` because a grid reads as a grid when its rows
+				 * align, and these measured 307/307/307/280/280/280/249: skill chips
+				 * wrap to two lines on some cards and one on others.
+				 */
+				<ul
+					className="grid auto-rows-fr grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
+					data-testid="agents-grid"
+				>
+					{ordered.map((template) => (
+						<AgentCard key={template.id} template={template} />
+					))}
+				</ul>
+			)}
 		</div>
 	);
 }
 
 /**
- * THE SECTION THAT REFUSES TO RENDER.
+ * One worker, as a card.
  *
- * For a model agent this shows identity.md and depth.md. For a person or a
- * script it shows neither, and says why, because that is what the renderer
- * actually does. Showing the text with a caveat beside it would put the operator
- * one glance away from believing a person receives it, which is the belief that
- * produced the bug.
- *
- * The stored text is not hidden entirely when it exists: the notice above says
- * it is there and will not be sent. Concealing it would trade one wrong belief
- * for another.
+ * THE WHOLE CARD IS NOT A BUTTON. The card carries a skills list whose entries
+ * are their own links, and nesting an anchor inside a button is invalid markup
+ * and unreachable by keyboard. The name is the control, which is also what an
+ * operator aims at.
  */
-function ModelContext({ template }: { template: AgentTemplateRow }) {
-	if (template.runtime !== "model") {
-		return (
-			<SectionCard
-				data-testid="agent-detail-context"
-				definition={TERM.runtime}
-				title="Written context"
-			>
-				<div className="px-4 py-4" data-context-sent="false">
-					<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
-						This agent is {runtimeLabel(template.runtime).toLowerCase()}, so no
-						written context is sent to it. Identity and depth text are built for
-						a model to read and the delivered package leaves them out entirely
-						for this agent.
-					</p>
-					{strandedModelContext(template) ? (
-						<p className="max-w-[52ch] pt-2 text-sm leading-relaxed text-gate-warn">
-							Text is stored on this template anyway. It is not shown here
-							because showing it would suggest it is used.
-						</p>
-					) : null}
-				</div>
-			</SectionCard>
-		);
-	}
+function AgentCard({ template }: { template: AgentTemplateRow }) {
+	const revoked = isRevoked(template);
 
 	return (
-		<SectionCard
-			data-testid="agent-detail-context"
-			definition="Identity is who the agent is. Depth is how far it goes before asking. Both are sent to the model and nowhere else."
-			title="Written context"
+		<li
+			className="elev-1 flex flex-col gap-3 rounded-md p-4"
+			data-testid="agent-card"
 		>
-			<div className="px-4 py-4" data-context-sent="true">
-				<p className="pb-2 text-micro text-text-subtle">identity.md</p>
-				<pre className="app-scroll max-h-[24rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
-					{template.identityMd.trim().length === 0
-						? "Empty. This agent is sent no identity text."
-						: template.identityMd}
-				</pre>
-				<p className="pt-4 pb-2 text-micro text-text-subtle">depth.md</p>
-				<pre className="app-scroll max-h-[24rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
-					{(template.depthMd ?? "").trim().length === 0
-						? "Not set. This agent is sent no depth text."
-						: template.depthMd}
-				</pre>
+			{/*
+			 * THE WHOLE HEADER IS THE CONTROL, name and slug together. It used to
+			 * be the name alone, which is a click target the width of a word on a
+			 * 337px card, and nothing else signalled what was clickable.
+			 *
+			 * Still not the whole card: the skill chips below are their own links,
+			 * and an anchor inside a button is invalid markup and unreachable by
+			 * keyboard.
+			 */}
+			<Link
+				className="interactive -mx-2 flex flex-col gap-1 rounded-sm px-2 py-1 text-left"
+				data-testid="agent-card-open"
+				params={{ agentId: template.id }}
+				to="/catalog/agent/$agentId"
+			>
+				<span
+					className={cn(
+						"font-display text-sm",
+						revoked
+							? "text-text-subtle line-through"
+							: "font-semibold text-text",
+					)}
+				>
+					{template.name}
+				</span>
+				<span className="font-mono text-micro text-text-subtle">
+					{template.slug}
+				</span>
+			</Link>
+
+			<div className="flex flex-wrap items-center gap-2">
+				<RuntimeChip
+					runtime={template.runtime}
+					testId={`agent-runtime-${template.slug}`}
+				/>
+				{revoked ? (
+					<RevocationChip
+						revokedAt={template.revokedAt}
+						testId={`agent-revoked-${template.slug}`}
+					/>
+				) : null}
 			</div>
-		</SectionCard>
+
+			<p className="text-micro text-text-muted" data-testid="agent-card-scope">
+				{template.kind === "horizontal"
+					? `Horizontal · ${template.team ?? "no band recorded"}`
+					: `Feature · ${template.engagementName ?? "no engagement recorded"}`}
+			</p>
+
+			{/*
+			 * THE FACT A REVIEWER LOOKS FOR FIRST, and it appeared nowhere in this
+			 * product before. Never summed: writable, append-only and read-only are
+			 * three different grants, not three shades of one.
+			 */}
+			<div>
+				<p className="pb-1 text-micro text-text-subtle">May change</p>
+				<PathBudget
+					appendOnly={template.appendOnlyPaths.length}
+					data-testid={`agent-paths-${template.slug}`}
+					readonly={template.readonlyPaths.length}
+					writable={template.writablePaths.length}
+				/>
+			</div>
+
+			<div>
+				<p className="pb-1 text-micro text-text-subtle">
+					{template.skills.length === 0
+						? "No skills attached"
+						: plural(template.skills.length, "skill", "skills")}
+				</p>
+				{template.skills.length === 0 ? null : (
+					<div className="flex flex-wrap gap-1.5">
+						{template.skills.map((skill) => (
+							<Link
+								data-testid="agent-card-skill"
+								key={skill.id}
+								search={{ skill: skill.id }}
+								to="/catalog/skills"
+							>
+								<Pill
+									className={cn(
+										"gap-1",
+										skill.revoked ? "text-gate-block line-through" : "",
+									)}
+									data-testid={`agent-card-skill-${skill.slug}`}
+								>
+									<SkillTypeGlyph
+										testId={`agent-card-skill-type-${skill.slug}`}
+										type={skill.type}
+									/>
+									{skill.name}
+								</Pill>
+							</Link>
+						))}
+					</div>
+				)}
+				{/* No sentence here. The struck-through chip marks WHICH skill, and
+				    the page banner already carries the consequence once. */}
+			</div>
+
+			{/* Non-zero only. "0 teams" on a template nobody has used yet is the
+			    normal state, and the opened template says so in words. */}
+			{template.rosterUseCount === 0 ? null : (
+				<p className="text-micro text-text-subtle" data-testid="agent-card-use">
+					On {plural(template.rosterUseCount, "mission team", "mission teams")}
+				</p>
+			)}
+		</li>
 	);
 }

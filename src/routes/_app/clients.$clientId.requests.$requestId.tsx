@@ -4,11 +4,11 @@ import type { z } from "zod";
 
 import { intakePreview, intakeSchema } from "#/contract/intake";
 import { success } from "#/contract/shared/envelope";
-import { SectionShell } from "#/modules/client/ui/scaffold";
 import { REQUEST_STATUS_TONE } from "#/modules/client/ui/status";
 import { usePageHeader } from "#/modules/shell/use-page-header";
 import { StatusBadge, Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
+import { SectionCard } from "#/ui/section-card";
 import { SkeletonRows } from "#/ui/skeleton";
 import { ErrorState } from "#/ui/states";
 import { Surface } from "#/ui/surface";
@@ -280,10 +280,10 @@ function RequestReview() {
 							</div>
 
 							{/* ── 1 · what was asked ─────────────────────────────────── */}
-							<SectionShell
+							<SectionCard
 								blurb="The request exactly as it arrived, unedited. Everything below is derived from this, so this is what you check the rest against."
 								id="asked"
-								n={1}
+								testId="request-section-asked"
 								state={intake.sourceMd === null ? "empty" : "populated"}
 								title="What was asked"
 							>
@@ -329,13 +329,13 @@ function RequestReview() {
 										</ul>
 									</div>
 								)}
-							</SectionShell>
+							</SectionCard>
 
 							{/* ── 2 · what we derived, and its evidence ──────────────── */}
-							<SectionShell
+							<SectionCard
 								blurb="The cut is how the work is split: horizontal means by layer, vertical means by feature. It is computed by reading the repository's folders, never chosen by hand, and the evidence below is what decided it."
 								id="derived"
-								n={2}
+								testId="request-section-derived"
 								state={intake.derivedCut === null ? "empty" : "populated"}
 								title="What we derived"
 							>
@@ -381,7 +381,7 @@ function RequestReview() {
 										)}
 									</div>
 								)}
-							</SectionShell>
+							</SectionCard>
 
 							{/* ── 3 · what we suggest ────────────────────────────────── */}
 							{/* ── 4 · what this will create ──────────────────────────── */}
@@ -392,10 +392,10 @@ function RequestReview() {
 									</p>
 								}
 								error={({ error }) => (
-									<SectionShell
+									<SectionCard
 										blurb="What approving this request would produce."
 										id="creates"
-										n={4}
+										testId="request-section-creates"
 										notBuiltReason={`The preview could not be computed (${error.message}). Until it can, there is nothing to approve, because approving without a preview is the one thing this screen exists to prevent.`}
 										state="not-built"
 										title="What this will create"
@@ -409,11 +409,11 @@ function RequestReview() {
 									const p = pv.data;
 									return (
 										<>
-											<SectionShell
+											<SectionCard
 												blurb="A preset is a saved squad. This is the roster it would produce, expanded, so you can see who would be assigned rather than a name standing in for them."
 												count={p.roster.length}
 												id="suggest"
-												n={3}
+												testId="request-section-suggest"
 												state={p.roster.length === 0 ? "empty" : "populated"}
 												title="What we suggest"
 											>
@@ -450,12 +450,12 @@ function RequestReview() {
 														))}
 													</ul>
 												)}
-											</SectionShell>
+											</SectionCard>
 
-											<SectionShell
+											<SectionCard
 												blurb="Approving creates this mission. A mission is the unit of work that gets dispatched, gated and delivered."
 												id="creates"
-												n={4}
+												testId="request-section-creates"
 												state="populated"
 												title="What this will create"
 											>
@@ -560,17 +560,17 @@ function RequestReview() {
 														</div>
 													)}
 												</div>
-											</SectionShell>
+											</SectionCard>
 										</>
 									);
 								}}
 							</Surface>
 
 							{/* ── 5 · the decision ───────────────────────────────────── */}
-							<SectionShell
+							<SectionCard
 								blurb="Approving creates the mission above. The request itself is kept either way, because it is the record of how the brief came to exist."
 								id="decision"
-								n={5}
+								testId="request-section-decision"
 								state="populated"
 								title="Decision"
 							>
@@ -672,7 +672,7 @@ function RequestReview() {
 										</div>
 									</div>
 								)}
-							</SectionShell>
+							</SectionCard>
 						</>
 					);
 				}}

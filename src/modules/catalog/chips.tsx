@@ -48,6 +48,33 @@ export function RevocationChip({
 	);
 }
 
+/**
+ * THE SAME FACT, SIZED FOR A DENSE ROW.
+ *
+ * `RevocationChip` is a full `StatusBadge` and measured 93x28 inside a 342x51
+ * library row — a quarter of the row's width, spent on a state that the
+ * strikethrough beside it already carries, and loud enough that it read as a
+ * control rather than a label.
+ *
+ * This keeps everything the rule requires and drops only the chrome: the ✕
+ * glyph, the word, and the block tone all survive, so the state still never
+ * rests on colour alone. It is a label at micro scale rather than a pill.
+ */
+export function RevocationMark({ testId }: { testId: string }) {
+	return (
+		<span
+			className="flex shrink-0 items-center gap-1 text-micro text-gate-block"
+			data-revoked="true"
+			data-testid={testId}
+		>
+			<span aria-hidden="true" className="font-mono">
+				✕
+			</span>
+			Revoked
+		</span>
+	);
+}
+
 /* ── skill type ──────────────────────────────────────────────────────────── */
 
 const SKILL_TYPE: Record<SkillType, { icon: LucideIcon; label: string }> = {
@@ -65,6 +92,35 @@ const SKILL_TYPE: Record<SkillType, { icon: LucideIcon; label: string }> = {
 	 */
 	capability: { icon: Wrench, label: "Capability · declarative" },
 };
+
+/**
+ * The type as a glyph alone, for places with no room for the word.
+ *
+ * Still never colour-only: the icon differs per type AND the accessible name
+ * spells it out, so it satisfies the same rule the full chip does. Capability
+ * keeps "declarative" in its title, because schema.ts requires the UI to say a
+ * capability grant is not enforced wherever it names one.
+ */
+export function SkillTypeGlyph({
+	type,
+	testId,
+}: {
+	type: SkillType;
+	testId: string;
+}) {
+	const { icon: Icon, label } = SKILL_TYPE[type];
+	return (
+		<span
+			className="text-text-subtle"
+			data-skill-type={type}
+			data-testid={testId}
+			title={label}
+		>
+			<Icon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
+			<span className="sr-only">{label}</span>
+		</span>
+	);
+}
 
 export function SkillTypeChip({
 	type,

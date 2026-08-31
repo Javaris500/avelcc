@@ -205,10 +205,14 @@
   --color-card:                 var(--color-app-panel);
   --color-card-foreground:      var(--color-text);
 
-  /* The sidebar is a DIFFERENT PLANE, not a raised one — UI-PLAN section 1.
-     It sits at app-bg in both themes, which is why this maps to app-bg and
-     not to panel or to a surface of its own. */
-  --color-sidebar:                    var(--color-app-bg);
+  /* THE SIDEBAR SHARES THE CONTENT'S GROUND. It maps to app-panel because
+     sidebar.tsx paints app-panel, and an alias that disagrees with the element
+     it is named after is a trap set for whoever reaches for `bg-sidebar` next.
+     Nothing consumes it today, which is exactly why it was free to be wrong.
+     It read app-bg, from when the sidebar was a separate darker plane; the
+     operator reversed that so the window is one surface divided by the accent
+     seam rather than by a tonal step. */
+  --color-sidebar:                    var(--color-app-panel);
   --color-sidebar-foreground:         var(--color-text);
   --color-sidebar-primary:            var(--color-accent);
   --color-sidebar-primary-foreground: var(--color-bg);
@@ -306,10 +310,14 @@
   --color-card:                 var(--color-app-panel);
   --color-card-foreground:      var(--color-text);
 
-  /* The sidebar is a DIFFERENT PLANE, not a raised one — UI-PLAN section 1.
-     It sits at app-bg in both themes, which is why this maps to app-bg and
-     not to panel or to a surface of its own. */
-  --color-sidebar:                    var(--color-app-bg);
+  /* THE SIDEBAR SHARES THE CONTENT'S GROUND. It maps to app-panel because
+     sidebar.tsx paints app-panel, and an alias that disagrees with the element
+     it is named after is a trap set for whoever reaches for `bg-sidebar` next.
+     Nothing consumes it today, which is exactly why it was free to be wrong.
+     It read app-bg, from when the sidebar was a separate darker plane; the
+     operator reversed that so the window is one surface divided by the accent
+     seam rather than by a tonal step. */
+  --color-sidebar:                    var(--color-app-panel);
   --color-sidebar-foreground:         var(--color-text);
   --color-sidebar-primary:            var(--color-accent);
   --color-sidebar-primary-foreground: var(--color-bg);

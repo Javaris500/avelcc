@@ -41,6 +41,7 @@ import { Route as ApiExportsPreviewRouteImport } from './routes/api/exports.prev
 import { Route as ApiIntakesIdRouteImport } from './routes/api/intakes.$id'
 import { Route as ApiMissionsIdRouteImport } from './routes/api/missions.$id'
 import { Route as ApiPreflightBlastRadiusRouteImport } from './routes/api/preflight.blast-radius'
+import { Route as AppCatalogAgentAgentIdRouteImport } from './routes/_app/catalog.agent.$agentId'
 import { Route as AppClientsClientIdIndexRouteImport } from './routes/_app/clients.$clientId.index'
 import { Route as AppMissionsMissionIdIndexRouteImport } from './routes/_app/missions.$missionId.index'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github.callback'
@@ -210,6 +211,11 @@ const ApiPreflightBlastRadiusRoute = ApiPreflightBlastRadiusRouteImport.update({
   path: '/api/preflight/blast-radius',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppCatalogAgentAgentIdRoute = AppCatalogAgentAgentIdRouteImport.update({
+  id: '/catalog/agent/$agentId',
+  path: '/catalog/agent/$agentId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppClientsClientIdIndexRoute = AppClientsClientIdIndexRouteImport.update({
   id: '/$clientId/',
   path: '/$clientId/',
@@ -291,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/missions/': typeof AppMissionsIndexRoute
+  '/catalog/agent/$agentId': typeof AppCatalogAgentAgentIdRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
@@ -333,6 +340,7 @@ export interface FileRoutesByTo {
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/missions': typeof AppMissionsIndexRoute
+  '/catalog/agent/$agentId': typeof AppCatalogAgentAgentIdRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/api/missions/$id': typeof ApiMissionsIdRouteWithChildren
   '/api/preflight/blast-radius': typeof ApiPreflightBlastRadiusRoute
   '/_app/missions/': typeof AppMissionsIndexRoute
+  '/_app/catalog/agent/$agentId': typeof AppCatalogAgentAgentIdRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/clients/$id/detail': typeof ApiClientsIdDetailRoute
   '/api/exports/$id/archive': typeof ApiExportsIdArchiveRoute
@@ -421,6 +430,7 @@ export interface FileRouteTypes {
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
     | '/missions/'
+    | '/catalog/agent/$agentId'
     | '/api/auth/github/callback'
     | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
@@ -463,6 +473,7 @@ export interface FileRouteTypes {
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
     | '/missions'
+    | '/catalog/agent/$agentId'
     | '/api/auth/github/callback'
     | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
@@ -506,6 +517,7 @@ export interface FileRouteTypes {
     | '/api/missions/$id'
     | '/api/preflight/blast-radius'
     | '/_app/missions/'
+    | '/_app/catalog/agent/$agentId'
     | '/api/auth/github/callback'
     | '/api/clients/$id/detail'
     | '/api/exports/$id/archive'
@@ -760,6 +772,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPreflightBlastRadiusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/catalog/agent/$agentId': {
+      id: '/_app/catalog/agent/$agentId'
+      path: '/catalog/agent/$agentId'
+      fullPath: '/catalog/agent/$agentId'
+      preLoaderRoute: typeof AppCatalogAgentAgentIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/clients/$clientId/': {
       id: '/_app/clients/$clientId/'
       path: '/$clientId'
@@ -853,6 +872,7 @@ interface AppRouteChildren {
   AppSettingsConnectionsRoute: typeof AppSettingsConnectionsRoute
   AppSettingsRepositoriesRoute: typeof AppSettingsRepositoriesRoute
   AppMissionsIndexRoute: typeof AppMissionsIndexRoute
+  AppCatalogAgentAgentIdRoute: typeof AppCatalogAgentAgentIdRoute
   AppMissionsMissionIdIndexRoute: typeof AppMissionsMissionIdIndexRoute
   AppMissionsMissionIdExportsNewRoute: typeof AppMissionsMissionIdExportsNewRoute
 }
@@ -869,6 +889,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsConnectionsRoute: AppSettingsConnectionsRoute,
   AppSettingsRepositoriesRoute: AppSettingsRepositoriesRoute,
   AppMissionsIndexRoute: AppMissionsIndexRoute,
+  AppCatalogAgentAgentIdRoute: AppCatalogAgentAgentIdRoute,
   AppMissionsMissionIdIndexRoute: AppMissionsMissionIdIndexRoute,
   AppMissionsMissionIdExportsNewRoute: AppMissionsMissionIdExportsNewRoute,
 }

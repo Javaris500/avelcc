@@ -34,11 +34,15 @@ import { expect, test } from "@playwright/test";
  * `populated` IS THE DATABASE'S STATE, not a preference, and it is the reason
  * these three screens assert different things.
  *
- * As of `a0ef4dd`: `agent_templates` holds 7 rows; `skills` and `skill_sources`
- * hold 0, confirmed against the database rather than inferred from a 200. When
- * skills are seeded, flip the flag and these tests follow. They are written to
- * fail rather than to quietly pass if that happens and nobody updates them,
- * which is the point of pinning it here instead of asking the page.
+ * All three are populated now: 7 agent templates, 10 skills of which 1 is
+ * revoked and attached to 2 live templates, and 3 sources with a genuinely
+ * uneven live/revoked split.
+ *
+ * THIS FLAG ALREADY EARNED ITS KEEP. It was `false` for skills and sources, and
+ * when they were seeded four tests failed rather than quietly passing — which is
+ * exactly why it is pinned here instead of read off the page. A test that asks
+ * the page what state it is in agrees with the page by construction and can
+ * never catch the page being wrong.
  */
 const SCREENS = [
 	{
@@ -47,8 +51,9 @@ const SCREENS = [
 		title: "Skills",
 		/** The first words of TERM.skill. Enough to pin the slot, not the prose. */
 		definition: "A skill is a piece of know-how",
-		populated: false,
-		subtitleContains: "",
+		populated: true,
+		subtitleContains: "revoked",
+		hasFilters: true,
 	},
 	{
 		path: "/catalog/agents",
@@ -57,14 +62,16 @@ const SCREENS = [
 		definition: "An agent template is a reusable description",
 		populated: true,
 		subtitleContains: "run by a model",
+		hasFilters: true,
 	},
 	{
 		path: "/catalog/sources",
 		id: "sources",
 		title: "Skill sources",
 		definition: "A source is where a skill came from",
-		populated: false,
-		subtitleContains: "",
+		populated: true,
+		subtitleContains: "live skill",
+		hasFilters: false,
 	},
 ] as const;
 
@@ -75,6 +82,15 @@ const SCREENS = [
  * as a device-guard failure rather than as three mystery timeouts.
  */
 test.use({ viewport: { width: 1440, height: 900 } });
+
+/** Each check's `data-check` key against the banner that replaces it. */
+const BANNERS: Record<string, Record<string, string>> = {
+	skills: { dangling: "skills-dangling-notice" },
+	agents: {
+		stranded: "agents-stranded-notice",
+		"revoked-skill": "agents-revoked-skill-notice",
+	},
+};
 
 for (const screen of SCREENS) {
 	test.describe(screen.title, () => {
@@ -220,6 +236,96 @@ for (const screen of SCREENS) {
 		 * still fails the suite.
 		 */
 
+		/**
+		 * THE AUDIT'S FINDINGS, PINNED, and re-pointed at the layouts that
+		 * replaced the tables they were found in.
+		 *
+		 * Every one of these was invisible while the catalogue tables were empty
+		 * and every one was found by looking at a populated page.
+		 */
+		test("renders counts and filters the way the audit ruled", async ({
+			page,
+		}) => {
+			test.skip(!screen.populated, "no rows to render counts for");
+			await expect(page.getByTestId("surface-success")).toBeVisible();
+
+			/*
+			 * A FILTER WHOSE ONLY OUTCOME IS AN EMPTY TABLE IS DISABLED, and keeps
+			 * its count so the chip still answers "are there any?" without being
+			 * clicked. Derived from the count, so it re-enables itself the day a
+			 * row exists rather than needing anyone to remember. This one survived
+			 * the rewrite unchanged and applies to both new layouts.
+			 */
+			/*
+			 * PINNED, not asked of the page. Sources has no filters at all — it is
+			 * a short list with nothing worth narrowing — and a test that asks the
+			 * page whether it has filters agrees with the page by construction,
+			 * so it can never catch a screen that lost them.
+			 */
+			const chips = page.locator(
+				`[data-testid^="${screen.id}-filter-"] button`,
+			);
+			expect((await chips.count()) > 0).toBe(screen.hasFilters);
+			for (const chip of await chips.all()) {
+				const zero = /\D0$/.test(
+					((await chip.textContent()) ?? "").replace(/\s+/g, ""),
+				);
+				const pressed = (await chip.getAttribute("aria-pressed")) === "true";
+				// The active chip is never disabled, so no filter can trap you in a
+				// state you cannot leave.
+				expect(await chip.isDisabled()).toBe(zero && !pressed);
+			}
+
+			/*
+			 * ONE KIND OF VALUE PER COLUMN, wherever a count cell survives. Skills
+			 * is a library now and agents is a card grid, so only sources still has
+			 * one — and its split live/revoked count was the last place the audit's
+			 * word-for-a-number defect was still living.
+			 */
+			for (const text of await page
+				.locator("[data-count]")
+				.evaluateAll((els) =>
+					els.map((el) => el.querySelector("span")?.textContent?.trim() ?? ""),
+				)) {
+				expect(text).toMatch(/^\d+$/);
+			}
+		});
+
+		/**
+		 * A CHECK IS A BANNER OR A CLAUSE, NEVER BOTH.
+		 *
+		 * This replaced the metric row, and the reason is a defect: a card reading
+		 * "1 · Revoked but still attached" sat directly above a banner stating the
+		 * same fact with room for the consequence. The two states are mutually
+		 * exclusive by construction now, and that is exactly what is asserted —
+		 * a check cannot be in both states, so neither can the page.
+		 *
+		 * The healthy state still has to be VISIBLE. "Not counted" and "counted
+		 * zero" must not become the same pixel, which is rule 7 at its smallest
+		 * scale, so a passing check gets a clause rather than silence.
+		 */
+		test("states each check exactly once", async ({ page }) => {
+			test.skip(screen.id === "sources", "sources runs no checks");
+			await expect(page.getByTestId("surface-success")).toBeVisible();
+
+			const checks = page.getByTestId(`${screen.id}-checks`);
+			const passed = (await checks.count())
+				? await checks
+						.locator("[data-check]")
+						.evaluateAll((els) =>
+							els.map((el) => el.getAttribute("data-check")),
+						)
+				: [];
+
+			for (const [key, banner] of Object.entries(BANNERS[screen.id] ?? {})) {
+				const fired = (await page.getByTestId(banner).count()) > 0;
+				const clean = passed.includes(key);
+				// Exactly one. Both would be the duplication that caused this
+				// rewrite; neither would mean the check silently stopped running.
+				expect(fired !== clean).toBe(true);
+			}
+		});
+
 		test("logs no error to the console", async ({ page }) => {
 			const errors: string[] = [];
 			page.on("console", (message) => {
@@ -265,3 +371,93 @@ for (const screen of SCREENS) {
  * testable the day the catalog endpoints exist, which is the same day the
  * fourth test above stops skipping.
  */
+
+/**
+ * A FILTER CHIP COUNTS WHAT SELECTING IT WOULD SHOW, not how many exist.
+ *
+ * Counting each dimension over the whole set passes the naive test and fails
+ * where two filters meet: with `Revoked` chosen, the type chips read
+ * "Knowledge 8 · Capability 2" over all ten skills, neither was disabled, and
+ * choosing Capability produced an empty list. The disabled-at-zero rule was
+ * asking "are there any of these" when the useful question is "would this do
+ * anything from where I am standing".
+ */
+test("filter counts respect the other filter", async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto("/catalog/skills?state=revoked");
+	await expect(page.getByTestId("surface-success")).toBeVisible();
+
+	const capability = page.getByTestId("skills-filter-type-capability");
+	// One revoked skill and it is a knowledge skill, so this combination has no
+	// members and the chip must say so rather than lead somewhere empty.
+	await expect(capability).toContainText("0");
+	await expect(capability).toBeDisabled();
+	await expect(page.getByTestId("skills-filter-type-knowledge")).toBeEnabled();
+});
+
+/**
+ * The dense row keeps the state and loses the chrome.
+ *
+ * A full `StatusBadge` measured 93x28 inside a 342x51 row — a quarter of the
+ * width for a fact the strikethrough beside it already carried, loud enough to
+ * read as a control. Glyph, word and tone all survive; only the pill goes.
+ */
+test("a revoked row is marked without a pill", async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.goto("/catalog/skills?state=revoked");
+	const mark = page.locator('[data-testid^="skill-revoked-"]').first();
+	await expect(mark).toBeVisible();
+	// The glyph is what carries the state for anyone who cannot separate hues.
+	await expect(mark).toContainText("Revoked");
+	const box = await mark.boundingBox();
+	expect(box?.width ?? 999).toBeLessThan(70);
+});
+
+/**
+ * ONE TEMPLATE HAS AN ADDRESS.
+ *
+ * It was a panel below the grid, so choosing a card scrolled you away from the
+ * thing you chose and the identity document landed at the bottom of a page
+ * already three screens tall.
+ *
+ * The route is `/catalog/agent/$agentId`, a SIBLING of the roster rather than
+ * a child of it, and that is not a style choice. Making `/catalog/agents` a
+ * parent route pushed the generated router types past an inference limit and
+ * silently stripped the Start `server` augmentation from every file in
+ * `src/routes/api/` — 23 type errors in files this module does not own,
+ * reproducible, and gone the moment the route became a sibling.
+ */
+test.describe("an agent template's own page", () => {
+	test.use({ viewport: { width: 1440, height: 900 } });
+
+	test("opens from a card, reloads, and comes back", async ({ page }) => {
+		await page.goto("/catalog/agents");
+		await expect(page.getByTestId("surface-success")).toBeVisible();
+		await page.getByTestId("agent-card-open").first().click();
+
+		await expect(page.getByTestId("agent-page-masthead")).toBeVisible();
+		expect(new URL(page.url()).pathname).toMatch(/^\/catalog\/agent\//);
+		// The shell header claims the template's name, so there is still one h1.
+		await expect(page.locator("h1")).toHaveCount(1);
+
+		await page.reload();
+		await expect(page.getByTestId("agent-page-masthead")).toBeVisible();
+
+		await page.getByTestId("agent-page-back").click();
+		await expect(page.getByTestId("agents-grid")).toBeVisible();
+	});
+
+	test("says a stale address is stale, and not that it broke", async ({
+		page,
+	}) => {
+		await page.goto("/catalog/agent/00000000-0000-4000-8000-000000000000");
+		await expect(page.getByTestId("empty-state")).toBeVisible();
+		await expect(page.getByTestId("empty-state")).toContainText(
+			"No template at this address",
+		);
+		// The read succeeded. A stale link is the ordinary way to arrive here, so
+		// it must not render as a fault.
+		await expect(page.getByTestId("error-state")).toHaveCount(0);
+		await expect(page.getByTestId("agent-page-not-built")).toHaveCount(0);
+	});
+});

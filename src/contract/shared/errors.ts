@@ -112,9 +112,35 @@ export const VIOLATION_CODES = [
 export type ViolationCode = (typeof VIOLATION_CODES)[number];
 
 /**
- * Exhaustiveness helper. Call it in the default branch of any switch over
- * ErrorCode: adding ANY code then fails the build at every site that has not
- * handled it, rather than silently falling through at runtime.
+ * Exhaustiveness helper. UNCALLED, DELIBERATELY, and this comment used to tell
+ * you to call it in the default branch of any switch over ErrorCode. Do not.
+ *
+ * That instruction was followed once and it would have shipped a regression.
+ * The switches in this codebase fall into two populations and NEITHER can take
+ * it:
+ *
+ *   WITH a `default:` — the error-message mappers, e.g.
+ *   `describeCatalogFailure(code: string, …)`. The parameter is `string`, an
+ *   OPEN domain, so `assertNever(value: never)` does not compile against it.
+ *   Forced in, it would THROW on any unhandled code inside the function whose
+ *   whole job is turning an unknown error into readable copy: a white screen
+ *   on the error path, where it is least recoverable. Those defaults are
+ *   graceful degradation, not missing exhaustiveness.
+ *
+ *   WITHOUT a `default:` — switches over closed unions (`ref.kind`,
+ *   `part.type`, `ToolUIPart["state"]`, `ChatStatus`) in functions with a
+ *   declared return type. `strict` is on, so a missing case ALREADY fails the
+ *   build with TS2366, "function lacks ending return statement". The
+ *   guarantee is delivered by the compiler. This helper would add nothing.
+ *
+ * So it has no correct call site TODAY. It is kept, not deleted, for the first
+ * closed-union switch that needs a runtime MESSAGE rather than a compile error
+ * — a union narrowed at runtime from parsed input, where the compiler cannot
+ * see the exhaustiveness it is checking.
+ *
+ * It has twice been refiled as dead code. It is not dead; it is early. Both
+ * times the reason it looked dead was that nobody checked whether a mechanism
+ * already closed the gap it was written for.
  */
 export function assertNever(value: never, context: string): never {
 	throw new Error(`${context}: unhandled variant ${JSON.stringify(value)}`);

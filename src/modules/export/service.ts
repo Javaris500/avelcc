@@ -33,8 +33,8 @@ import {
  * and in one place.
  *
  * Everything external is injected. Not for test ergonomics: the render input
- * assembler does not exist yet (see `RenderPackage`), and a service that
- * imported a concrete renderer could not be written at all until it did.
+ * assembler is NOT WIRED (see `RenderPackage`), and a service that imported a
+ * concrete renderer could not have been written until one existed.
  */
 
 /* ── what the service needs from the outside ─────────────────────────────── */
@@ -42,11 +42,22 @@ import {
 /**
  * Mission -> rendered package.
  *
- * INJECTED BECAUSE IT IS NOT BUILT. `render()` takes a RenderMission — roster,
- * playbook, per-agent skills — and nothing assembles one from Neon yet. That
- * assembler is a real module and its absence is the reason delivery cannot yet
- * run for a live mission. Injecting it means this service is complete and
- * exercisable now, against the golden fixture, rather than blocked behind it.
+ * INJECTED BECAUSE IT IS NOT WIRED. `render()` takes a RenderMission — roster,
+ * playbook, per-agent skills — and `export/assemble.ts` builds one from Neon:
+ * `assembleRenderMission(db, missionId, unsourced, config)`, which EXISTS.
+ *
+ * IT IS DELIBERATELY NOT WIRED, AND IT IS UNTESTED. `assemble.test.ts` covers
+ * `briefToMarkdown` and `toRenderAgent` and does not import the assembler at
+ * all, so nothing has ever exercised it end to end. Wiring it is a CAPABILITY
+ * change — it moves the product from "delivery cannot run for a live mission"
+ * to "it can" — and it would put an untested function on the one path that
+ * writes into a repository we do not own. That is an operator's decision, not
+ * a cleanup.
+ *
+ * This comment previously said the assembler did not exist. It did, for long
+ * enough that the claim became the stated reason delivery was blocked. Status
+ * claims rot; reasons do not. Injecting keeps this service complete and
+ * exercisable against the golden fixture either way.
  */
 export type RenderPackage = (mission: {
 	id: string;

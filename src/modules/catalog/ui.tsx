@@ -1,59 +1,41 @@
 import type { LucideIcon } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { Pill, StatusBadge, type StatusBadgeProps } from "#/ui/badge";
+import { Input } from "#/ui/input";
 import { EmptyState } from "#/ui/states";
 import { cn } from "#/utils/cn";
 
 /**
  * THE SHARED VOCABULARY, HELD IN ONE FILE UNTIL IT HAS A REAL HOME.
  *
- * UI-PLAN section 2 lists eleven components the shell needs and records that
- * none of them exist. `src/ui/` holds twelve files today, verified by listing
- * it: badge, button, dialog, dropdown-menu, heading, input, page-empty,
- * page-header, skeleton, states, surface, tooltip. `SectionCard`,
- * `DefinitionList`, `StatusChip`, `DataTable` and `MetricStat` are still not
- * among them. `[built]`
- *
- * PAGEHEADER HAS LANDED AND IS GONE FROM HERE. It is not imported directly:
- * the header sits above `main` in the tree, so a route claims it through
- * `usePageHeader` and the shell renders it. Each view calls that hook and this
- * file no longer has a header component at all. One down, five to go.
- *
- * avel-71 owns `src/ui/` and is building the rest. This session may not write
- * there. The instruction that came with this work is the important one: "DO NOT
- * INVENT PARALLEL COMPONENTS. Four sessions each building their own card is the
+ * avel-71 owns `src/ui/` and is building `SectionCard`, `DefinitionList`,
+ * `StatusChip` and `DataTable`; this session may not write there. The
+ * instruction that came with the work is the load-bearing one: "DO NOT INVENT
+ * PARALLEL COMPONENTS. Four sessions each building their own card is the
  * specific outcome this split exists to prevent."
  *
- * So this file is the single seam, and it obeys three rules:
+ * Three rules make that survivable:
  *
- *   1. ONE FILE. Nothing in `src/modules/catalog/` styles a card, a table or a
- *      chip itself. Everything imports from here. When the real primitives
- *      land, this file becomes a handful of re-export lines and one commit
- *      closes it. PageHeader proved the shape: adopting the real one touched
- *      this file and three call sites, and nothing else.
- *   2. NOTHING NEW IS INVENTED. Where `src/ui/` already has the thing, this
- *      wraps it rather than reimplementing it. `StatusChip` is `StatusBadge`
- *      with a domain mapping. `EmptyState` is re-exported untouched.
- *   3. THE PROP SIGNATURES ARE THE REQUEST. They are what the catalog screens
- *      need. Where they differ from what avel-71 builds, avel-71 wins and this
- *      module adapts.
+ *   1. ONE FILE. Nothing else in `src/modules/catalog/` styles a card or a
+ *      chip. When the real primitives land this becomes re-export lines and one
+ *      commit closes it. `PageHeader` proved the shape: adopting the real one
+ *      touched this file and three call sites and nothing else.
+ *   2. NOTHING NEW IS INVENTED. Where `src/ui/` has the thing, this wraps it.
+ *      `StatusChip` is `StatusBadge` with a domain mapping; `EmptyState` is
+ *      re-exported untouched.
+ *   3. THE PROP SIGNATURES ARE THE REQUEST. Where they differ from what
+ *      avel-71 builds, avel-71 wins and this module adapts.
  *
- * WHAT IS BEING ASKED FOR, beyond the names, and why:
- *   - `SectionCard` needs a `definition` slot SEPARATE from its title and any
- *     count. Section 2 gives a subtitle to "counts, status, last activity";
- *     section 12 rule 5 gives the header the one plain sentence that names the
- *     jargon. Two lines, two jobs, and collapsing them loses one of them.
- *     `usePageHeader` already carries both slots under these names, so this is
- *     the same request one level down rather than a new one.
- *   - `DataTable` needs a per-row tone. A revoked row that looks like a live
- *     row is the defect this catalog was asked to fix, and it cannot be fixed
- *     from inside a cell.
+ * The one request that is not just a name: `SectionCard` needs a `definition`
+ * slot separate from its title and count. Section 2 gives a subtitle to counts
+ * and status; section 12 rule 5 gives the header the plain sentence that names
+ * the jargon. Two jobs, and collapsing them loses one. `usePageHeader` already
+ * carries both slots under these names.
  *
- * MOTION. CSS only, on `--duration-micro` and `--ease-avel` from
- * patch.css:114-117. No library is installed and adding one is open (section
- * 11). The `interactive` utility already carries the hover transition on those
- * tokens, so hover states use it rather than a second timing.
+ * MOTION is CSS only, on `--duration-micro` and `--ease-avel`. No animation
+ * library is installed and adding one is an open decision.
  */
 
 /* ── re-exported untouched ───────────────────────────────────────────────── */
@@ -198,252 +180,390 @@ export function StatusChip({
 	);
 }
 
-/* ── MetricStat ──────────────────────────────────────────────────────────── */
+/* ── ChecksPassed ────────────────────────────────────────────────────────── */
 
 /**
- * A number with a label. `hint` is the third line section 2 calls a trend; the
- * catalog has no time series, so it carries a qualifier instead of a delta. An
- * invented trend arrow would be the screen asserting a change nothing measured.
+ * WHAT WAS CHECKED AND FOUND CLEAN, on one quiet line.
+ *
+ * This replaces a row of `MetricStat` cards and the replacement is the whole
+ * point, so the reasoning is here rather than in a commit message.
+ *
+ * The cards were carrying two different jobs. Totals — "9 live skills", "1
+ * revoked" — moved to the header subtitle, because the same number in two
+ * places means one of them is redundant. What was left was the risk numbers,
+ * and those turned out to duplicate something too: a card reading "1 · Revoked
+ * but still attached" sat directly above a banner reading "A revoked skill is
+ * still attached to work · nothing re-checks the catalog when a package is
+ * built". Same fact, twice, stacked, in two treatments, and the banner says it
+ * better because it has room for the consequence.
+ *
+ * THE CARD WAS NOT USELESS THOUGH, and dropping it outright loses the thing it
+ * was good at. At ZERO it was the only evidence the check had run at all, and
+ * "not counted" and "counted zero" becoming the same pixel is the failure this
+ * module has been arguing against at three different scales.
+ *
+ * So the two states split and become mutually exclusive. A check that FAILS
+ * renders as a banner, with room for what to do about it. A check that PASSES
+ * renders as one clause here. Neither can duplicate the other, because a check
+ * is never in both states at once, and the page keeps its answer to "did
+ * anything look at this?"
  */
-export function MetricStat({
-	label,
-	value,
-	hint,
-	tone = "rest",
+export function ChecksPassed({
+	items,
 	"data-testid": testId,
 }: {
-	label: string;
-	value: ReactNode;
-	hint?: string;
-	/** `warn` where the number is a problem rather than a fact. */
-	tone?: "rest" | "warn";
+	/** Only the checks that PASSED. A failing one belongs in a DataNotice. */
+	items: { key: string; label: string }[];
 	"data-testid": string;
 }) {
+	if (items.length === 0) return null;
 	return (
-		<div
-			className="elev-1 min-w-[12ch] flex-1 rounded-md px-4 py-3"
+		<p
+			className={cn(
+				// px-4/py-3 matches DataNotice exactly. The two are mutually
+				// exclusive occupants of the same slot — a check is a banner or a
+				// clause, never both — so a different inset made the block appear to
+				// shift sideways depending on which state the page was in.
+				"flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm px-4 py-3",
+				// A surface, so the passing half of banner-or-clause reads as a
+				// status strip rather than as floating text beside a loud banner.
+				// A border around one thing, not a rule between two.
+				"border border-[var(--elevation-border-rest)] text-micro text-text-muted",
+			)}
 			data-testid={testId}
 		>
-			<p
+			<span aria-hidden="true" className="font-mono text-gate-pass">
+				✓
+			</span>
+			<span>Checked:</span>
+			{items.map((item, i) => (
+				<span data-check={item.key} key={item.key}>
+					{item.label}
+					{i < items.length - 1 ? "," : ""}
+				</span>
+			))}
+		</p>
+	);
+}
+
+/* ── SearchField ─────────────────────────────────────────────────────────── */
+
+/** True when focus is somewhere that should receive the keystroke itself. */
+function isTypingTarget(el: EventTarget | null): boolean {
+	if (!(el instanceof HTMLElement)) return false;
+	if (el.isContentEditable) return true;
+	return ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
+}
+
+/**
+ * A SEARCH FIELD, rather than an input with a placeholder.
+ *
+ * The first version was the bare `Input` primitive and a placeholder, which is
+ * the minimum that works and nothing more: you could filter to zero results and
+ * the only signal was an empty list. Four things were missing and each is a
+ * question the operator would otherwise have to answer by looking elsewhere.
+ *
+ *   - A COUNT. "3 of 10" says the filter is doing something, and says it in the
+ *     one place you are already looking.
+ *   - A CLEAR. Selecting text and deleting it is not an affordance.
+ *   - `/` TO FOCUS, guarded the way `sidebar-search.tsx` guards its `F`, so it
+ *     never steals a keystroke from someone typing. The hint is rendered, so it
+ *     has to work: a shortcut the product advertises and does not honour is
+ *     worse than no shortcut.
+ *   - ESCAPE TO CLEAR, which is what every search field anyone has used does.
+ *
+ * COLOUR, AND THE FIRST ANSWER WAS WRONG. The `Input` primitive paints itself
+ * `bg-muted`, which resolves to `app-recessed`. That reasoning was "a search box
+ * is somewhere you put something", and on paper a well is right.
+ *
+ * On the dark theme it reads as a black hole punched in the card. The numbers
+ * say why: after the ramp was re-derived, `app-recessed` is `#16181d` at
+ * `L* 8.2` while `app-panel` — the card this field sits on — is `L* 11.7`. The
+ * field is DARKER than its container, and against a dark surface that does not
+ * read as depth, it reads as a gap.
+ *
+ * So it sits at `app-raised` instead, one step ABOVE the card, which is what
+ * every other control on a card does — `secondary` buttons resolve there too.
+ * A search field is a control, not an excavation.
+ *
+ * When a query is active it takes an accent left edge, the same treatment as a
+ * selected row in the list beneath it, so "a filter is on" is legible without
+ * reading the field. No new tokens in either case.
+ */
+export function SearchField({
+	value,
+	onChange,
+	label,
+	placeholder,
+	shown,
+	total,
+	"data-testid": testId,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	/** The accessible name. Never rendered, so it must stand alone. */
+	label: string;
+	placeholder: string;
+	shown: number;
+	total: number;
+	"data-testid": string;
+}) {
+	const inputRef = useRef<HTMLInputElement>(null);
+	const active = value.trim() !== "";
+
+	useEffect(() => {
+		function onKeyDown(event: KeyboardEvent) {
+			if (event.key !== "/") return;
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
+			if (isTypingTarget(event.target)) return;
+			event.preventDefault();
+			inputRef.current?.focus();
+		}
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, []);
+
+	return (
+		<div className="flex flex-col gap-1" data-testid={testId}>
+			<div
 				className={cn(
-					"tabular font-display text-lg font-semibold",
-					tone === "warn" ? "text-gate-warn" : "text-text",
+					"relative rounded-xs",
+					// The accent edge, matching the selected row. Transparent rather
+					// than absent when idle, so the field does not shift by 2px the
+					// moment you type.
+					"border-l-2",
+					active ? "border-accent" : "border-transparent",
 				)}
-				data-testid={`${testId}-value`}
+				data-active={active ? "true" : undefined}
 			>
-				{value}
+				<Search
+					aria-hidden="true"
+					className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-subtle"
+					strokeWidth={1.8}
+				/>
+				<Input
+					aria-label={label}
+					// Overrides the primitive's `bg-muted`. See the colour note above.
+					className="bg-app-raised pr-8 pl-8"
+					data-testid={`${testId}-input`}
+					onChange={(event) => onChange(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Escape" && active) {
+							event.preventDefault();
+							onChange("");
+						}
+					}}
+					placeholder={placeholder}
+					ref={inputRef}
+					type="text"
+					value={value}
+				/>
+				{active ? (
+					<button
+						aria-label="Clear the filter"
+						className="interactive absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-xs text-text-subtle"
+						data-testid={`${testId}-clear`}
+						onClick={() => {
+							onChange("");
+							inputRef.current?.focus();
+						}}
+						type="button"
+					>
+						<X aria-hidden="true" className="size-3.5" strokeWidth={2} />
+					</button>
+				) : null}
+			</div>
+			{/*
+			 * The count only appears once it means something. "10 of 10" on arrival
+			 * is the screen narrating its own resting state, and the non-zero rule
+			 * applies to a filter's effect as much as to a row's counts.
+			 */}
+			<p
+				className="text-micro text-text-subtle"
+				data-testid={`${testId}-count`}
+			>
+				{active ? (
+					<span>
+						{shown} of {total} shown
+					</span>
+				) : (
+					<span>
+						Press <span className="font-mono">/</span> to filter
+					</span>
+				)}
 			</p>
-			<p className="pt-0.5 text-micro text-text-muted">{label}</p>
-			{hint ? (
-				<p className="pt-1 text-micro leading-relaxed text-text-subtle">
-					{hint}
-				</p>
-			) : null}
 		</div>
 	);
 }
 
-/* ── DataTable ───────────────────────────────────────────────────────────── */
+/* ── FilterBar ───────────────────────────────────────────────────────────── */
 
-export type Column<T> = {
-	key: string;
-	header: string;
-	render: (row: T) => ReactNode;
-	/** Omit to make the column unsortable. */
-	sortValue?: (row: T) => string | number;
-	align?: "start" | "end";
-	/** Dropped below `lg`. Catalog routes are desktop-only, this is headroom. */
-	secondary?: boolean;
-};
-
-export type RowTone = "rest" | "revoked" | "warn";
-
-export type DataTableProps<T> = {
-	rows: T[];
-	columns: Column<T>[];
-	rowId: (row: T) => string;
-	/**
-	 * PER ROW, NOT PER CELL. A withdrawn row has to read as withdrawn across its
-	 * whole width. Doing it inside one cell is how a revoked skill ends up
-	 * looking live everywhere except the column nobody was reading.
-	 */
-	rowTone?: (row: T) => RowTone;
-	/** The cell whose contents become the row's select control. */
-	selectColumn?: string;
-	selectedId?: string | null;
-	onSelect?: (id: string) => void;
-	/** Rendered in place of the body. Say why it is empty, never "Nothing here". */
-	empty: ReactNode;
-	/** Screen-reader description of what the table lists. */
-	caption: string;
-	"data-testid": string;
-};
-
-const TONE_ROW: Record<RowTone, string> = {
-	rest: "",
-	/**
-	 * Dimmed AND struck through on the leading cell, never dimming alone.
-	 * Opacity is not a state: a low-contrast row reads as disabled, as loading
-	 * or as a rendering fault depending on who is looking. The row also carries
-	 * `data-row-tone` so a test can assert the state rather than a colour.
-	 */
-	revoked: "text-text-subtle",
-	warn: "",
-};
-
-export function DataTable<T>({
-	rows,
-	columns,
-	rowId,
-	rowTone,
-	selectColumn,
-	selectedId,
-	onSelect,
-	empty,
-	caption,
+/**
+ * ONE TOOLBAR, WITH NARROWING ON THE LEFT AND ORDERING ON THE RIGHT.
+ *
+ * Four chip groups used to sit in a single undifferentiated run: three that
+ * NARROW the set and one that REORDERS it, in identical pills, reading as one
+ * long strip of fourteen controls governing seven cards. Labelling the groups
+ * fixed which dimension each chip belonged to and did nothing about the more
+ * basic confusion, which is that two of these do completely different things.
+ *
+ * So the two kinds separate spatially. Filters left, ordering right, which is
+ * the arrangement every toolbar the operator has used already puts them in.
+ *
+ * `summary` is the third thing a filter bar owes you and none of these had it:
+ * what the filters currently leave, and a way out. It renders only when
+ * something is actually filtered — the same non-zero rule the counts follow,
+ * because "7 of 7" on arrival is the screen narrating its resting state.
+ */
+export function FilterBar({
+	children,
+	order,
+	summary,
 	"data-testid": testId,
-}: DataTableProps<T>) {
-	const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
-
-	const sorted = useMemo(() => {
-		if (sort === null) return rows;
-		const column = columns.find((c) => c.key === sort.key);
-		if (column?.sortValue === undefined) return rows;
-		const read = column.sortValue;
-		// A copy. Sorting the prop in place mutates the caller's array, and the
-		// caller here is a react-query cache entry shared with other screens.
-		return [...rows].sort((a, b) => {
-			const left = read(a);
-			const right = read(b);
-			const order =
-				typeof left === "number" && typeof right === "number"
-					? left - right
-					: String(left).localeCompare(String(right));
-			return sort.desc ? -order : order;
-		});
-	}, [rows, columns, sort]);
-
-	if (rows.length === 0) return <>{empty}</>;
-
+}: {
+	/** The narrowing controls. */
+	children: ReactNode;
+	/** The reordering control, pushed right. */
+	order?: ReactNode;
+	/** Rendered under the bar, only when a filter is active. */
+	summary?: ReactNode;
+	"data-testid": string;
+}) {
 	return (
-		<div className="app-scroll overflow-x-auto">
-			<table
-				className="density-comfortable w-full border-collapse text-sm"
+		<div className="flex flex-col gap-2" data-testid={testId}>
+			<div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+				{children}
+				{order ? <div className="md:ml-auto">{order}</div> : null}
+			</div>
+			{summary}
+		</div>
+	);
+}
+
+/**
+ * What the filters left, and the way back out.
+ *
+ * A count alone is a statement; a count with a reset is a control. Both are
+ * absent when nothing is filtered, so the bar stays quiet until it is doing
+ * something.
+ */
+export function FilterSummary({
+	shown,
+	total,
+	noun,
+	onClear,
+	"data-testid": testId,
+}: {
+	shown: number;
+	total: number;
+	noun: string;
+	onClear: () => void;
+	"data-testid": string;
+}) {
+	if (shown === total) return null;
+	return (
+		<p
+			className="flex flex-wrap items-center gap-2 text-micro text-text-subtle"
+			data-testid={testId}
+		>
+			<span>
+				{shown} of {total} {noun}
+			</span>
+			<button
+				className="interactive rounded-xs px-1.5 py-0.5 text-accent-text"
+				data-testid={`${testId}-clear`}
+				onClick={onClear}
+				type="button"
+			>
+				Clear filters
+			</button>
+		</p>
+	);
+}
+
+/* ── PathBudget ──────────────────────────────────────────────────────────── */
+
+/**
+ * WHAT AN AGENT MAY CHANGE, as three numbers.
+ *
+ * This is the single strongest thing the agent-template list was missing. The
+ * three path sets are already on the wire and appeared nowhere in the product,
+ * and they are the first fact a reviewer looks for: an agent template list that
+ * cannot say what an agent may WRITE is a list of names.
+ *
+ * The three are not three shades of one thing, which is why they are never
+ * summed. `roster.ts` states the distinction and it is load-bearing: writable
+ * is edit freely, append-only is add your own and never remove or reorder
+ * anyone else's, read-only is read and do not write. A single "12 paths" would
+ * erase exactly the difference that makes an agent safe.
+ *
+ * Zero is shown, in the subtle tone, never omitted. An agent with no writable
+ * paths cannot change a single file, which is a real and notable configuration
+ * — and an omitted row would read as "not recorded" instead.
+ */
+export function PathBudget({
+	writable,
+	appendOnly,
+	readonly,
+	"data-testid": testId,
+}: {
+	writable: number;
+	appendOnly: number;
+	readonly: number;
+	"data-testid": string;
+}) {
+	const parts = [
+		{ key: "writable", label: "writable", n: writable },
+		{ key: "append", label: "append-only", n: appendOnly },
+		{ key: "readonly", label: "read-only", n: readonly },
+	];
+
+	/*
+	 * ALL THREE EMPTY IS "NOT DECLARED", NOT "DECLARED AS ZERO".
+	 *
+	 * The schema defaults every one of these to `{}`, so all-three-empty is the
+	 * shape of a template nobody has configured rather than one deliberately
+	 * granted nothing. Rendering `0 · 0 · 0` asserts a decision that was never
+	 * made, and it did it seven times across the roster — twenty-one zeros on
+	 * one screen, in the block that is supposed to be the strongest thing on a
+	 * card.
+	 *
+	 * A partial grant still shows numbers, including its zeros: once ANY of the
+	 * three is set, the empty ones are a real answer.
+	 */
+	if (writable === 0 && appendOnly === 0 && readonly === 0) {
+		return (
+			<p
+				className="text-micro text-text-subtle"
+				data-path-budget="undeclared"
 				data-testid={testId}
 			>
-				<caption className="sr-only">{caption}</caption>
-				<thead>
-					{/* No rule under the header row either. The label tone already
-					    separates it from the data, and the extra bottom padding does
-					    what the line was doing. */}
-					<tr>
-						{columns.map((column) => {
-							const active = sort?.key === column.key;
-							return (
-								<th
-									className={cn(
-										"px-3 pt-2 pb-3 text-micro font-medium text-text-subtle",
-										column.align === "end" ? "text-right" : "text-left",
-										column.secondary ? "hidden lg:table-cell" : "",
-									)}
-									key={column.key}
-									scope="col"
-								>
-									{column.sortValue === undefined ? (
-										column.header
-									) : (
-										<button
-											aria-label={`Sort by ${column.header}`}
-											className="interactive -mx-1 rounded-xs px-1 py-0.5"
-											data-testid={`${testId}-sort-${column.key}`}
-											onClick={() =>
-												setSort(
-													active
-														? { key: column.key, desc: !sort.desc }
-														: { key: column.key, desc: false },
-												)
-											}
-											type="button"
-										>
-											{column.header}
-											{/* The glyph carries the direction. An arrow that only
-											    changes colour when active is not a state. */}
-											<span aria-hidden="true" className="pl-1 font-mono">
-												{active ? (sort.desc ? "↓" : "↑") : "·"}
-											</span>
-										</button>
-									)}
-								</th>
-							);
-						})}
-					</tr>
-				</thead>
-				<tbody>
-					{sorted.map((row) => {
-						const id = rowId(row);
-						const tone = rowTone?.(row) ?? "rest";
-						const selected = selectedId === id;
-						return (
-							<tr
-								className={cn(
-									// No rule between rows. `--row-pad` is the separation now,
-									// which is what "tone and gap" means for a table: the rows
-									// are already distinguished by their own content and a line
-									// per row is 200 lines on a full catalog.
-									//
-									// Selection is a background, and it transitions on the
-									// state duration rather than the micro one: it is a panel
-									// state change, which is what --duration-state is for.
-									"transition-colors duration-[var(--duration-state)] ease-[var(--ease-avel)]",
-									selected ? "bg-accent-surface" : "",
-									TONE_ROW[tone],
-								)}
-								data-row-tone={tone}
-								data-selected={selected ? "true" : undefined}
-								data-testid={`${testId}-row`}
-								key={id}
-							>
-								{columns.map((column) => {
-									const content = column.render(row);
-									const isSelect =
-										onSelect !== undefined && column.key === selectColumn;
-									return (
-										<td
-											className={cn(
-												"px-3 py-[var(--row-pad)] align-top",
-												column.align === "end"
-													? "text-right tabular"
-													: "text-left",
-												column.secondary ? "hidden lg:table-cell" : "",
-											)}
-											key={column.key}
-										>
-											{isSelect ? (
-												// A real button rather than a click handler on the
-												// row. The row is a <tr>, and a <tr> given onClick
-												// is not reachable by keyboard without inventing
-												// roles that lie about what it is.
-												<button
-													aria-expanded={selected}
-													className="interactive -mx-1 block w-full rounded-sm px-1 py-0.5 text-left"
-													data-testid={`${testId}-select`}
-													onClick={() => onSelect(id)}
-													type="button"
-												>
-													{content}
-												</button>
-											) : (
-												content
-											)}
-										</td>
-									);
-								})}
-							</tr>
-						);
-					})}
-				</tbody>
-			</table>
-		</div>
+				No boundaries declared yet
+			</p>
+		);
+	}
+
+	return (
+		<dl
+			className="flex flex-wrap items-baseline gap-x-4 gap-y-1"
+			data-path-budget="declared"
+			data-testid={testId}
+		>
+			{parts.map((part) => (
+				<div className="flex items-baseline gap-1.5" key={part.key}>
+					<dd
+						className={cn(
+							"tabular text-sm",
+							part.n === 0 ? "text-text-subtle" : "text-text",
+						)}
+						data-path-count={part.key}
+					>
+						{part.n}
+					</dd>
+					<dt className="text-micro text-text-subtle">{part.label}</dt>
+				</div>
+			))}
+		</dl>
 	);
 }
 
@@ -461,47 +581,77 @@ export function FilterChips<K extends string>({
 	label,
 	"data-testid": testId,
 }: {
-	options: { key: K; label: string; count: number }[];
+	/** `count` is optional: an ORDER has no count, only a filter does. */
+	options: { key: K; label: string; count?: number }[];
 	value: K;
 	onChange: (key: K) => void;
+	/** Short, and now VISIBLE. One or two words. */
 	label: string;
 	"data-testid": string;
 }) {
 	return (
-		// A real <fieldset>, not a div carrying role="group". The set of chips IS
-		// one control with several options, and the element that says so already
-		// exists. The legend is the group's name and is read rather than seen: the
-		// chips carry their own labels, so a visible "Filter by state" above them
-		// would be a second heading for something already obvious.
-		<fieldset
-			className="flex flex-wrap items-center gap-2 border-0 p-0"
-			data-testid={testId}
-		>
-			<legend className="sr-only">{label}</legend>
-			{options.map((option) => {
-				const active = option.key === value;
-				return (
-					<button
-						aria-pressed={active}
-						className={cn(
-							"interactive rounded-full border px-2.5 py-0.5 text-micro",
-							"transition-colors duration-[var(--duration-micro)] ease-[var(--ease-avel)]",
-							active
-								? "border-border-strong bg-accent-surface text-text"
-								: "border-[var(--elevation-border-rest)] text-text-muted",
-						)}
-						data-testid={`${testId}-${option.key}`}
-						key={option.key}
-						onClick={() => onChange(option.key)}
-						type="button"
-					>
-						{option.label}
-						<span className="tabular pl-1.5 text-text-subtle">
-							{option.count}
-						</span>
-					</button>
-				);
-			})}
+		// A real <fieldset>, not a div with role="group". The legend renders
+		// ABOVE the chips rather than inside the flex row: a <legend> is laid out
+		// specially by browsers and putting it in a flex container is where that
+		// gets unpredictable, so the chips get their own row instead.
+		<fieldset className="min-w-0 border-0 p-0" data-testid={testId}>
+			{/*
+			 * VISIBLE, and it used to be `sr-only`. Four groups sat in one row with
+			 * 8px between chips and 16px between groups — a 2:1 ratio that is not
+			 * enough to read as a boundary — so fourteen chips ran together as one
+			 * undifferentiated strip and nothing said which dimension any of them
+			 * belonged to. Naming the dimension is what turns a strip of pills back
+			 * into four small controls.
+			 */}
+			<legend className="float-none p-0 pb-1.5 text-micro text-text-subtle">
+				{label}
+			</legend>
+			<div className="flex flex-wrap items-center gap-1.5">
+				{options.map((option) => {
+					const active = option.key === value;
+					/*
+					 * A CHIP THAT CAN ONLY EMPTY THE TABLE IS DISABLED, WITH ITS COUNT
+					 * STILL SHOWING. Section 12 rule 6 does not quite name this case:
+					 * the control works perfectly and its only possible outcome is
+					 * nothing. Disabled rather than hidden, because the count is the
+					 * information — hiding "Person" would leave an operator unable to
+					 * tell whether no agent is run by a person or whether the product
+					 * has no such idea. The active chip is never disabled, so no
+					 * filter can trap you.
+					 *
+					 * A countless option is never dead: an ordering always applies.
+					 */
+					const dead = option.count === 0 && !active;
+					return (
+						<button
+							aria-pressed={active}
+							className={cn(
+								"rounded-full border px-2.5 py-0.5 text-micro",
+								"transition-colors duration-[var(--duration-micro)] ease-[var(--ease-avel)] motion-reduce:transition-none",
+								active
+									? "border-border-strong bg-accent-surface text-text"
+									: "border-[var(--elevation-border-rest)] text-text-muted",
+								dead
+									? "cursor-not-allowed opacity-[var(--opacity-disabled)]"
+									: "interactive",
+							)}
+							data-testid={`${testId}-${option.key}`}
+							disabled={dead}
+							key={option.key}
+							onClick={() => onChange(option.key)}
+							title={dead ? "Nothing matches this filter" : undefined}
+							type="button"
+						>
+							{option.label}
+							{option.count === undefined ? null : (
+								<span className="tabular pl-1.5 text-text-subtle">
+									{option.count}
+								</span>
+							)}
+						</button>
+					);
+				})}
+			</div>
 		</fieldset>
 	);
 }

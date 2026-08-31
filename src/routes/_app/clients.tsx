@@ -545,7 +545,7 @@ function ClientsLayout() {
 									</div>
 								}
 								body="A client is the company the work is for. Adding one is the first step: engagements, requests and missions all hang off a client, and nothing can be delivered until one exists."
-								className="px-0"
+								inset="section"
 								title="No clients yet"
 							/>
 						}
@@ -554,7 +554,7 @@ function ClientsLayout() {
 							return (
 								<ErrorState
 									body={shown.body}
-									className="px-0"
+									inset="section"
 									code={error.message}
 									retry={shown.canRetry ? retry : undefined}
 									title={shown.title}
@@ -608,7 +608,7 @@ function ClientsLayout() {
 											</Button>
 										}
 										body={`No client has the status "${status}". The filter is hiding ${data.data.length} ${data.data.length === 1 ? "client" : "clients"}.`}
-										className="px-0"
+										inset="section"
 										title="Nothing matches this filter"
 									/>
 								) : (

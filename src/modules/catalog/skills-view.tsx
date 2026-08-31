@@ -2,124 +2,88 @@ import { Link } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SkillRow } from "#/contract/catalog";
-import { RevocationChip, SkillTypeChip } from "#/modules/catalog/chips";
+import {
+	RevocationMark,
+	SkillTypeChip,
+	SkillTypeGlyph,
+} from "#/modules/catalog/chips";
 import { danglingAttachments, isRevoked } from "#/modules/catalog/derive";
-import { isoDate, plural } from "#/modules/catalog/format";
+import { isoDate, plural, subtitleFor } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useSkills } from "#/modules/catalog/queries";
 import { CatalogSurface } from "#/modules/catalog/screen";
 import {
-	type Column,
+	ChecksPassed,
 	DataNotice,
-	DataTable,
-	DefinitionList,
 	EmptyState,
+	FilterBar,
 	FilterChips,
-	MetricStat,
-	type RowTone,
+	FilterSummary,
+	SearchField,
 	SectionCard,
 } from "#/modules/catalog/ui";
 import { usePageHeader } from "#/modules/shell/use-page-header";
-import { Tag } from "#/ui/badge";
+import { Pill, Tag } from "#/ui/badge";
+import { cn } from "#/utils/cn";
 
 /**
- * THE SKILLS CATALOG.
+ * THE SKILLS LIBRARY.
  *
- * Two decisions shape this screen and neither is cosmetic.
+ * WHY THIS IS NOT A TABLE ANY MORE, and it is not for variety's sake.
  *
- * 1. A REVOKED SKILL IS VISIBLY REVOKED, EVERYWHERE. It was possible for a
- *    revoked skill to render into a client package on this project, and the
- *    catalog is where that becomes noticeable or does not. So revocation gets a
- *    column of its own rather than a shade of grey, a metric of its own on the
- *    masthead, and a banner when a withdrawn skill is still attached to
- *    something that will carry it into a package.
+ * The previous version fetched `contentMd` and rendered it nowhere. Ten skills
+ * cost 1100px of screen to say almost nothing, and clicking a row did nothing,
+ * so the page was an index of documents you could not read. `avelEnhancementMd`
+ * had the problem twice over: that column exists precisely so AVEL's addition is
+ * separable from the imported source text, and nothing distinguished them
+ * because neither was ever shown.
  *
- * 2. A SKILL IS SHOWN WITH WHAT HOLDS IT. A list of skill names answers no
- *    question an operator has. "Which agents carry this" and "is anything still
- *    carrying this after I withdrew it" are the two that matter, and both need
- *    the attachment relations, so both sides of the join are on the row.
+ * A skill is a DOCUMENT. There are many, the number grows, and what you do with
+ * one is read it or find out who carries it. That shape wants a dense list and a
+ * reading pane, which is what a library has looked like for a very long time.
+ * The agent-template page is a roster of cards for the opposite reason: seven
+ * workers you choose between. Differentiating by colour or chrome instead would
+ * have made the two pages look different and still be the same page.
  *
- * REVOKED ROWS ARE NOT HIDDEN BY DEFAULT. The filter defaults to every row,
- * marked. Hiding them would make the live list look clean while leaving the
- * exposure invisible, which is exactly how the original bug survived.
+ * MARKDOWN IS NOT RENDERED, deliberately. No markdown library is installed, and
+ * adding one to make a design look finished is the wrong order. Preformatted
+ * mono is honest, readable, and reversible in one commit.
  */
 
 type StateFilter = "all" | "live" | "revoked";
 type TypeFilter = "all" | "knowledge" | "capability";
 
-/**
- * The header's one orienting line. Totals only.
- *
- * It does NOT repeat the risk numbers below it. The MetricStat row carries
- * "revoked but still attached" with the sentence explaining why zero is the
- * healthy value, and a bare count of it up here would be the same number
- * twice with the meaning stripped off one of them.
- */
-function summarise(skills: SkillRow[] | undefined): string | undefined {
-	/*
-	 * NOTHING TO ORIENT AMONG. Undefined while the read is in flight, and
-	 * undefined again when it resolves to zero rows.
-	 *
-	 * The second case is the one worth writing down. "0 skills · 0 revoked ·
-	 * from 0 sources" is a measured, true, useless line: it sits directly above
-	 * an EmptyState whose whole job is to say the catalog is empty, in better
-	 * words, with the reason attached. A subtitle exists to orient you among
-	 * many rows. With no rows there is nothing to orient.
-	 *
-	 * Seen live rather than reasoned about: `skills` and `skill_sources` hold
-	 * zero rows today, so this is what those two screens actually rendered.
-	 */
-	if (skills === undefined || skills.length === 0) return undefined;
-	const revoked = skills.filter(isRevoked).length;
-	const sources = new Set(skills.map((s) => s.sourceId)).size;
-	return `${plural(skills.length, "skill", "skills")} · ${revoked} revoked · from ${plural(sources, "source", "sources")}`;
-}
+export type SkillsSearch = {
+	skill?: string;
+	state?: StateFilter;
+	type?: TypeFilter;
+};
 
-export function SkillsCatalog() {
-	/*
-	 * THE SHELL RENDERS THE TITLE, not this screen.
-	 *
-	 * It printed its own <h1> until avel-71 moved the title into the shell
-	 * header, and then every catalog page had TWO h1s reading the same word.
-	 * Measured on the running app, not inferred: /catalog/sources was worse
-	 * than a duplicate, carrying "Sources" from the nav-derived fallback and
-	 * "Skill sources" from here, which is two names for one page.
-	 *
-	 * Claimed unconditionally, outside the four-state boundary, for the reason
-	 * the in-content header was moved out in the first place: a screen with no
-	 * endpoint behind it must still say what it is. `definition` is a separate
-	 * slot from `subtitle` so the plain sentence naming the jargon is not
-	 * competing with counts. The counts stay on the MetricStat row, which is
-	 * inside the boundary because a count is not knowable until the read
-	 * resolves.
-	 */
+/** Totals only. The risk number is a banner or a checked line, never here. */
+const summarise = (skills: SkillRow[] | undefined) =>
+	subtitleFor(skills, (rows) => [
+		plural(rows.length, "skill", "skills"),
+		`${rows.filter(isRevoked).length} revoked`,
+		`from ${plural(new Set(rows.map((s) => s.sourceId)).size, "source", "sources")}`,
+	]);
+
+export function SkillsCatalog({
+	search,
+	onSearch,
+}: {
+	search: SkillsSearch;
+	onSearch: (next: SkillsSearch) => void;
+}) {
 	const query = useSkills();
 
-	/*
-	 * ONE CLAIM, ONE LATE FIELD. `subtitle` is a string and sits in the hook's
-	 * dependency array, so it updates on its own when the read resolves. The
-	 * earlier version of the hook read it from a ref and kept it out of the
-	 * deps, which meant a subtitle arriving after its title was written and
-	 * never read again; that is why this screen carried no counts at all for a
-	 * while. avel-71 fixed the hook, so the workaround is gone rather than
-	 * papered over.
-	 *
-	 * `undefined` until the read resolves, deliberately. A header printing a
-	 * count above a screen that says "not built" would be asserting a number
-	 * nothing measured.
-	 */
-	const skills = query.data?.data;
 	usePageHeader({
 		title: "Skills",
 		definition: TERM.skill,
-		subtitle: summarise(skills),
+		subtitle: summarise(query.data?.data),
 	});
-	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
-	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	return (
-		<div className="flex flex-col gap-5 px-6 py-5">
+		<div className="flex flex-col gap-4">
 			<CatalogSurface
 				data-testid="skills"
 				empty={
@@ -131,48 +95,33 @@ export function SkillsCatalog() {
 				noun="skills catalog"
 				query={query}
 			>
-				{(page) => {
-					const skills = page.data;
-					return (
-						<SkillsCatalogBody
-							onSelect={(id) =>
-								setSelectedId((current) => (current === id ? null : id))
-							}
-							onStateFilter={setStateFilter}
-							onTypeFilter={setTypeFilter}
-							selectedId={selectedId}
-							skills={skills}
-							stateFilter={stateFilter}
-							total={page.meta.total}
-							typeFilter={typeFilter}
-						/>
-					);
-				}}
+				{(page) => (
+					<SkillsLibrary
+						onSearch={onSearch}
+						search={search}
+						skills={page.data}
+						total={page.meta.total}
+					/>
+				)}
 			</CatalogSurface>
 		</div>
 	);
 }
 
-function SkillsCatalogBody({
+function SkillsLibrary({
 	skills,
 	total,
-	stateFilter,
-	typeFilter,
-	onStateFilter,
-	onTypeFilter,
-	selectedId,
-	onSelect,
+	search,
+	onSearch,
 }: {
 	skills: SkillRow[];
 	total: number;
-	stateFilter: StateFilter;
-	typeFilter: TypeFilter;
-	onStateFilter: (value: StateFilter) => void;
-	onTypeFilter: (value: TypeFilter) => void;
-	selectedId: string | null;
-	onSelect: (id: string) => void;
+	search: SkillsSearch;
+	onSearch: (next: SkillsSearch) => void;
 }) {
-	const live = skills.filter((s) => !isRevoked(s));
+	const stateFilter = search.state ?? "all";
+	const typeFilter = search.type ?? "all";
+
 	const revoked = skills.filter(isRevoked);
 	const dangling = revoked.filter((s) => danglingAttachments(s) > 0);
 	const danglingHolders = dangling.reduce(
@@ -180,66 +129,105 @@ function SkillsCatalogBody({
 		0,
 	);
 
-	const shown = useMemo(() => {
-		return skills.filter((skill) => {
-			const stateOk =
-				stateFilter === "all" ||
-				(stateFilter === "live" ? !isRevoked(skill) : isRevoked(skill));
-			const typeOk = typeFilter === "all" || skill.type === typeFilter;
-			return stateOk && typeOk;
-		});
-	}, [skills, stateFilter, typeFilter]);
+	/*
+	 * LOCAL STATE, not the URL. A filter you chose is worth linking; a substring
+	 * you are part-way through typing is not, and putting it in the URL writes a
+	 * history entry per keystroke.
+	 *
+	 * It matches the SOURCE as well as the name and the slug. That is what makes
+	 * "which of these came from Anthropic engineering" answerable without adding
+	 * a source column to a 360px row that already carries two lines.
+	 */
+	const [queryText, setQueryText] = useState("");
+	const needle = queryText.trim().toLowerCase();
 
-	const selected = shown.find((s) => s.id === selectedId) ?? null;
+	/*
+	 * A CHIP COUNTS WHAT SELECTING IT WOULD ACTUALLY SHOW.
+	 *
+	 * Counting each dimension over the whole set looks right and fails exactly
+	 * where two filters meet: with `Revoked` selected the type chips still read
+	 * "Knowledge 8 · Capability 2" over all ten skills, neither is disabled, and
+	 * clicking Capability produces an empty list. The disabled-at-zero rule was
+	 * only ever asking "are there any of these at all", which is a different
+	 * question from "would this do anything from where I am standing".
+	 *
+	 * So each dimension counts against the OTHER dimension's current value. The
+	 * disabling falls out of it unchanged, and now catches the combination too.
+	 */
+	const matchesText = (skill: SkillRow) =>
+		needle === "" ||
+		`${skill.name} ${skill.slug} ${skill.sourceName}`
+			.toLowerCase()
+			.includes(needle);
+	const matchesState = (skill: SkillRow, value: StateFilter) =>
+		value === "all" ||
+		(value === "live" ? !isRevoked(skill) : isRevoked(skill));
+	const matchesType = (skill: SkillRow, value: TypeFilter) =>
+		value === "all" || skill.type === value;
+
+	const countState = (value: StateFilter) =>
+		skills.filter(
+			(s) =>
+				matchesText(s) && matchesState(s, value) && matchesType(s, typeFilter),
+		).length;
+	const countType = (value: TypeFilter) =>
+		skills.filter(
+			(s) =>
+				matchesText(s) && matchesState(s, stateFilter) && matchesType(s, value),
+		).length;
+
+	const shown = useMemo(
+		() =>
+			skills.filter((skill) => {
+				const textOk =
+					needle === "" ||
+					`${skill.name} ${skill.slug} ${skill.sourceName}`
+						.toLowerCase()
+						.includes(needle);
+				const stateOk =
+					stateFilter === "all" ||
+					(stateFilter === "live" ? !isRevoked(skill) : isRevoked(skill));
+				const typeOk = typeFilter === "all" || skill.type === typeFilter;
+				return textOk && stateOk && typeOk;
+			}),
+		[skills, needle, stateFilter, typeFilter],
+	);
+
+	/*
+	 * SELECTION FALLS BACK TO THE FIRST ROW rather than to nothing. A reading
+	 * pane that opens empty spends its whole width telling you to click
+	 * something. The URL still wins when it names a skill, so a link to one
+	 * survives a reload.
+	 *
+	 * BY ID, NOT SLUG, and that is a schema fact rather than a preference:
+	 * `skills_slug_live_unique` is PARTIAL, `where deleted_at is null`. A revoked
+	 * skill and a live skill can therefore share a slug, so a slug in the URL is
+	 * ambiguous exactly where this catalog is most careful.
+	 */
+	const selected = shown.find((s) => s.id === search.skill) ?? shown[0] ?? null;
 
 	return (
-		<>
-			{skills.length === total ? null : (
-				// The only count that has nowhere else to live. A partial page is a
-				// fact about the READ, not about the catalog, so no MetricStat can
-				// carry it and its absence would leave the totals below quietly wrong.
-				<p className="text-micro text-text-subtle" data-testid="skills-partial">
-					{skills.length} of {total} loaded. The rest are on a page this screen
-					does not fetch yet, so every count below is of what is loaded.
-				</p>
-			)}
-
-			<div className="flex flex-wrap gap-3">
-				<MetricStat
-					data-testid="skills-metric-live"
-					hint="Available to attach to an agent."
-					label="Live skills"
-					value={live.length}
+		<div className="flex flex-col gap-4">
+			{/*
+			 * THE CHECK IS A BANNER OR A LINE, NEVER BOTH. A card reading "1 ·
+			 * Revoked but still attached" used to sit directly above a banner
+			 * stating the same fact with room for the consequence. The two states
+			 * are mutually exclusive now, so the page keeps its answer to "did
+			 * anything look at this?" without saying it twice.
+			 */}
+			{dangling.length === 0 ? (
+				<ChecksPassed
+					data-testid="skills-checks"
+					items={[
+						{
+							key: "dangling",
+							label: "no revoked skill is still attached to work",
+						},
+					]}
 				/>
-				<MetricStat
-					data-testid="skills-metric-revoked"
-					hint="Withdrawn, and kept because delivered work refers to them."
-					label="Revoked"
-					value={revoked.length}
-				/>
-				{/*
-				 * THE NUMBER THIS SCREEN EXISTS FOR. Zero is the normal state and
-				 * renders in the resting tone; anything above zero is a live
-				 * exposure and renders as a warning, because every one of those
-				 * holders will render the skill into a package without re-checking
-				 * the catalog.
-				 */}
-				<MetricStat
-					data-testid="skills-metric-dangling"
-					hint={
-						dangling.length === 0
-							? "Nothing is carrying a withdrawn skill."
-							: `Held by ${plural(danglingHolders, "agent or mission", "agents and missions")}.`
-					}
-					label="Revoked but still attached"
-					tone={dangling.length === 0 ? "rest" : "warn"}
-					value={dangling.length}
-				/>
-			</div>
-
-			{dangling.length === 0 ? null : (
+			) : (
 				<DataNotice
-					body={`${plural(dangling.length, "skill has", "skills have")} been withdrawn from the catalog while something still holds ${dangling.length === 1 ? "it" : "them"}. Nothing re-checks the catalog when a package is built, so each holder will still ship the skill. Detaching it from the agent template is what stops that; revoking it here does not.`}
+					body={`${plural(dangling.length, "skill has", "skills have")} been withdrawn from the catalog while something still holds ${dangling.length === 1 ? "it" : "them"}, ${plural(danglingHolders, "place", "places")} in total. Nothing re-checks the catalog when a package is built, so each holder will still ship the skill. Detaching it from the agent template is what stops that; revoking it here does not.`}
 					data-testid="skills-dangling-notice"
 					icon={ShieldAlert}
 					title="A revoked skill is still attached to work"
@@ -247,394 +235,395 @@ function SkillsCatalogBody({
 				/>
 			)}
 
-			<SectionCard
-				action={
-					<div className="flex flex-wrap items-center gap-4">
-						<FilterChips
-							data-testid="skills-filter-state"
-							label="Filter by state"
-							onChange={onStateFilter}
-							options={[
-								{ key: "all", label: "All", count: skills.length },
-								{ key: "live", label: "Live", count: live.length },
-								{ key: "revoked", label: "Revoked", count: revoked.length },
-							]}
-							value={stateFilter}
-						/>
-						<FilterChips
-							data-testid="skills-filter-type"
-							label="Filter by type"
-							onChange={onTypeFilter}
-							options={[
-								{ key: "all", label: "Any type", count: skills.length },
-								{
-									key: "knowledge",
-									label: "Knowledge",
-									count: skills.filter((s) => s.type === "knowledge").length,
-								},
-								{
-									key: "capability",
-									label: "Capability",
-									count: skills.filter((s) => s.type === "capability").length,
-								},
-							]}
-							value={typeFilter}
-						/>
-					</div>
+			{skills.length === total ? null : (
+				<p className="text-micro text-text-subtle" data-testid="skills-partial">
+					{skills.length} of {total} loaded. Every count is of what is loaded.
+				</p>
+			)}
+
+			<FilterBar
+				data-testid="skills-filterbar"
+				summary={
+					<FilterSummary
+						data-testid="skills-filter-summary"
+						noun="skills"
+						onClear={() => {
+							setQueryText("");
+							onSearch({ skill: search.skill });
+						}}
+						shown={shown.length}
+						total={skills.length}
+					/>
 				}
-				count={shown.length}
-				data-testid="skills-table-card"
-				title="Catalog"
 			>
-				<DataTable
-					caption="Skills in the catalog, with what each one is attached to."
-					columns={SKILL_COLUMNS}
-					data-testid="skills-table"
-					empty={
+				{/*
+				 * THE SEARCH SITS WITH THE CHIPS, not inside the list card.
+				 *
+				 * All three narrow the same set, and having two of them above the
+				 * panes while the third lived in the list's header meant an operator
+				 * had to find the filtering controls in two places. One bar owns the
+				 * narrowing; the list card is just the list.
+				 */}
+				<div className="w-full max-w-[42ch]">
+					<SearchField
+						data-testid="skills-search"
+						label="Filter skills by name, slug or source"
+						onChange={setQueryText}
+						placeholder="Name, slug or source"
+						shown={shown.length}
+						total={skills.length}
+						value={queryText}
+					/>
+				</div>
+				<FilterChips
+					data-testid="skills-filter-state"
+					label="State"
+					onChange={(state) => onSearch({ ...search, skill: undefined, state })}
+					options={[
+						{ key: "all", label: "All", count: countState("all") },
+						{ key: "live", label: "Live", count: countState("live") },
+						{ key: "revoked", label: "Revoked", count: countState("revoked") },
+					]}
+					value={stateFilter}
+				/>
+				<FilterChips
+					data-testid="skills-filter-type"
+					label="Type"
+					onChange={(type) => onSearch({ ...search, skill: undefined, type })}
+					options={[
+						{ key: "all", label: "All", count: countType("all") },
+						{
+							key: "knowledge",
+							label: "Knowledge",
+							count: countType("knowledge"),
+						},
+						{
+							key: "capability",
+							label: "Capability",
+							count: countType("capability"),
+						},
+					]}
+					value={typeFilter}
+				/>
+			</FilterBar>
+
+			{/*
+			 * TWO PANES, and the list is a fixed 360px rather than a fraction. The
+			 * reader is the variable one: a row is a name and a slug and does not
+			 * get better with more width, while a paragraph does. Stacks below `lg`,
+			 * which is headroom rather than a phone layout — these routes are
+			 * desktop-only.
+			 */}
+			<div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
+				<SkillList
+					onSelect={(id) => onSearch({ ...search, skill: id })}
+					selectedId={selected?.id ?? null}
+					skills={shown}
+				/>
+				{selected === null ? (
+					<SectionCard data-testid="skills-reader" title="Nothing to read">
 						<EmptyState
-							body="No skill matches this filter. Every skill is still in the catalog; the filter above is hiding them."
+							body="No skill matches this filter, so there is nothing to open. Every skill is still in the catalog; the filters above are hiding them."
 							title="Nothing matches"
 						/>
-					}
-					onSelect={onSelect}
-					rowId={(row) => row.id}
-					rowTone={skillRowTone}
-					rows={shown}
-					selectColumn="name"
-					selectedId={selectedId}
-				/>
-			</SectionCard>
-
-			{selected === null ? null : <SkillDetail skill={selected} />}
-		</>
+					</SectionCard>
+				) : (
+					<SkillReader skill={selected} />
+				)}
+			</div>
+		</div>
 	);
 }
 
-function skillRowTone(skill: SkillRow): RowTone {
-	if (isRevoked(skill)) return "revoked";
-	// A live skill whose SOURCE was withdrawn is not itself withdrawn, and must
-	// not be painted as though it were. It is flagged in the source column.
-	return "rest";
+/**
+ * THE DENSE HALF. Rows are two short lines, around 44px.
+ *
+ * The previous table spent 110px per row because the attachment cell stacked
+ * four lines of its own. That saving is what pays for the reading pane, so the
+ * row carries ONE attachment number and the reader carries the breakdown.
+ */
+function SkillList({
+	skills,
+	selectedId,
+	onSelect,
+}: {
+	skills: SkillRow[];
+	selectedId: string | null;
+	onSelect: (id: string) => void;
+}) {
+	return (
+		<SectionCard
+			count={skills.length}
+			// No `definition` here: the page header already carries TERM.skill and
+			// the two sat about 40px apart, verbatim. Section 12 rule 5 wants the
+			// jargon named once at first encounter, and the header IS first.
+			data-testid="skills-list"
+			title="Catalog"
+		>
+			{skills.length === 0 ? (
+				<p
+					className="px-4 pb-3 text-micro text-text-subtle"
+					data-testid="skills-list-empty"
+				>
+					Nothing matches. Every skill is still in the catalog; the filter and
+					the chips above are hiding them.
+				</p>
+			) : null}
+			{/*
+			 * px-4, matching the card's title and its search field. It was px-2,
+			 * which put three different left edges inside one 360px card — title
+			 * at 279, search at 277, row background at 271 — and eight pixels of
+			 * rag down the left of a dense list is exactly the kind of thing that
+			 * reads as "off" without being nameable.
+			 */}
+			<ul className="flex flex-col px-4 pb-2">
+				{skills.map((skill) => {
+					const held =
+						skill.attachedTo.templates.length +
+						skill.attachedTo.rosterEntries.length;
+					const selected = skill.id === selectedId;
+					const revoked = isRevoked(skill);
+					return (
+						<li key={skill.id}>
+							<button
+								aria-current={selected ? "true" : undefined}
+								className={cn(
+									// py-1, not py-2. Measured at 61px and the target was ~44;
+									// this brings a two-line row to ~46.
+									// No left padding: the 2px accent border IS the left inset,
+									// so the row's text sits on the card's content edge
+									// instead of two pixels further in than everything else.
+									"w-full rounded-sm py-1 pr-2 pl-0 text-left",
+									"transition-colors duration-[var(--duration-state)] ease-[var(--ease-avel)] motion-reduce:transition-none",
+									// A LEFT EDGE, not a background alone. The selected row was
+									// measurably quieter than a revoked badge on a different
+									// row, so the eye went to the wrong place; an accent edge
+									// beats a badge without shouting.
+									"border-l-2",
+									selected
+										? "border-accent bg-accent-surface"
+										: "interactive border-transparent",
+								)}
+								data-revoked={revoked ? "true" : undefined}
+								data-testid="skill-row"
+								onClick={() => onSelect(skill.id)}
+								type="button"
+							>
+								<span className="flex items-baseline gap-2">
+									<SkillTypeGlyph
+										testId={`skill-type-${skill.slug}`}
+										type={skill.type}
+									/>
+									<span
+										className={cn(
+											"min-w-0 flex-1 truncate font-display text-sm",
+											revoked
+												? "text-text-subtle line-through"
+												: "font-medium text-text",
+										)}
+									>
+										{skill.name}
+									</span>
+									{revoked ? (
+										<RevocationMark testId={`skill-revoked-${skill.slug}`} />
+									) : null}
+								</span>
+								<span className="flex items-baseline gap-2 text-micro text-text-subtle">
+									<span className="min-w-0 flex-1 truncate font-mono">
+										{skill.slug}
+									</span>
+									{/* Non-zero only. "0 carried" on every newly imported skill
+									    is noise, and the reader says it in words. */}
+									{held === 0 ? null : (
+										<span className="tabular" data-testid="skill-held">
+											{held} carried
+										</span>
+									)}
+								</span>
+							</button>
+						</li>
+					);
+				})}
+			</ul>
+		</SectionCard>
+	);
 }
 
-const SKILL_COLUMNS: Column<SkillRow>[] = [
-	{
-		key: "name",
-		header: "Skill",
-		sortValue: (row) => row.name,
-		render: (row) => (
-			<div className="flex flex-col gap-1">
-				<span
-					className={
-						isRevoked(row)
-							? "font-display text-sm text-text-subtle line-through"
-							: "font-display text-sm font-medium text-text"
-					}
-				>
-					{row.name}
-				</span>
-				<span className="font-mono text-micro text-text-subtle">
-					{row.slug}
-				</span>
-			</div>
-		),
-	},
-	{
-		key: "state",
-		header: "State",
-		sortValue: (row) => (isRevoked(row) ? 0 : 1),
-		render: (row) =>
-			isRevoked(row) ? (
-				<RevocationChip
-					revokedAt={row.revokedAt}
-					testId={`skill-revoked-${row.slug}`}
-				/>
-			) : (
-				<span className="text-micro text-text-subtle">Live</span>
-			),
-	},
-	{
-		key: "type",
-		header: "Type",
-		sortValue: (row) => row.type,
-		render: (row) => (
-			<SkillTypeChip testId={`skill-type-${row.slug}`} type={row.type} />
-		),
-	},
-	{
-		key: "source",
-		header: "Source",
-		sortValue: (row) => row.sourceName,
-		render: (row) => (
-			<div className="flex flex-col gap-1">
-				<span className="text-sm text-text-muted">{row.sourceName}</span>
-				{row.sourceRevoked ? (
-					<span className="text-micro text-gate-warn">source revoked</span>
-				) : null}
-			</div>
-		),
-	},
-	{
-		key: "attached",
-		header: "Attached to",
-		align: "end",
-		sortValue: (row) =>
-			row.attachedTo.templates.length + row.attachedTo.rosterEntries.length,
-		render: (row) => {
-			const templates = row.attachedTo.templates.length;
-			const entries = row.attachedTo.rosterEntries.length;
-			if (templates === 0 && entries === 0) {
-				return (
-					// Not "0". Nothing carrying a skill is a real and useful state, and
-					// a bare zero in a column of counts reads as a missing value.
-					<span className="text-micro text-text-subtle">nothing</span>
-				);
-			}
-			return (
-				<div className="flex flex-col items-end gap-0.5">
-					<span className="text-sm text-text">
-						{plural(templates, "template", "templates")}
-					</span>
-					<span className="text-micro text-text-subtle">
-						{plural(entries, "roster entry", "roster entries")}
-					</span>
-				</div>
-			);
-		},
-	},
-	{
-		key: "updated",
-		header: "Updated",
-		align: "end",
-		secondary: true,
-		sortValue: (row) => row.updatedAt,
-		render: (row) => (
-			<span className="font-mono text-micro text-text-subtle">
-				{isoDate(row.updatedAt)}
-			</span>
-		),
-	},
-];
-
-/* ── detail ──────────────────────────────────────────────────────────────── */
-
-/**
- * IN-PAGE, NOT A ROUTE.
- *
- * A `/catalog/skills/$skillId` route would be the obvious shape and it is not
- * worth its cost right now: five sessions share one working tree,
- * `routeTree.gen.ts` is generated, and it has blocked merges twice. A detail
- * panel under the table costs no generated file and answers the same question.
- *
- * It becomes a route the moment the detail needs its own URL, which is the same
- * rule UI-PLAN section 5 applies to engagement detail.
- */
-function SkillDetail({ skill }: { skill: SkillRow }) {
+/** The half that made the rewrite worth doing: the skill itself. */
+function SkillReader({ skill }: { skill: SkillRow }) {
 	const revoked = isRevoked(skill);
 	const holders =
 		skill.attachedTo.templates.length + skill.attachedTo.rosterEntries.length;
 
 	return (
-		<div className="flex flex-col gap-4" data-testid="skill-detail">
-			{revoked ? (
-				<DataNotice
-					body={
-						holders === 0
-							? `Withdrawn on ${isoDate(skill.revokedAt ?? "")}. Nothing is attached to it, so nothing will ship it. It stays listed because work already delivered refers to it.`
-							: `Withdrawn on ${isoDate(skill.revokedAt ?? "")}, and still attached to ${plural(holders, "place", "places")}. Each one will render this skill into its package. Revoking here did not detach it.`
-					}
-					data-testid="skill-detail-revoked"
-					icon={ShieldAlert}
-					title={
-						holders === 0
-							? "This skill is revoked"
-							: "This skill is revoked and still in use"
-					}
-					tone={holders === 0 ? "warn" : "block"}
-				/>
-			) : null}
+		<div className="flex flex-col gap-4" data-testid="skills-reader">
+			<SectionCard data-testid="skill-detail" title={skill.name}>
+				<div className="flex flex-col gap-4 px-4 pt-1 pb-4">
+					<div className="flex flex-wrap items-center gap-2">
+						<Tag data-testid="skill-detail-slug">{skill.slug}</Tag>
+						<SkillTypeChip testId="skill-detail-type" type={skill.type} />
+						<span className="text-micro text-text-subtle">
+							from {skill.sourceName}
+						</span>
+						{/* No revoked chip here. The banner immediately beneath says it
+						    with the date and the consequence, and the chip was the sixth
+						    place one screen stated the same fact. */}
+					</div>
 
-			<SectionCard data-testid="skill-detail-facts" title={skill.name}>
-				<div className="px-4 py-4">
-					<DefinitionList
-						data-testid="skill-detail-list"
-						items={[
-							{
-								label: "Slug",
-								value: <Tag data-testid="skill-detail-slug">{skill.slug}</Tag>,
-							},
-							{
-								label: "Type",
-								value: (
-									<SkillTypeChip testId="skill-detail-type" type={skill.type} />
-								),
-								hint:
-									skill.type === "capability"
-										? TERM.capabilitySkill
-										: TERM.knowledgeSkill,
-							},
-							{
-								label: "Source",
-								value: skill.sourceName,
-								hint: skill.sourceRevoked
-									? "This source has been revoked. The skill was not, so it is still live and still attachable."
-									: undefined,
-							},
-							{
-								label: "Recommended for",
-								value:
-									skill.recommendedFor.length === 0 ? (
-										<span className="text-text-subtle">
-											Nothing recorded. Nothing is filtered by this.
-										</span>
-									) : (
-										<div className="flex flex-wrap gap-1.5">
-											{skill.recommendedFor.map((entry) => (
-												<Tag data-testid="skill-detail-recommended" key={entry}>
-													{entry}
-												</Tag>
-											))}
-										</div>
-									),
-							},
-							{
-								label: "State",
-								value: revoked ? (
-									<RevocationChip
-										revokedAt={skill.revokedAt}
-										testId="skill-detail-state"
-									/>
-								) : (
-									"Live"
-								),
-								hint: revoked ? TERM.revoked : undefined,
-							},
-							{
-								label: "Added",
-								value: (
-									<span className="font-mono text-micro">
-										{isoDate(skill.createdAt)}
-									</span>
-								),
-							},
-							{
-								label: "Updated",
-								value: (
-									<span className="font-mono text-micro">
-										{isoDate(skill.updatedAt)}
-									</span>
-								),
-							},
-						]}
-					/>
-				</div>
-			</SectionCard>
+					{/*
+					 * ABOVE THE DOCUMENT, AND COMPACT.
+					 *
+					 * This was a full section at the bottom, 712px down and below the
+					 * fold, and "where is this in use" is what a catalogue is opened to
+					 * answer. Moving the whole section up instead pushed the document
+					 * to 904px, trading one below-the-fold fact for a worse one. I made
+					 * exactly that mistake and measured it.
+					 *
+					 * So it is a strip rather than a section: enough to answer the
+					 * question at a glance, cheap enough that the skill body still
+					 * starts above the fold.
+					 */}
+					<CarriedByStrip skill={skill} />
 
-			<SectionCard
-				count={skill.attachedTo.templates.length}
-				data-testid="skill-detail-templates"
-				definition={TERM.agentTemplate}
-				title="On agent templates"
-			>
-				{skill.attachedTo.templates.length === 0 ? (
-					<EmptyState
-						body="No agent template carries this skill, so no future mission will pick it up. A skill in the catalog does nothing until it is attached to a template."
-						title="Not attached to any template"
-					/>
-				) : (
-					<ul className="flex flex-col">
-						{skill.attachedTo.templates.map((template) => (
-							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
-								key={template.id}
-							>
-								<span className="font-display text-sm text-text">
-									{template.name}
-								</span>
-								<Tag data-testid="skill-template-slug">{template.slug}</Tag>
-								{template.revoked ? (
-									<span className="text-micro text-text-subtle">
-										template revoked
-									</span>
-								) : null}
-								<Link
-									className="ml-auto text-micro text-accent-text hover:text-accent-hover"
-									data-testid="skill-template-link"
-									to="/catalog/agents"
-								>
-									Open agent templates
-								</Link>
-							</li>
-						))}
-					</ul>
-				)}
-			</SectionCard>
+					{revoked ? (
+						<DataNotice
+							body={
+								holders === 0
+									? `Withdrawn on ${isoDate(skill.revokedAt ?? "")}. Nothing is attached to it, so nothing will ship it. It stays listed because work already delivered refers to it.`
+									: `Withdrawn on ${isoDate(skill.revokedAt ?? "")}, and still attached in ${plural(holders, "place", "places")}. Each one will render this skill into its package. Revoking here did not detach it.`
+							}
+							data-testid="skill-detail-revoked"
+							icon={ShieldAlert}
+							title={
+								holders === 0
+									? "This skill is revoked"
+									: "This skill is revoked and still in use"
+							}
+							tone={holders === 0 ? "warn" : "block"}
+						/>
+					) : null}
 
-			<SectionCard
-				count={skill.attachedTo.rosterEntries.length}
-				data-testid="skill-detail-roster"
-				definition={TERM.rosterEntry}
-				title="On mission teams"
-			>
-				{skill.attachedTo.rosterEntries.length === 0 ? (
-					<EmptyState
-						body="No mission team carries this skill today. That is not the same as no template carrying it: a template hands its skills over when a mission copies it in, so a newly attached skill shows up here only on the next mission."
-						title="Not on any mission team"
-					/>
-				) : (
-					<ul className="flex flex-col">
-						{skill.attachedTo.rosterEntries.map((entry) => (
-							<li
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
-								key={entry.id}
-							>
-								<Link
-									className="font-display text-sm text-accent-text hover:text-accent-hover"
-									data-testid="skill-roster-link"
-									params={{ missionId: entry.missionId }}
-									to="/missions/$missionId"
-								>
-									{entry.missionTitle ?? "Unnamed mission"}
-								</Link>
-								<Tag data-testid="skill-roster-agent">{entry.agentSlug}</Tag>
-								{entry.inactive ? (
-									// Inactive is NOT safe here. `active` gates dispatch, not the
-									// render, so an inactive entry still carries the skill into
-									// the package.
-									<span className="text-micro text-text-subtle">
-										inactive · still carries this skill
-									</span>
-								) : null}
-							</li>
-						))}
-					</ul>
-				)}
-			</SectionCard>
+					{skill.sourceRevoked ? (
+						<p className="text-micro text-gate-warn">
+							This skill's source has been revoked. The skill was not, so it is
+							still live and still attachable.
+						</p>
+					) : null}
 
-			<SectionCard data-testid="skill-detail-content" title="Skill content">
-				<div className="px-4 py-4">
-					<p className="pb-2 text-micro text-text-subtle">
-						The source text, as stored. It is rendered as written rather than
-						formatted, because nothing in this app turns markdown into markup
-						and showing it half-formatted would misrepresent what an agent
-						receives.
-					</p>
-					<pre className="app-scroll max-h-[28rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
-						{skill.contentMd}
-					</pre>
-					{skill.avelEnhancementMd === null ? null : (
-						<>
-							<p className="pt-4 pb-2 text-micro text-text-subtle">
-								AVEL's own addition to the imported text. It travels with the
-								skill.
+					{/*
+					 * THE SUBSTANCE, on screen for the first time. Preformatted rather
+					 * than rendered: no markdown library is installed, and adding one
+					 * to make this look finished is a dependency decision that is not
+					 * mine to make.
+					 */}
+					<div>
+						<p className="pb-1.5 text-micro text-text-subtle">
+							The skill, as imported. Markdown is not rendered.
+						</p>
+						<pre
+							className="app-scroll max-h-[34rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro leading-relaxed whitespace-pre-wrap text-text-muted"
+							data-testid="skill-content"
+						>
+							{skill.contentMd}
+						</pre>
+					</div>
+
+					{/*
+					 * VISUALLY SEPARATE FROM THE IMPORTED TEXT, which is the entire
+					 * reason this column exists. An accent rule down the left edge is a
+					 * border AROUND this block rather than a rule BETWEEN two panes, so
+					 * it survives the divider ruling.
+					 */}
+					{skill.avelEnhancementMd === null ? (
+						// AN ABSENT-STATE, because the alternative is that the one field
+						// defined by being separable from the source text is invisible
+						// whether or not it exists. It is null on every skill today, so
+						// without this the block has never rendered in either direction.
+						<p
+							className="border-l-2 border-[var(--elevation-border-rest)] pl-3 text-micro text-text-subtle"
+							data-testid="skill-enhancement-absent"
+						>
+							No AVEL addition. Nothing has been written on top of the imported
+							text, so this skill reaches an agent exactly as its source wrote
+							it.
+						</p>
+					) : (
+						<div
+							className="border-l-2 border-accent pl-3"
+							data-testid="skill-enhancement"
+						>
+							<p className="pb-1 text-micro font-medium text-accent-text">
+								AVEL's addition
 							</p>
-							<pre className="app-scroll max-h-[28rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro whitespace-pre-wrap text-text-muted">
+							<p className="max-w-[52ch] pb-1.5 text-micro leading-relaxed text-text-subtle">
+								Written here rather than imported. It travels with the skill
+								into every package.
+							</p>
+							<pre className="app-scroll max-h-[24rem] overflow-auto rounded-sm bg-muted px-3 py-3 font-mono text-micro leading-relaxed whitespace-pre-wrap text-text-muted">
 								{skill.avelEnhancementMd}
 							</pre>
-						</>
+						</div>
 					)}
 				</div>
 			</SectionCard>
+		</div>
+	);
+}
+
+/**
+ * Where the skill is actually in use, as one or two lines.
+ *
+ * Templates and roster entries stay distinguishable — they are different facts,
+ * one about future missions and one about running ones — but they no longer get
+ * a section each. Absence is stated in words rather than as an empty list,
+ * because "nothing carries this" is a real and useful answer.
+ */
+function CarriedByStrip({ skill }: { skill: SkillRow }) {
+	const { templates, rosterEntries } = skill.attachedTo;
+	return (
+		<div className="flex flex-col gap-1.5" data-testid="skill-carried-by">
+			<p className="text-micro text-text-subtle">Carried by</p>
+			{templates.length === 0 && rosterEntries.length === 0 ? (
+				<p className="max-w-[52ch] text-sm text-text-subtle">
+					Nothing carries this skill, so no package will ship it. A skill does
+					nothing until it is attached to an agent template.
+				</p>
+			) : (
+				<div className="flex flex-wrap items-center gap-1.5">
+					{templates.map((template) => (
+						<Link
+							data-testid="skill-template-link"
+							key={template.id}
+							params={{ agentId: template.id }}
+							to="/catalog/agent/$agentId"
+						>
+							<Pill data-testid={`skill-template-${template.slug}`}>
+								{template.name}
+							</Pill>
+						</Link>
+					))}
+					{rosterEntries.map((entry) => (
+						<Link
+							data-testid="skill-roster-link"
+							key={entry.id}
+							params={{ missionId: entry.missionId }}
+							to="/missions/$missionId"
+						>
+							<Pill data-testid="skill-roster-entry">
+								{entry.missionTitle ?? "Unnamed mission"} · {entry.agentSlug}
+							</Pill>
+						</Link>
+					))}
+					{rosterEntries.length === 0 ? (
+						// Said, not omitted: a template carrying a skill and a mission
+						// carrying it are different facts, and silence here reads as
+						// "no data" rather than "not on a team yet".
+						<span className="text-micro text-text-subtle">
+							not on any mission team yet
+						</span>
+					) : null}
+				</div>
+			)}
 		</div>
 	);
 }

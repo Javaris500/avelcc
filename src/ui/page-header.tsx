@@ -107,8 +107,26 @@ export function PageHeader({
 					{title}
 				</h1>
 
+				{/*
+				 * THE SAME READING MEASURE AS THE DEFINITION BELOW, and it costs
+				 * nothing today. Most subtitles are a count — "3 missions" — but the
+				 * chat home passes a full sentence, and a subtitle is prose whenever
+				 * a route decides it is.
+				 *
+				 * The arithmetic, because a cap that reflows existing screens is a
+				 * different change from one that bounds a future screen: 52ch renders
+				 * about 71 characters in this face (ch is the advance of "0", so a
+				 * unit buys roughly 1.37 characters of lowercase), and the longest
+				 * subtitle in the app is 64. Every current one still sets on one
+				 * line. What this stops is the next one that does not — the header
+				 * is the widest thing on a page that no longer has a mat or a cap
+				 * to constrain it.
+				 */}
 				{subtitle ? (
-					<p className="text-sm text-text-muted" data-testid="page-subtitle">
+					<p
+						className="max-w-[52ch] text-sm text-text-muted"
+						data-testid="page-subtitle"
+					>
 						{subtitle}
 					</p>
 				) : null}

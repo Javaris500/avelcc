@@ -15,10 +15,16 @@ import { cn } from "#/utils/cn";
 /**
  * The app shell.
  *
- * Frame per the reference: `.page > .app > aside.side + .main`. The page is a
- * 26px mat; the app is a bordered, rounded window inside it, capped at 1440px
- * and `100vh - 52px` tall so the mat shows on all four sides. Overflow is
- * hidden on the window so the rounded corners actually clip.
+ * Frame: `.page > .app > aside.side + .main`, full bleed. The app fills the
+ * viewport — no mat, no rounded corners, no window border.
+ *
+ * It was a 26px mat around a bordered, rounded window, per the reference. The
+ * operator's call reversed it: the inset read as a black margin rather than as
+ * a frame. `overflow-hidden` stays on the window, now to contain the two
+ * scrolling panes rather than to clip corners that no longer exist.
+ *
+ * `--frame-mat` and the elevation border are both still defined and still used
+ * elsewhere; nothing was removed from the token layer for this.
  *
  * Theme comes from the shared `useTheme` hook rather than local state, because
  * login renders outside this component with its own `.app` wrapper and the two
@@ -81,7 +87,7 @@ export function Shell({
 			<PageHeaderProvider>
 				<div
 					className={cn(
-						"app min-h-screen bg-app-bg p-(--frame-mat) text-text max-md:p-3",
+						"app min-h-screen bg-app-bg text-text",
 						theme === "light" && "light",
 					)}
 					data-testid="app-shell"
@@ -128,11 +134,25 @@ export function Shell({
 						// could not help here, because a child cannot shrink into a row
 						// that was never bounded.
 						//
-						// The border here STAYS. "No rules throughout the shell" means
-						// internal dividers; this is the window's edge against the mat,
-						// and without it the rounded corners have nothing to describe
-						// them against. Every rule BETWEEN panes is gone.
-						className="mx-auto grid h-[calc(100vh-(var(--frame-mat)*2))] max-w-(--frame-max) grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-[var(--elevation-border-rest)] bg-app-panel shadow-e2 max-md:h-[calc(100vh-calc(var(--spacing)*6))]"
+						// THE MAT, THE CORNERS AND THE WINDOW BORDER ARE GONE, on the
+						// operator's call: the 26px inset read as a black margin around
+						// the app rather than as a frame around a window. In dark it was
+						// app-bg #1a1d23 against a panel at #1c1f25, so it was a near
+						// black edge on all four sides.
+						//
+						// The border's justification retired with them. It stayed because
+						// it was "the window's edge against the mat, and without it the
+						// rounded corners have nothing to describe them against" — both
+						// halves of that reason are false now, so dropping it follows the
+						// no-rules rule rather than breaking it. Every rule BETWEEN panes
+						// was already gone.
+						//
+						// `h-screen` replaces `100vh - mat*2`, and the `max-md` height
+						// override goes with it: there is no inset to subtract at any
+						// width any more. The grid row stays `minmax(0,1fr)` — that fix
+						// was about giving children a bounded row to shrink within and
+						// has nothing to do with the mat.
+						className="mx-auto grid h-screen max-w-(--frame-max) grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)] overflow-hidden bg-app-panel"
 						data-testid="app-window"
 					>
 						{compact ? null : sidebar}

@@ -4,10 +4,6 @@ import type { z } from "zod";
 
 import { clientDetail, clientSchema } from "#/contract/client";
 import { success } from "#/contract/shared/envelope";
-import {
-	DefinitionListShell,
-	SectionShell,
-} from "#/modules/client/ui/scaffold";
 import { SECTIONS } from "#/modules/client/ui/sections";
 import {
 	CLIENT_STATUS_TONE,
@@ -19,6 +15,8 @@ import {
 import { usePageHeader } from "#/modules/shell/use-page-header";
 import { StatusBadge, Tag } from "#/ui/badge";
 import { Button } from "#/ui/button";
+import { DefinitionList } from "#/ui/definition-list";
+import { SectionCard } from "#/ui/section-card";
 import { SkeletonRows } from "#/ui/skeleton";
 import { EmptyState, ErrorState } from "#/ui/states";
 import { Surface } from "#/ui/surface";
@@ -484,7 +482,7 @@ function ClientDetail() {
 							 */}
 							{/*
 							 * A MEASURE, now that the rail is gone and this column is the
-							 * full width of the window. `DefinitionListShell` is a
+							 * full width of the window. `DefinitionList` is a
 							 * two-column grid with no max of its own, so at 1052px it put
 							 * "Primary contact" and "Status" 538px apart — a pair that has
 							 * to be read as a pair, separated by half the screen.
@@ -560,16 +558,16 @@ function Sections({
 				return (
 					<>
 						{/* ── masthead ─────────────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={overview.blurb}
 							id={overview.id}
-							n={overview.n}
+							testId={`client-section-${overview.id}`}
 							state="populated"
 							title={overview.title}
 						>
 							<div className="flex flex-col gap-4">
 								<Metrics metrics={d.metrics} />
-								<DefinitionListShell
+								<DefinitionList
 									items={[
 										{
 											label: "Primary contact",
@@ -624,7 +622,7 @@ function Sections({
 									</p>
 								)}
 							</div>
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 1 · requests ─────────────────────────────────────── */}
 						{/*
@@ -634,11 +632,11 @@ function Sections({
 						 * many are waiting but cannot name one or link to its review. The
 						 * count is real and is shown; the list says what is missing.
 						 */}
-						<SectionShell
+						<SectionCard
 							blurb={section("requests").blurb}
 							count={d.openRequests}
 							id="requests"
-							n={1}
+							testId="client-section-requests"
 							state={d.openRequests === 0 ? "empty" : "populated"}
 							title="Requests"
 						>
@@ -660,14 +658,14 @@ function Sections({
 									rather than guessed.
 								</p>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 2 · engagements ──────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("engagements").blurb}
 							count={d.engagements.length}
 							id="engagements"
-							n={2}
+							testId="client-section-engagements"
 							state={stateOf(d.engagements.length)}
 							title="Engagements"
 						>
@@ -697,14 +695,14 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 3 · missions ─────────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("missions").blurb}
 							count={d.missions.length}
 							id="missions"
-							n={3}
+							testId="client-section-missions"
 							state={stateOf(d.missions.length)}
 							title="Missions"
 						>
@@ -761,14 +759,14 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 4 · deliveries ───────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("deliveries").blurb}
 							count={d.deliveries.length}
 							id="deliveries"
-							n={4}
+							testId="client-section-deliveries"
 							state={stateOf(d.deliveries.length)}
 							title="Deliveries"
 						>
@@ -807,14 +805,14 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 5 · roster ───────────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("roster").blurb}
 							count={d.roster.length}
 							id="roster"
-							n={5}
+							testId="client-section-roster"
 							state={stateOf(d.roster.length)}
 							title="Roster"
 						>
@@ -839,14 +837,14 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 6 · repositories ─────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("repositories").blurb}
 							count={d.repositories.length}
 							id="repositories"
-							n={6}
+							testId="client-section-repositories"
 							state={stateOf(d.repositories.length)}
 							title="Repositories"
 						>
@@ -875,7 +873,7 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 7 · brief & documents ────────────────────────────── */}
 						{/*
@@ -885,21 +883,21 @@ function Sections({
 						 * empty state here would claim there are no documents, which this
 						 * page has no way to know.
 						 */}
-						<SectionShell
+						<SectionCard
 							blurb={section("brief").blurb}
 							id="brief"
-							n={7}
+							testId="client-section-brief"
 							notBuiltReason="A brief belongs to a mission. Which documents belong to a client, rather than to one of its missions, is not modelled yet — so this cannot say there are none."
 							state="not-built"
 							title="Brief & documents"
 						/>
 
 						{/* ── 8 · cost ─────────────────────────────────────────── */}
-						<SectionShell
+						<SectionCard
 							blurb={section("cost").blurb}
 							count={d.cost.length}
 							id="cost"
-							n={8}
+							testId="client-section-cost"
 							state={stateOf(d.cost.length)}
 							title="Cost"
 						>
@@ -932,7 +930,7 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 
 						{/* ── 9 · activity ─────────────────────────────────────── */}
 						{/*
@@ -942,11 +940,11 @@ function Sections({
 						 * UPDATE and DELETE by database trigger, so a control offering
 						 * either would be a control that cannot work.
 						 */}
-						<SectionShell
+						<SectionCard
 							blurb={section("activity").blurb}
 							count={d.activity.length}
 							id="activity"
-							n={9}
+							testId="client-section-activity"
 							state={stateOf(d.activity.length)}
 							title="Activity"
 						>
@@ -967,7 +965,7 @@ function Sections({
 									))}
 								</ul>
 							)}
-						</SectionShell>
+						</SectionCard>
 					</>
 				);
 			}}

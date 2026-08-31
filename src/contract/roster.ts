@@ -118,18 +118,18 @@ export const rosterAgentSchema = z.object({
  * session 2 building the table.
  */
 
-export const coherenceBlock = z.object({
-	code: z.literal("no_agents_in_first_wave"),
-	reason: z.string(),
-	wave: z.string(),
-});
-
-export const coherenceResult = z.object({
-	block: coherenceBlock.optional(),
-	warnings: z.array(
-		z.object({ code: z.string(), reason: z.string() }).passthrough(),
-	),
-});
+/**
+ * COHERENCE LIVES IN `contract/shared/coherence.ts`, NOT HERE.
+ *
+ * This file declared a `coherenceBlock` / `coherenceResult` zod pair that
+ * nothing referenced, while the real definition — `CoherenceBlock`,
+ * `CoherenceWarning`, `Coherence` and `computeCoherence`, with a test — sat in
+ * the shared module. One fact with two owners is the drift rule violated in
+ * code rather than in docs, and the unreferenced copy was the loser.
+ *
+ * Import from `#/contract/shared/coherence` if the roster endpoints need to
+ * express coherence on the wire. Do not redeclare it here.
+ */
 
 export const rosterContract = c.router({
 	/**

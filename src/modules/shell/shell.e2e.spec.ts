@@ -165,10 +165,12 @@ test.describe("shell structure", () => {
 	test("matches the reference frame geometry", async ({ page }) => {
 		await gotoApp(page);
 
-		// .page — a 26px mat on all four sides.
-		await expectStyle(page, "app-shell", "padding").toBe("26px");
+		// .page — NO mat. The 26px inset was removed on the operator's call; it
+		// read as a black margin around the app rather than as a frame around a
+		// window. Asserted as 0 rather than deleted, so the mat cannot creep back.
+		await expectStyle(page, "app-shell", "padding").toBe("0px");
 
-		// .app — 238px + 1fr, capped, radius-lg, clipping its corners.
+		// .app — 238px + 1fr, full bleed, square, still clipping its panes.
 		const side = await page.getByTestId("sidebar").boundingBox();
 		expect(side?.width).toBe(238);
 		// DELIBERATE DIVERGENCE from the reference, at the operator's request.
@@ -176,10 +178,39 @@ test.describe("shell structure", () => {
 		// size; a tool discarding 44% of a 2560px screen is a different problem.
 		// --frame-max is now 100%.
 		await expectStyle(page, "app-window", "max-width").toBe("100%");
-		await expectStyle(page, "app-window", "border-top-left-radius").toBe(
-			"14px",
-		);
+		// The corners went with the mat: there is nothing left to be rounded
+		// against. Pinned at 0 for the same reason as the padding above.
+		await expectStyle(page, "app-window", "border-top-left-radius").toBe("0px");
 		await expectStyle(page, "app-window", "overflow").toBe("hidden");
+
+		/**
+		 * AND THE OPERATOR'S ACTUAL REQUIREMENT, WHICH NONE OF THE ABOVE STATES.
+		 *
+		 * "Cover the entire page" is a claim about COVERAGE, and zero padding,
+		 * zero radius and `max-width: 100%` are three properties that each have
+		 * to hold for it without any of them saying it.
+		 *
+		 * Demonstrated rather than argued, because my first example was wrong. I
+		 * claimed capping `--frame-max` would slip past everything above; it does
+		 * not, because the line above pins that token's effect at exactly 100%.
+		 * A MARGIN does slip past: 40px of `margin-left` on the window leaves the
+		 * padding 0, the radius 0 and the max-width 100%, and puts 40px of app-bg
+		 * back down the side. Injected, run, and this line is the only one that
+		 * went red — "Expected: 1280, Received: 1240".
+		 *
+		 * So it earns its place, just not for the reason I first gave it.
+		 */
+		const viewport = page.viewportSize();
+		const win = await page.getByTestId("app-window").boundingBox();
+		if (!viewport || !win) throw new Error("no viewport or window box");
+		expect(Math.round(win.width), "app-bg must not show at the sides").toBe(
+			viewport.width,
+		);
+		expect(Math.round(win.height), "app-bg must not show above or below").toBe(
+			viewport.height,
+		);
+		expect(Math.round(win.x)).toBe(0);
+		expect(Math.round(win.y)).toBe(0);
 
 		// .scroll — the main pane takes the scrollbar, not the page.
 		await expectStyle(page, "main", "overflow-y").toBe("auto");
@@ -254,25 +285,33 @@ test.describe("theme", () => {
 		await gotoApp(page);
 
 		/**
-		 * THE SIDEBAR IS A DIFFERENT PLANE, NOT A RAISED ONE. This asserted the
-		 * literal #2a2e36 — the old app-panel — which is to say it asserted that
-		 * the sidebar IS A CARD. That premise is exactly what the operator's
-		 * ruling removed, so the test was pinning the design it was meant to
-		 * protect us from changing by accident.
+		 * THE SIDEBAR SHARES THE CONTENT'S GROUND. This asserted app-bg, the
+		 * desktop tone, on the strength of a "the sidebar is a different plane"
+		 * ruling that was later reversed: the window is ONE surface now, sidebar
+		 * and content column both on app-panel, and the accent seam divides them
+		 * instead of a tonal step.
 		 *
-		 * Now it asserts the ROLE: whatever app-bg resolves to, the desktop and
-		 * the sidebar share it. That survives the next re-tune and still fails if
-		 * somebody paints the sidebar as a panel again.
+		 * It still asserts the ROLE rather than a hex, so a re-tune moves it for
+		 * free. What changed is which role the sidebar plays, not how it is
+		 * checked. The desktop mat behind the window is still app-bg.
 		 */
 		const appBg = await paintedToken(page, "--color-app-bg");
+		const panel = await paintedToken(page, "--color-app-panel");
 		await expectStyle(page, "app-shell", "background-color").toBe(appBg);
-		await expectStyle(page, "sidebar", "background-color").toBe(appBg);
+		await expectStyle(page, "sidebar", "background-color").toBe(panel);
 
-		// The switcher is a control ON that plane, so it takes the raised surface.
-		// It is what makes "a white control reads on a grey sidebar" true.
-		const raised = await paintedToken(page, "--color-app-raised");
+		/**
+		 * THE SWITCHER HAS NO FILL AT REST, which is the design and not an
+		 * omission. This asserted app-raised — #ffffff in light, the same value
+		 * as app-panel — so the moment the sidebar moved onto app-panel the
+		 * control became white on white with a hairline doing all the work.
+		 *
+		 * Transparent cannot collide with ANY surface the sidebar is later given,
+		 * which is why it beats picking a better fill. What makes it visible is
+		 * asserted in the light test, where the failure would actually appear.
+		 */
 		await expectStyle(page, "workspace-switcher", "background-color").toBe(
-			raised,
+			"rgba(0, 0, 0, 0)",
 		);
 
 		await expectStyle(page, "app-shell", "color").toBe(DARK.text);
@@ -331,10 +370,7 @@ test.describe("borders follow the theme", () => {
 	 * against the desktop mat, without which the rounded corners have nothing to
 	 * describe them against, and the switcher's is a control's own container.
 	 */
-	const BORDERED = [
-		["app-window", "border-top-color"],
-		["workspace-switcher", "border-top-color"],
-	] as const;
+	const BORDERED = [["workspace-switcher", "border-top-color"]] as const;
 
 	/**
 	 * The removals, pinned POSITIVELY rather than left to the absence of a test.
@@ -345,6 +381,12 @@ test.describe("borders follow the theme", () => {
 	const UNBORDERED = [
 		["sidebar", "border-right-width"],
 		["page-header", "border-bottom-width"],
+		// MOVED HERE FROM `BORDERED`, following the rule stated directly above.
+		// The window border was justified as "the window's edge against the mat",
+		// and with the mat gone that reason is gone with it. Deleting its
+		// assertion would have been the quiet revert this list exists to prevent,
+		// so it is pinned as an absence instead.
+		["app-window", "border-top-width"],
 	] as const;
 
 	test("every frame border is the dark border in dark", async ({ page }) => {
@@ -418,22 +460,35 @@ test.describe("borders follow the theme", () => {
 		 * correction 4's signature. Driving it by hand showed the token and the
 		 * paint both correct in both themes. The bug was the measurement.
 		 */
-		const appBg = await paintedToken(page, "--color-app-bg");
-		const raised = await paintedToken(page, "--color-app-raised");
+		const panel = await paintedToken(page, "--color-app-panel");
+		await expectStyle(page, "sidebar", "background-color").toBe(panel);
 
-		expect(
-			raised,
-			"the switcher's surface must differ from the sidebar's",
-		).not.toBe(appBg);
-
-		// Each is still the token that names its role, not a one-off colour.
-		await expectStyle(page, "sidebar", "background-color").toBe(appBg);
+		/**
+		 * NO FILL SEPARATES THESE TWO IN LIGHT, because none can: app-panel and
+		 * app-raised are both #ffffff there. The earlier version of this test
+		 * asserted that the switcher's fill DIFFERED from the sidebar's, which
+		 * was satisfiable only while the sidebar sat on app-bg. It does not any
+		 * more, and no repointing of that assertion can pass — the requirement
+		 * had to be met a different way rather than re-measured.
+		 *
+		 * It is met by having no fill. So the test asserts the two things that
+		 * carry the control instead, and a revert of either half fails here
+		 * rather than shipping a control nobody can see.
+		 */
 		await expectStyle(page, "workspace-switcher", "background-color").toBe(
-			raised,
+			"rgba(0, 0, 0, 0)",
 		);
 
+		// One: its own border at rest.
 		await expectStyle(page, "workspace-switcher", "border-top-color").toBe(
 			LIGHT.border,
+		);
+
+		// Two: a real change on contact. Downward is the only direction light
+		// has, so hover RECESSES rather than lifting.
+		await page.getByTestId("workspace-switcher").hover();
+		await expectStyle(page, "workspace-switcher", "background-color").not.toBe(
+			"rgba(0, 0, 0, 0)",
 		);
 	});
 });
@@ -595,6 +650,28 @@ test.describe("search", () => {
 		// The trigger is conditionally rendered, so this only works if focus is
 		// restored AFTER it remounts.
 		await expect(page.getByTestId("search-trigger")).toBeFocused();
+	});
+
+	test("collapsing closes it, so expanding does not reveal a stale panel", async ({
+		page,
+	}) => {
+		await gotoApp(page);
+		await page.getByTestId("search-trigger").click();
+		await expect(page.getByTestId("search-input")).toBeFocused();
+
+		await page.getByTestId("sidebar-collapse").click();
+		await page.getByTestId("sidebar-collapse").click();
+
+		/**
+		 * THE ROUND TRIP IS THE TEST. Collapsing alone proves nothing: the panel
+		 * renders under `searchOpen && !collapsed`, so a rail hides it whether or
+		 * not the state was reset. Only expanding again separates "closed" from
+		 * "hidden" — without the effect the panel comes back open, focus lands in
+		 * a field the operator did not ask for, and the `F` hint is gone because
+		 * the trigger it lives on is not rendered.
+		 */
+		await expect(page.getByTestId("search-input")).toHaveCount(0);
+		await expect(page.getByTestId("search-trigger")).toBeVisible();
 	});
 
 	test("says there is nothing to search rather than inventing results", async ({
@@ -846,7 +923,6 @@ test.describe("rail labelling", () => {
  */
 test.describe("compact width", () => {
 	const PHONE = { width: 390, height: 844 };
-	const MAT_PX = 12;
 
 	test.use({ viewport: PHONE });
 
@@ -858,21 +934,27 @@ test.describe("compact width", () => {
 		await expect(page.getByTestId("nav-drawer")).toHaveCount(0);
 	});
 
-	test("main takes the full width inside the mat", async ({ page }) => {
+	test("main takes the full width of the viewport", async ({ page }) => {
 		await gotoApp(page);
 		const main = await page.getByTestId("main").boundingBox();
 		if (!main) throw new Error("main not laid out");
 
-		// The 1px window border on each side is the only other subtraction.
-		expect(Math.round(main.width)).toBe(PHONE.width - MAT_PX * 2 - 2);
-		expect(Math.round(main.x)).toBe(MAT_PX + 1);
+		// Full bleed: no mat to subtract and no window border either. At compact
+		// width the sidebar is a drawer, so main starts at the viewport edge.
+		expect(Math.round(main.width)).toBe(PHONE.width);
+		expect(Math.round(main.x)).toBe(0);
 	});
 
-	test("the mat shrinks on a phone", async ({ page }) => {
+	/**
+	 * WAS "the mat shrinks on a phone", asserting a 12px inset against the 26px
+	 * desktop one. There is no mat at any width now, so the narrow case is the
+	 * same assertion as the wide one — kept rather than deleted, because a mat
+	 * returning on phones only is exactly the regression nobody would catch by
+	 * looking at a desktop.
+	 */
+	test("there is no mat on a phone either", async ({ page }) => {
 		await gotoApp(page);
-
-		// 26px of 390 is 13% of the screen spent on margins.
-		await expectStyle(page, "app-shell", "padding").toBe(`${MAT_PX}px`);
+		await expectStyle(page, "app-shell", "padding").toBe("0px");
 	});
 
 	test("a trigger opens the drawer, and it holds the real sidebar", async ({

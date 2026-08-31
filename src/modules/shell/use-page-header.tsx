@@ -140,13 +140,25 @@ export function usePageHeader({
 	const set = useContext(SetContext);
 	const key = actionsKey(actions);
 
+	/**
+	 * `key` stands in for `actions`, whose array identity is fresh every render.
+	 * Depending on `actions` itself is the infinite loop avel-bb found; the
+	 * derived key compares the same information by VALUE.
+	 *
+	 * THE SUPPRESSION HAS TO SIT HERE, ON THE LINE BEFORE `useEffect`. It was
+	 * at the bottom of the effect body, above the dependency array — which
+	 * reads as though it annotates the deps and does nothing at all: biome
+	 * binds a suppression to the NEXT line, and the rule reports on the
+	 * `useEffect` call. So the warning was live, the comment explaining it away
+	 * was not, and the file looked handled. `biome check` names both, the
+	 * unsuppressed rule and the suppression that suppresses nothing.
+	 */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: actions is keyed
 	useEffect(() => {
 		// Every input is compared by VALUE — two strings and a derived key — so
 		// this runs exactly when the header's content actually changed, and never
 		// because a render produced a new object saying the same thing.
 		set({ title, subtitle, definition, actions });
 		return () => set({});
-		// `key` stands in for `actions`, whose array identity is fresh each render.
-		// biome-ignore lint/correctness/useExhaustiveDependencies: actions is keyed
 	}, [set, title, subtitle, definition, key]);
 }

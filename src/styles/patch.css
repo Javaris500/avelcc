@@ -497,6 +497,47 @@ body {
 
 
 /* ══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION — the floor
+   ══════════════════════════════════════════════════════════════════════════
+
+   THERE WAS NONE. Zero occurrences of `prefers-reduced-motion` in the whole of
+   src/, while `message.tsx` carried a comment describing "an app that honours
+   prefers-reduced-motion". A comment asserting a guarantee nothing provides is
+   the same shape as the `min-h` that was never applied and the
+   `motion-reduce:animate-none` on an element that never animated: it reads as
+   though the check has been done, which is why nobody ran it.
+
+   A FLOOR, NOT THE ONLY GUARD. Components keep their own `motion-reduce:`
+   escapes — those are expressive and can say "this one still moves, because the
+   movement is the message". This catches everything nobody thought about, which
+   is the set that matters: the three infinite loops above run forever on a page
+   an operator may be sitting in front of for an hour.
+
+   `!important` IS DELIBERATE and not defensive. Tailwind's `animate-*` are
+   utilities; a bare `*` selector loses to them on specificity, and this has to
+   win against a class nobody remembered to guard. The per-component escapes
+   still work — they stop motion too, so there is nothing to lose a fight over.
+
+   NOT `animation: none`. That never fires `animationend`, so anything waiting
+   on one waits forever. A near-zero duration runs the animation to completion
+   immediately: the end state is reached, the event fires, and nothing moves.
+   The same reasoning applies to transitions.
+
+   `scroll-behavior: auto` because a smooth programmatic scroll is motion the
+   operator did not ask for, and it is the one people forget is an animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
    OUTSTANDING — one token still fails and needs a decision
    --------------------------------------------------------------------------
    --color-text-subtle #6e7681 measures 2.96:1 on the app panel (#2a2e36).

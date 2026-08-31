@@ -4,18 +4,20 @@ import { useState } from "react";
 import type { SkillSourceRow } from "#/contract/catalog";
 import { RevocationChip } from "#/modules/catalog/chips";
 import { isRevoked } from "#/modules/catalog/derive";
-import { isoDate, plural } from "#/modules/catalog/format";
+import { isoDate, plural, subtitleFor } from "#/modules/catalog/format";
 import { TERM } from "#/modules/catalog/jargon";
 import { useSkillSources } from "#/modules/catalog/queries";
 import { CatalogSurface } from "#/modules/catalog/screen";
 import {
 	type Column,
-	DataNotice,
+	CountCell,
 	DataTable,
+	type RowTone,
+} from "#/modules/catalog/table";
+import {
+	DataNotice,
 	DefinitionList,
 	EmptyState,
-	MetricStat,
-	type RowTone,
 	SectionCard,
 } from "#/modules/catalog/ui";
 import { usePageHeader } from "#/modules/shell/use-page-header";
@@ -36,13 +38,16 @@ import { usePageHeader } from "#/modules/shell/use-page-header";
  * does not exist.
  */
 
-/** Totals only. The revoked-skill count stays on the MetricStat row. */
-function summarise(sources: SkillSourceRow[] | undefined): string | undefined {
-	// Absent while loading and when empty. See the note in skills-view.tsx.
-	if (sources === undefined || sources.length === 0) return undefined;
-	const liveSkills = sources.reduce((sum, s) => sum + s.liveSkillCount, 0);
-	return `${plural(sources.length, "source", "sources")} · ${plural(liveSkills, "live skill", "live skills")}`;
-}
+/** Totals only. The split live/revoked count lives on the row. */
+const summarise = (sources: SkillSourceRow[] | undefined) =>
+	subtitleFor(sources, (rows) => [
+		plural(rows.length, "source", "sources"),
+		plural(
+			rows.reduce((sum, s) => sum + s.liveSkillCount, 0),
+			"live skill",
+			"live skills",
+		),
+	]);
 
 export function SkillSourceCatalog() {
 	const query = useSkillSources();
@@ -57,7 +62,7 @@ export function SkillSourceCatalog() {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	return (
-		<div className="flex flex-col gap-5 px-6 py-5">
+		<div className="flex flex-col gap-4">
 			<CatalogSurface
 				data-testid="sources"
 				empty={
@@ -95,13 +100,7 @@ function SourcesBody({
 	selectedId: string | null;
 	onSelect: (id: string) => void;
 }) {
-	const live = sources.filter((s) => !isRevoked(s));
 	const revoked = sources.filter(isRevoked);
-	const liveSkills = sources.reduce((sum, s) => sum + s.liveSkillCount, 0);
-	const revokedSkills = sources.reduce(
-		(sum, s) => sum + s.revokedSkillCount,
-		0,
-	);
 	// A revoked source that still has live skills. Not a fault, and not obvious.
 	const revokedWithLive = revoked.filter((s) => s.liveSkillCount > 0);
 
@@ -118,27 +117,6 @@ function SourcesBody({
 					does not fetch yet, so every count below is of what is loaded.
 				</p>
 			)}
-
-			<div className="flex flex-wrap gap-3">
-				<MetricStat
-					data-testid="sources-metric-live"
-					hint="Available to import from."
-					label="Live sources"
-					value={live.length}
-				/>
-				<MetricStat
-					data-testid="sources-metric-skills"
-					hint="Across every source, countable on the skills page."
-					label="Live skills"
-					value={liveSkills}
-				/>
-				<MetricStat
-					data-testid="sources-metric-revoked-skills"
-					hint="Withdrawn skills, kept because delivered work refers to them."
-					label="Revoked skills"
-					value={revokedSkills}
-				/>
-			</div>
 
 			{revokedWithLive.length === 0 ? null : (
 				<DataNotice
@@ -216,16 +194,19 @@ const SOURCE_COLUMNS: Column<SkillSourceRow>[] = [
 		align: "end",
 		sortValue: (row) => row.liveSkillCount,
 		render: (row) => (
-			<div className="flex flex-col items-end gap-0.5">
-				<span className="text-sm text-text">
-					{plural(row.liveSkillCount, "live", "live")}
-				</span>
-				{row.revokedSkillCount === 0 ? null : (
-					<span className="text-micro text-text-subtle">
-						{row.revokedSkillCount} revoked
-					</span>
-				)}
-			</div>
+			// Split, never one total: a source with 3 live and 1 revoked is a
+			// different object from one with 4 live, and a single number renders
+			// them identically. Same shape as every other count in the catalog.
+			<CountCell
+				data-testid={`source-skills-${row.id}`}
+				unit={row.liveSkillCount === 1 ? "live skill" : "live skills"}
+				value={row.liveSkillCount}
+				warning={
+					row.revokedSkillCount === 0
+						? undefined
+						: `${row.revokedSkillCount} revoked`
+				}
+			/>
 		),
 	},
 	{
