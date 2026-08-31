@@ -690,7 +690,25 @@ Modelled on export pre-flight:
 3. **Request review.** New. Replaces `/intake`.
 4. **New request.** A form, reachable from the client header and from the chat.
 5. **Engagement detail.** A section anchor. Make it a route only when it needs
-   its own URL.
+   its own URL — and when it does, add it as a SIBLING under `clients.tsx`,
+   never as a child of `clients.$clientId.index`.
+
+   Two reasons now. A route nobody links to is a URL nobody can share. And
+   structurally: making a leaf into a parent pushes the generated router types
+   past an inference limit and degrades the Start `server` augmentation across
+   every file in `src/routes/api/` — 23 errors, in a different directory, owned
+   by someone else, with nothing about those files changed. A child under a
+   route that renders content instead of an `<Outlet />` also renders the
+   PARENT's screen silently: no error, no 404, indistinguishable from a broken
+   link. `DEV-TIPS.md` §12. `[built]`
+
+   `clients.tsx` is a layout and renders the Outlet; `clients.$clientId.index`
+   renders content. Everything under `clients` is already a sibling, and that
+   was luck rather than foresight — the three-pane split happened to produce the
+   immune shape.
+
+   **The same binds New request and a request list.** Both hang off a client,
+   and both go beside `clients.$clientId.index` rather than beneath it.
 6. **Delivery detail.** Links out to the existing export screens rather than
    duplicating them.
 
