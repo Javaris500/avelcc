@@ -37,7 +37,9 @@ import { usePageHeader } from "#/modules/shell/use-page-header";
  */
 
 /** Totals only. The revoked-skill count stays on the MetricStat row. */
-function summarise(sources: SkillSourceRow[]): string {
+function summarise(sources: SkillSourceRow[] | undefined): string | undefined {
+	// Absent while loading and when empty. See the note in skills-view.tsx.
+	if (sources === undefined || sources.length === 0) return undefined;
 	const liveSkills = sources.reduce((sum, s) => sum + s.liveSkillCount, 0);
 	return `${plural(sources.length, "source", "sources")} · ${plural(liveSkills, "live skill", "live skills")}`;
 }
@@ -50,7 +52,7 @@ export function SkillSourceCatalog() {
 	usePageHeader({
 		title: "Skill sources",
 		definition: TERM.source,
-		subtitle: sources === undefined ? undefined : summarise(sources),
+		subtitle: summarise(sources),
 	});
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 

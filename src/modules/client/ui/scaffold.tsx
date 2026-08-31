@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { ChevronRightIcon } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 
+import { Pill } from "#/ui/badge";
 import { Heading, HeadingLevel } from "#/ui/heading";
 import { cn } from "#/utils/cn";
 import type { SectionBuildState } from "./sections";
@@ -7,11 +9,11 @@ import type { SectionBuildState } from "./sections";
 /**
  * TEMPORARY. Delete this file when avel-71 lands `src/ui/`.
  *
- * These are stand-ins for `SectionCard`, `SectionRail` and `DataTable`, which
- * are avel-71's to build. They exist so the clients routes can be structured,
- * reviewed and reasoned about before those primitives land, and they are all in
- * ONE file on purpose: swapping to the real primitives is then one deletion and
- * one import change, not a hunt through nine call sites.
+ * These are stand-ins for `SectionCard` and `DefinitionList`, which are
+ * avel-71's to build. They exist so the clients routes can be structured,
+ * reviewed and reasoned about before those primitives land, and they are in ONE
+ * file on purpose: swapping to the real primitives is then one deletion and one
+ * import change, not a hunt through nine call sites.
  *
  * The reason that matters: four sessions each hand-rolling a SectionCard is the
  * specific outcome the work split exists to prevent. A stand-in that is
@@ -19,9 +21,19 @@ import type { SectionBuildState } from "./sections";
  * second implementation quietly becoming permanent — but only while it stays
  * confined. Nothing outside `src/modules/client/ui/` may import from here.
  *
- * Deliberately plain. No hover states, no elevation opinions, no density
- * control. Every design decision is left to the real primitive so that when it
- * lands there is nothing to reconcile.
+ * `SectionRailShell` WAS HERE AND IS GONE. The operator ruled the sections
+ * vertical rather than horizontal, and the rail was the thing making the layout
+ * horizontal. Collapse is what made it redundant rather than merely optional: a
+ * closed section is one line carrying its title, count and state, so ten
+ * stacked ARE the table of contents the rail was drawn to be — and a better
+ * one, because a rail item could not say whether the section it pointed at had
+ * anything in it. Deleted rather than left unused; two lists of the same ten
+ * things is one list too many, and an unreferenced export is a thing the next
+ * person has to work out is dead.
+ *
+ * Deliberately plain otherwise. No hover states, no elevation opinions, no
+ * density control. Every design decision is left to the real primitive so that
+ * when it lands there is nothing to reconcile.
  */
 
 /**
@@ -34,7 +46,9 @@ import type { SectionBuildState } from "./sections";
  */
 export function SectionShell({
 	id,
-	n,
+	// `n` is accepted and deliberately NOT destructured. It stays in the props
+	// below so the nine call sites keep compiling and the model keeps its
+	// ordering, but nothing renders it — see the header comment.
 	title,
 	blurb,
 	state,
@@ -44,7 +58,8 @@ export function SectionShell({
 	children,
 }: {
 	id: string;
-	n: number | null;
+	/** Kept for the model's ordering. Not rendered. */
+	n?: number | null;
 	title: string;
 	blurb: string;
 	state: SectionBuildState;
@@ -53,39 +68,101 @@ export function SectionShell({
 	action?: ReactNode;
 	children?: ReactNode;
 }) {
+	/**
+	 * OPEN WHERE THERE IS SOMETHING TO SAY, CLOSED WHERE THERE IS NOT.
+	 *
+	 * The operator's complaint was spacing, and an empty section was spending a
+	 * heading plus a paragraph to report that nothing is there. Collapsed it
+	 * costs one line and the explanation is one click away.
+	 *
+	 * This does NOT weaken the three-state rule. The section still renders, so
+	 * an absent section is still distinguishable from one you scrolled past, and
+	 * `not-built` still reads differently from `empty` once opened. What changes
+	 * is how much vertical space a section spends saying "nothing yet".
+	 *
+	 * Initial state only. Once the operator has opened or closed something, that
+	 * is their decision and a re-render must not overrule it.
+	 */
+	const [open, setOpen] = useState(state === "populated");
+
+	/**
+	 * A RAIL LINK MUST OPEN WHAT IT JUMPS TO.
+	 *
+	 * Nine of the ten rail links point at sections that may be collapsed. Without
+	 * this, following one scrolls to a closed row and looks broken — and looks
+	 * broken in the specific way that reads as "this app is unfinished" rather
+	 * than "that section is empty", because the operator asked to go somewhere
+	 * and apparently arrived nowhere.
+	 *
+	 * Browsers are beginning to auto-expand `<details>` for in-page anchors, but
+	 * it is recent and uneven, so this does not rely on it. `hashchange` does not
+	 * fire when the hash is set to its current value, which is why the click is
+	 * also handled on the rail itself — see `SectionRailShell`.
+	 */
+	useEffect(() => {
+		const openIfTargeted = () => {
+			if (window.location.hash === `#${id}`) setOpen(true);
+		};
+		openIfTargeted();
+		window.addEventListener("hashchange", openIfTargeted);
+		return () => window.removeEventListener("hashchange", openIfTargeted);
+	}, [id]);
+
 	return (
-		<section
-			aria-labelledby={`${id}-heading`}
-			/*
-			 * NO BORDER AND NO SURFACE OF ITS OWN. These sections sit INSIDE the
-			 * detail pane, which is already `bg-app-panel`, so a card here would be
-			 * a panel on a panel — and the operator asked for every divider removed.
-			 * Separation is gap and the heading's own weight, per that ruling.
-			 */
+		/*
+		 * NATIVE `<details>`, not a button and a panel.
+		 *
+		 * Keyboard operation, the accessible expanded state and the open/close
+		 * behaviour all come from the element. A hand-rolled disclosure would be a
+		 * fourth way to draw one in this codebase and the first one whose ARIA is
+		 * mine to get wrong.
+		 *
+		 * NO BORDER AND NO SURFACE OF ITS OWN. These sit INSIDE the detail pane,
+		 * which is already `bg-app-panel`, so a card here would be a panel on a
+		 * panel — and the operator asked for every divider removed.
+		 */
+		<details
 			className="scroll-mt-16"
 			data-build-state={state}
 			data-testid={`client-section-${id}`}
 			id={id}
+			onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+			open={open}
 		>
 			{/*
-			 * Sticky, per UI-PLAN polish item 6: "sticky SectionCard titles on the
-			 * client page, so scrolling through ten sections never loses the label
-			 * of the one you are in". On a ten-section page the heading is the only
-			 * thing telling you where you are.
+			 * THE SUMMARY IS THE HEADING ROW, made pressable. Nothing new to design.
 			 *
-			 * It carries the pane's own background so scrolling content passes
-			 * BEHIND it rather than through it. A transparent sticky heading over
-			 * moving text is unreadable at exactly the moment it is needed.
+			 * Sticky, per UI-PLAN polish item 6, and it carries the pane's own
+			 * background so scrolling content passes BEHIND it rather than through
+			 * it. `list-none` plus the webkit rule removes the default triangle,
+			 * which is replaced by a chevron that says the same thing in this app's
+			 * own vocabulary.
 			 */}
-			<header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-app-panel py-2">
-				{n === null ? null : (
-					<span className="font-mono text-micro text-text-subtle">{n}</span>
+			<summary
+				className={cn(
+					"sticky top-0 z-10 flex cursor-pointer list-none flex-wrap items-baseline gap-2",
+					"bg-app-panel py-2 [&::-webkit-details-marker]:hidden",
 				)}
+			>
+				<ChevronRightIcon
+					aria-hidden="true"
+					className={cn(
+						"size-3.5 shrink-0 self-center text-text-subtle",
+						"transition-transform duration-[var(--duration-micro)] ease-[var(--ease-avel)]",
+						// The global reduced-motion block is UI-PLAN polish item 2 and has
+						// not landed. Until it does, this respects the setting locally
+						// rather than waiting for a file that is not mine.
+						"motion-reduce:transition-none",
+						open && "rotate-90",
+					)}
+				/>
 				{/*
-				 * A REAL HEADING AT THE LEVEL THE TREE SAYS, not a hardcoded h2.
-				 * The shell header owns the document's only h1, so a section here
-				 * is an h2 — but this component is also the seam the nested states
-				 * hang off, and the body below wraps them a level deeper.
+				 * A REAL HEADING AT THE LEVEL THE TREE SAYS, not a hardcoded h2. The
+				 * shell header owns the document's only h1, so a section here is an
+				 * h2 — and the body below wraps its contents a level deeper.
+				 *
+				 * A heading inside `<summary>` is valid, and it is what keeps the
+				 * page navigable by headings now that the rows are collapsible.
 				 */}
 				<Heading
 					className="font-display text-sm font-semibold tracking-wide uppercase"
@@ -97,38 +174,62 @@ export function SectionShell({
 				 * A count renders only when there IS one. Zero is a real count and
 				 * shows as 0; `undefined` means nobody counted, and printing 0 for
 				 * that would be the screen asserting an emptiness it never checked.
+				 *
+				 * It earns its place twice over now that sections collapse: on a
+				 * closed row it is the only thing saying whether opening it is worth
+				 * the click.
 				 */}
 				{count === undefined ? null : (
-					<span
-						className="font-mono text-micro text-text-subtle"
-						data-testid={`client-section-${id}-count`}
-					>
-						{count}
-					</span>
+					<Pill data-testid={`client-section-${id}-count`}>{count}</Pill>
 				)}
-				{action ? <div className="ml-auto">{action}</div> : null}
-			</header>
+				{/*
+				 * An action inside a `<summary>` toggles the disclosure when clicked,
+				 * because the whole summary is the toggle. Stopping propagation here
+				 * means a section's own control does what it says instead of also
+				 * collapsing the thing it acts on. No section passes one today; this
+				 * is the trap set for whoever adds the first.
+				 */}
+				{action ? (
+					// biome-ignore lint/a11y/noStaticElementInteractions: not a control — it exists to stop the summary's toggle swallowing the real control inside it.
+					<div
+						className="ml-auto"
+						onClick={(e) => e.stopPropagation()}
+						onKeyDown={(e) => e.stopPropagation()}
+					>
+						{action}
+					</div>
+				) : null}
+			</summary>
 
-			{/*
-			 * THE BLURB IS NOT DECORATION. UI-PLAN section 12 rule 5 puts the one
-			 * plain sentence that names the jargon on the section header, "rather
-			 * than in a glossary nobody opens". For an operator who is not
-			 * technical this is the only place `roster entry`, `engagement` or
-			 * `cut` is ever defined.
-			 */}
-			<p className="max-w-[68ch] pt-1 text-sm leading-relaxed text-text-muted">
-				{blurb}
-			</p>
-
-			{/*
-			 * THE BODY IS ONE LEVEL DEEPER THAN THE SECTION HEADING. Every empty
-			 * section renders an `EmptyState`, whose title is a real heading taking
-			 * its level from this context — without the wrapper it would emit the
-			 * same level as the section heading above it, so "No cost recorded"
-			 * would read as a SIBLING of "Cost" rather than as its content. On a
-			 * ten-section page that turns one outline into twenty flat peers.
-			 */}
 			<HeadingLevel>
+				{/*
+				 * THE BLURB IS NOT DECORATION. UI-PLAN section 12 rule 5 puts the one
+				 * plain sentence that names the jargon on the section header, "rather
+				 * than in a glossary nobody opens".
+				 *
+				 * Collapse moves it one click away, which is the one thing this
+				 * ruling costs. It stays inside rather than above the summary
+				 * because a closed row has to be one line to be worth closing, and
+				 * because the sentence explains the CONTENT — an operator who opens
+				 * a section to find out what a roster entry is meets it there.
+				 */}
+				{/*
+				 * 54ch, NOT 68ch, AND THE UNIT IS THE REASON.
+				 *
+				 * `ch` is the advance of "0", which in this face is 8.2px, while the
+				 * average advance of actual lowercase prose at 13px is 5.96px. So a
+				 * `ch` constraint yields about 1.38 characters for every unit asked
+				 * for: `68ch` was rendering ~94 characters per line, not 68, against
+				 * a readable band of 45 to 75.
+				 *
+				 * Measured on the rendered page three ways rather than converted on
+				 * paper — the discrepancy is invisible in the source, where the
+				 * number looks like it is already in the right units.
+				 */}
+				<p className="max-w-[54ch] pt-1 text-sm leading-relaxed text-text-muted">
+					{blurb}
+				</p>
+
 				{state === "not-built" ? (
 					<p
 						className="py-3 text-sm text-text-subtle"
@@ -140,42 +241,7 @@ export function SectionShell({
 					<div className="py-3">{children}</div>
 				)}
 			</HeadingLevel>
-		</section>
-	);
-}
-
-/**
- * The in-page nav. Anchors only — no scroll-spy, no active state.
- *
- * Left out deliberately rather than forgotten: scroll-spy is behaviour the real
- * `SectionRail` should own once, and a version here would be a second one to
- * throw away. Plain anchors already do the job the rail exists for, which is
- * reaching section 9 without scrolling past eight.
- */
-export function SectionRailShell({
-	items,
-	className,
-}: {
-	items: { id: string; label: string }[];
-	className?: string;
-}) {
-	return (
-		<nav
-			aria-label="Sections"
-			className={cn("flex flex-col gap-1", className)}
-			data-testid="client-section-rail"
-		>
-			{items.map((item) => (
-				<a
-					className="interactive rounded-sm px-2 py-1 text-sm text-text-muted"
-					data-testid={`client-rail-${item.id}`}
-					href={`#${item.id}`}
-					key={item.id}
-				>
-					{item.label}
-				</a>
-			))}
-		</nav>
+		</details>
 	);
 }
 

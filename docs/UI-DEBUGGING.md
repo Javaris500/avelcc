@@ -169,6 +169,53 @@ them**, and it was silently unrunnable for weeks (see below).
 
 ---
 
+## Shared-tree traps
+
+*Five sessions, one working tree. These are not UI bugs, but they produce
+wrong claims about UI code and they cost the same time.*
+
+### A correct read of the working tree expires in minutes
+
+Two sessions each made a wrong claim tonight from a **correct** read. One read
+a file after another session had rewritten it and concluded the original bug
+report had always been wrong. The other attributed live uncommitted work to the
+wrong session. Neither was careless; the tree moved underneath both.
+
+The defence is not more checking, because both checks were accurate when run.
+
+- **Say WHEN.** "as of 17:52" turns a stale claim into a dated one, and a dated
+  claim can be re-checked instead of argued with.
+- **Ask HEAD, not the tree, when the question is historical.** "Was this always
+  like this?" is a question about HEAD. `git show HEAD:path` answers it;
+  `cat path` answers a different one.
+- **Never attribute uncommitted work by inference.** Ask whose it is. Work
+  attributed to the wrong session is work nobody is actually watching.
+
+### A file can depend on a symbol that is not committed
+
+The live case: `clients.tsx` on disk imports `clientBlockedTone`; HEAD's
+`status.ts` exports only `blockedTone`. Both files are dirty, in different
+sessions.
+
+```
+disk  clients.tsx  ->  clientBlockedTone
+HEAD  status.ts    ->  blockedTone          # TS2305
+```
+
+Two ways this bites, and the second is worse:
+
+1. Reverting `status.ts` stops `clients.tsx` compiling.
+2. **Committing `clients.tsx` alone breaks `main`** - HEAD would import a
+   symbol HEAD does not export. Three sessions are in that file and any one of
+   them could land it.
+
+`tsc` on the working tree is green for both. Nothing in a per-file check can
+see it, because each file is individually correct and the split is what is
+broken. **Before committing, typecheck the paths you are staging against
+HEAD for everything you are not.**
+
+---
+
 ## Environment traps
 
 ### Kill your dev servers
@@ -197,6 +244,22 @@ Do this before concluding anything is stale. It was never stale once.
 `/src/routes/index.tsx` returns a *stub*; the component body is in
 `?tsr-split=component`. Grepping the stub for your change finds nothing and
 looks exactly like a stale server.
+
+### `grep "x" file || echo "missing"` cannot tell you the file is missing
+
+`grep` exits 1 for **no match**, which is the same exit a missing file does not
+even reach. So a wrong search term renders as a missing file:
+
+```bash
+grep "blockedTone" status.ts || echo "NO status.ts"   # printed NO status.ts
+                                                       # the file existed
+                                                       # the function is clientBlockedTone
+```
+
+The tool did not fail. It answered a different question, and `||` turned that
+answer into a claim about the filesystem. Same family as `grep -c` against a bad
+path returning something that reads like a real zero. **Test existence with
+`ls` or `test -f`, separately from searching content.**
 
 ### `biome check` red on ~30 files is CRLF, not formatting
 

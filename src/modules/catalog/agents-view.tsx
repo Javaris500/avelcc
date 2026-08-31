@@ -59,7 +59,11 @@ type StateFilter = "all" | "live" | "revoked";
  * Totals only, and the runtime split rather than two separate counts.
  * "9 templates · 2 not run by a model" leaves the operator subtracting.
  */
-function summarise(templates: AgentTemplateRow[]): string {
+function summarise(
+	templates: AgentTemplateRow[] | undefined,
+): string | undefined {
+	// Absent while loading and when empty. See the note in skills-view.tsx.
+	if (templates === undefined || templates.length === 0) return undefined;
 	const nonModel = templates.filter((t) => t.runtime !== "model").length;
 	return `${plural(templates.length, "template", "templates")} · ${templates.length - nonModel} run by a model, ${nonModel} by a person or script`;
 }
@@ -72,7 +76,7 @@ export function AgentTemplateCatalog() {
 	usePageHeader({
 		title: "Agent templates",
 		definition: TERM.agentTemplate,
-		subtitle: templates === undefined ? undefined : summarise(templates),
+		subtitle: summarise(templates),
 	});
 	const [runtimeFilter, setRuntimeFilter] = useState<RuntimeFilter>("all");
 	const [kindFilter, setKindFilter] = useState<KindFilter>("all");
@@ -633,7 +637,7 @@ function AgentDetail({ template }: { template: AgentTemplateRow }) {
 				<div className="flex flex-col gap-5 px-4 py-4">
 					<div>
 						<p className="pb-1 text-sm font-medium text-text">Writable</p>
-						<p className="max-w-[68ch] pb-2 text-micro leading-relaxed text-text-subtle">
+						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
 							{TERM.writablePaths}
 						</p>
 						<PathList
@@ -644,7 +648,7 @@ function AgentDetail({ template }: { template: AgentTemplateRow }) {
 					</div>
 					<div>
 						<p className="pb-1 text-sm font-medium text-text">Append-only</p>
-						<p className="max-w-[68ch] pb-2 text-micro leading-relaxed text-text-subtle">
+						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
 							{TERM.appendOnlyPaths}
 						</p>
 						<PathList
@@ -655,7 +659,7 @@ function AgentDetail({ template }: { template: AgentTemplateRow }) {
 					</div>
 					<div>
 						<p className="pb-1 text-sm font-medium text-text">Read-only</p>
-						<p className="max-w-[68ch] pb-2 text-micro leading-relaxed text-text-subtle">
+						<p className="max-w-[52ch] pb-2 text-micro leading-relaxed text-text-subtle">
 							{TERM.readonlyPaths}
 						</p>
 						<PathList
@@ -692,14 +696,14 @@ function ModelContext({ template }: { template: AgentTemplateRow }) {
 				title="Written context"
 			>
 				<div className="px-4 py-4" data-context-sent="false">
-					<p className="max-w-[68ch] text-sm leading-relaxed text-text-muted">
+					<p className="max-w-[52ch] text-sm leading-relaxed text-text-muted">
 						This agent is {runtimeLabel(template.runtime).toLowerCase()}, so no
 						written context is sent to it. Identity and depth text are built for
 						a model to read and the delivered package leaves them out entirely
 						for this agent.
 					</p>
 					{strandedModelContext(template) ? (
-						<p className="max-w-[68ch] pt-2 text-sm leading-relaxed text-gate-warn">
+						<p className="max-w-[52ch] pt-2 text-sm leading-relaxed text-gate-warn">
 							Text is stored on this template anyway. It is not shown here
 							because showing it would suggest it is used.
 						</p>

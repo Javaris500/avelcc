@@ -55,7 +55,21 @@ type TypeFilter = "all" | "knowledge" | "capability";
  * healthy value, and a bare count of it up here would be the same number
  * twice with the meaning stripped off one of them.
  */
-function summarise(skills: SkillRow[]): string {
+function summarise(skills: SkillRow[] | undefined): string | undefined {
+	/*
+	 * NOTHING TO ORIENT AMONG. Undefined while the read is in flight, and
+	 * undefined again when it resolves to zero rows.
+	 *
+	 * The second case is the one worth writing down. "0 skills · 0 revoked ·
+	 * from 0 sources" is a measured, true, useless line: it sits directly above
+	 * an EmptyState whose whole job is to say the catalog is empty, in better
+	 * words, with the reason attached. A subtitle exists to orient you among
+	 * many rows. With no rows there is nothing to orient.
+	 *
+	 * Seen live rather than reasoned about: `skills` and `skill_sources` hold
+	 * zero rows today, so this is what those two screens actually rendered.
+	 */
+	if (skills === undefined || skills.length === 0) return undefined;
 	const revoked = skills.filter(isRevoked).length;
 	const sources = new Set(skills.map((s) => s.sourceId)).size;
 	return `${plural(skills.length, "skill", "skills")} · ${revoked} revoked · from ${plural(sources, "source", "sources")}`;
@@ -98,7 +112,7 @@ export function SkillsCatalog() {
 	usePageHeader({
 		title: "Skills",
 		definition: TERM.skill,
-		subtitle: skills === undefined ? undefined : summarise(skills),
+		subtitle: summarise(skills),
 	});
 	const [stateFilter, setStateFilter] = useState<StateFilter>("all");
 	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");

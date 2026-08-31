@@ -17,31 +17,33 @@ import {
 /**
  * THE READ PATH FOR THE CATALOG, AND THE ONE THING IT HAS TO BE HONEST ABOUT.
  *
- * `src/routes/api/` was listed on 2026-08-30. It holds clients, connections,
- * engagements, exports, missions and preflight. There is no skills route, no
- * agent-templates route and no skill-sources route. `[built]` This session is
- * frontend-only and may not add them.
+ * ALL THREE ENDPOINTS EXIST AS OF `a0ef4dd` and answer 200 with JSON, verified
+ * against the running app rather than inferred from the commit. `[built]` This
+ * header described them as absent until then, and the earlier version of that
+ * paragraph is worth keeping in one line because it is why this file has the
+ * shape it does: the screens were built against endpoints that did not exist,
+ * and the choice made then was to call the real paths and render a designed
+ * "not built" state rather than to hold a few plausible rows in a constant.
  *
- * TWO WAYS TO BUILD A SCREEN AGAINST AN ENDPOINT THAT DOES NOT EXIST, and only
- * one of them is allowed here.
+ * That choice is what made this switch free. Nothing in this module changed
+ * when the routes landed except which module the shapes are imported from.
+ * A fixture would have had to be found and removed, and CLAUDE.md's opening
+ * line is about exactly the screen that looks finished while it is not.
  *
- * The tempting one is a fixture. Hold a few plausible skills in a constant,
- * render the interface against them, and the screens look finished. That is
- * precisely the failure CLAUDE.md opens with: "AI produces work that looks
- * finished but isn't." A catalog rendering invented rows is worse than an empty
- * one, because an empty screen cannot be mistaken for the product working.
+ * ENDPOINT_ABSENT IS STILL DETECTED, AND IS NOT DEAD CODE. It is now the
+ * treatment for a route that BREAKS rather than one nobody has written, which
+ * is the same fact from the operator's side: nothing answered. CLAUDE.md rule
+ * 1 — "If a tool fails, say the tool failed. Do not interpret an error as a
+ * result." A missing API route in TanStack Start does not reliably answer 404;
+ * an unmatched path can fall through to the SPA document and answer 200 with
+ * HTML. Both are read as the same code, and neither is read as "the catalog is
+ * empty", because an empty catalog and an unreachable one look identical on
+ * screen unless something distinguishes them here.
  *
- * So these hooks call the real endpoints. Today every call fails, the screens
- * render a designed state that says exactly what is missing, and the day
- * someone adds `/api/skills` the interface fills in with no change here.
- *
- * ENDPOINT_ABSENT IS DETECTED, NOT ASSUMED. CLAUDE.md rule 1: "If a tool fails,
- * say the tool failed. Do not interpret an error as a result." A missing API
- * route in TanStack Start does not reliably answer 404; an unmatched path can
- * fall through to the SPA document and answer 200 with HTML. Both are the same
- * fact, so both are read as the same code, and neither is read as "the catalog
- * is empty". An empty catalog and an unbuilt endpoint look identical on screen
- * unless something distinguishes them here.
+ * THAT DISTINCTION IS NOW LIVE. `skills` and `skill_sources` hold zero rows,
+ * so those two screens render a true EmptyState — there is nothing here yet —
+ * while a broken route would still render "not built". Until `a0ef4dd` only
+ * one of those two states had ever been seen.
  */
 
 /**
@@ -59,9 +61,10 @@ async function readList<T extends z.ZodTypeAny>(
 ): Promise<z.infer<T>> {
 	const res = await fetch(path);
 
-	// Checked BEFORE the body is read. A route that does not exist answers with
-	// the SPA document, and `res.json()` on HTML throws a parse error that would
-	// otherwise be reported as a transport failure the operator could retry.
+	// Checked BEFORE the body is read. A route that is missing or broken answers
+	// with the SPA document, and `res.json()` on HTML throws a parse error that
+	// would otherwise be reported as a transport failure the operator could
+	// retry forever.
 	const contentType = res.headers.get("content-type") ?? "";
 	if (res.status === 404 || !contentType.includes("application/json")) {
 		throw new Error(ENDPOINT_ABSENT);
