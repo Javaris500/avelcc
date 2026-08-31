@@ -1207,10 +1207,51 @@ compiles, each file compiles, and `HEAD` imports a symbol `HEAD` does not export
 It happened to a `blockedTone` rename that touched three files where two were
 believed — the third was still on disk. `[built]`
 
-So before committing a rename in a shared tree: **stash and type-check `HEAD`
-alone.** That is the only check that answers the question the pre-commit hook is
-assumed to answer. Found by avel-c2, who broke `HEAD` for four minutes and caught
-it by running exactly that.
+So before committing a rename, type-check `HEAD` alone. That is the only check
+that answers the question the pre-commit hook is assumed to answer. Found by
+avel-c2, who broke `HEAD` for four minutes and caught it by running exactly that.
+
+### But do NOT bare-`stash` to do it
+
+An earlier version of this line said "stash and type-check `HEAD` alone", and
+**that advice cost twenty-six files across four sessions the same night it was
+written.** `git stash` takes every uncommitted file in the tree, not yours — so
+in a shared tree one person's type-check swallows everybody's work.
+
+**And the pop can be REFUSED.** It was: `local changes to src/routeTree.gen.ts
+would be overwritten`. So the failure was not forgetting to pop. It was popping,
+being refused, and reading the summary rather than the exit — which leaves the
+working tree looking clean while twenty-six files sit in a stash. An unfinished
+stash is indistinguishable from lost work to everyone else, and it does not
+appear in `git status`.
+
+Scope it instead:
+
+```
+git stash push -- <your paths>     # never bare `git stash`
+npx tsc --noEmit                   # HEAD alone
+git stash pop                      # then READ THE EXIT, not the summary line
+```
+
+Scoping is also the more correct check: the question is whether `HEAD` plus
+*your* change builds, and nobody else's uncommitted work bears on that.
+`[hypothesis]` — it follows from documented pathspec behaviour and avel-c2
+deliberately has not re-run it, because another stash in a live tree would
+re-trigger the alarm the first one caused.
+
+**Two traps inside the recovery, both worse than the original mistake:**
+
+- `git checkout <stash> -- <paths>` **stages** what it restores. Restoring
+  twenty-five files put four sessions' uncommitted work into one index, a single
+  `git commit` from sweeping all of it — the third near-miss of that kind in one
+  night. Run `git reset` after, always.
+- `git diff $SHA -- $(git stash show --name-only $SHA)` reports success when the
+  inner command returns nothing, because an empty pathspec diffs nothing. Verify
+  with **no pathspec** and check content markers.
+
+**Not a worktree.** `node_modules` lives at the repo root and is untracked, so a
+fresh `git worktree` has no dependencies and `tsc` cannot run in it. Checked, so
+nobody spends twenty minutes finding out.
 
 Steps 1 to 6 are shell work and touch no data. Step 7 is a schema change and
 belongs to whoever owns the schema. Soft-delete and append-only conventions
