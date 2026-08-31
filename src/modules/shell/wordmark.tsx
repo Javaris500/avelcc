@@ -30,19 +30,52 @@ export function Wordmark({ className }: { className?: string }) {
 }
 
 /**
- * The ring mark beside the wordmark. Reference `.brand .logo`: a 22px ring in
- * the text colour with a filled core, drawn from the border and a pseudo
- * element. Rendered here as two nested elements rather than `::after`, which
- * Tailwind cannot express without arbitrary-variant escapes.
+ * `A.` — the monogram, per the operator's selected logo system: **3a, bare
+ * monogram.** "Type, unhoused. Lightest in the sidebar, and the period reads as
+ * the same stop as the wordmark's."
+ *
+ * WAS A RING — a 22px circle with a filled core, from the reference's
+ * `.brand .logo`. The selected system is a letterform, and "unhoused" is the
+ * operative word: no ring, no plate, no container. The mark is type.
+ *
+ * THE PERIOD IS THE SAME STOP AS THE WORDMARK'S, which is why it takes
+ * `--accent-text` rather than `--accent`. They are the same #0092ca in dark;
+ * light shifts accent-text to #0078ab for contrast, and a period on the accent
+ * value would fail against white. Two marks, one stop, one token.
+ *
+ * AND IT DOES NOT ANIMATE, deliberately. The wordmark's period carries the
+ * one signature animation, and the patch is explicit that it is used "once per
+ * page, never adjacent to another animated element" — this sits directly
+ * beside it. Two blinking stops in one lockup would spend the signature twice
+ * and read as a fault rather than a flourish.
+ *
+ * The default 22px box is the ring's old footprint, kept so the collapsed rail
+ * and the expanded sidebar align on the same axis. Collapsed, this is the only
+ * brand element rendered, so it is also the rail's whole identity.
+ *
+ * `className` exists for one caller: the login page, where the sheet's STACKED
+ * lockup puts the monogram above the wordmark at roughly twice its size. Size
+ * is the only thing a caller may change — the letterform, the stop and its
+ * token are the mark.
  */
-export function BrandMark() {
+export function BrandMark({ className }: { className?: string }) {
 	return (
 		<span
 			aria-hidden="true"
-			className="relative size-[22px] shrink-0 rounded-full border-[1.5px] border-text"
+			/*
+			 * NOT a flex container. `flex` made the letter and the period separate
+			 * flex items — no kerning between them, and `innerText` returned the
+			 * letter and the stop on separate lines, because they were laid out as
+			 * siblings rather than as a word.
+			 * The selected system is TYPE; it has to flow as type.
+			 */
+			className={cn(
+				"inline-block w-[22px] shrink-0 text-center font-display text-lg font-bold leading-[22px] tracking-[var(--tracking-wordmark)] text-text",
+				className,
+			)}
 			data-testid="brand-mark"
 		>
-			<span className="absolute inset-[5px] rounded-full bg-text" />
+			A<span className="text-accent-text">.</span>
 		</span>
 	);
 }

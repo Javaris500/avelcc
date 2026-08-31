@@ -51,8 +51,20 @@ function Login() {
 			{/* Inputs and the submit button sit high on the page so a mobile
 			    keyboard cannot cover them. Everything else goes underneath. */}
 			<main className="flex w-full max-w-[352px] flex-col gap-5 pt-[12vh] pb-16">
-				<div className="flex flex-col gap-2">
-					<Wordmark />
+				{/*
+				 * CENTRED, WORDMARK ONLY — no monogram. Operator ruling.
+				 *
+				 * The heading centres with it rather than staying left. A centred mark
+				 * above a left-aligned heading reads as a misalignment, which is the
+				 * defect this block had a moment ago in the other direction. Brand and
+				 * heading share one axis.
+				 *
+				 * The FORM below stays left-aligned deliberately: inputs and their
+				 * labels are read down a common left edge, and centring them would cost
+				 * more than the symmetry is worth.
+				 */}
+				<div className="flex flex-col items-center gap-2.5 pt-2 pb-1 text-center">
+					<Wordmark className="text-2xl" />
 					<h1 className="font-display text-title font-semibold tracking-[-0.01em]">
 						Sign in to the Command Center
 					</h1>
