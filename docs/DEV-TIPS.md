@@ -170,3 +170,51 @@ The single-statement version was safe here only because the table was empty, ver
 **Write the measurement before the feature.** Even a spreadsheet: mission · agents used · time to ship · defects found post-delivery · tokens spent. Ten rows beats any amount of architecture for telling you what to build next.
 
 **Keep a `SURPRISES.md`.** Every time an agent does something you didn't predict, one line. That file becomes your anti-pattern library, your demo material, and eventually your KnowledgeEntry seed data — and unlike the vault, it costs nothing to start today.
+
+---
+
+## 12. A nested route can break typing in files you did not touch
+
+Adding a child under an existing leaf route — `catalog.agents.$agentId.tsx`
+beneath `catalog.agents.tsx` — produced **23 type errors in `src/routes/api/**`**,
+every one of them `'server' does not exist in type ...`. Different directory,
+different owner, nothing about those files changed.
+
+Making a leaf into a PARENT pushes the generated router types past an inference
+limit, and what degrades is the Start `server` augmentation on every API route.
+The failure surfaces nowhere near the change, which is what makes it expensive.
+
+**Measured across three variants:**
+
+```
+HEAD, no new route ..................   0 errors
++ catalog.agents.$agentId.tsx .......  23 errors, all src/routes/api/**
++ the index-route split for it ......  23 errors, same set
++ catalog.agent.$agentId.tsx ........   0 errors     <- sibling, not child
+```
+
+**The fix is a sibling path.** `/catalog/agent/$agentId`, singular, beside the
+roster rather than beneath it. The URL pair reads slightly oddly; that is the
+entire cost.
+
+**It is not the generator.** With the new route file deleted,
+`pnpm generate-routes` reproduces the committed `routeTree.gen.ts` byte for
+byte. The generator is correct — the tree crossing a size threshold is the
+problem.
+
+**Run the generator and `tsc` as separate commands.** Chained on one shell line,
+`tsc` reads a partially written tree and reports a number that measures nothing.
+Two measurements disagreed for exactly this reason before anyone noticed. Same
+class as the Vite compile race in the e2e suite: against this repo, waiting for
+a build and asserting on its output are different steps.
+
+**And a child route needs its parent to render an `<Outlet />`.** Without one,
+`/catalog/agents/<id>` silently renders the ROSTER — no error, no 404, just the
+wrong screen. That is correct file-routing behaviour and it looks exactly like a
+broken link.
+
+Found by avel-fa. Not independently reproduced: doing so means adding and
+removing a route file, which regenerates `routeTree.gen.ts` in a tree three
+sessions are working in, and that file has blocked merges twice. The report
+carries its own error correction and three measured variants, which is a better
+basis than a fourth run taken carelessly.
